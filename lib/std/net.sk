@@ -1,26 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.net — TCP/UDP networking over Winsocskarn.
+// std.net — TCP/UDP networking over Winsock2. A thin facade over a layered set of
+// submodules: net.os (raw ws2_32 + NetError), net.addr (IpV4/SocketAddr), net.socket
+// (the typed Socket handle), net.tcp (TcpStream/TcpListener), net.udp (UdpSocket).
 //
-// This file is a thin convenience facade. The library is layered across a
-// subdirectory module so each piece stays small and focused:
-//
-//   std.net.os     — raw ws2_32 bindings, constants, `NetError`, the wire addr
-//   std.net.addr   — IpV4 / SocketAddr (parsing, formatting, `#derive(Eq)`)
-//   std.net.socket — `Socket`: the typed handle + shared options (timeouts, …)
-//   std.net.tcp    — `TcpStream` / `TcpListener` (+ `send_all` / `recv_exact`)
-//   std.net.udp    — `UdpSocket` (datagrams: `send_to` / `recv_from`)
-//
-// `net::init()` once per process, then either use the helpers here or import a
-// submodule directly for its types:
+// Call net::init() once per process, then use the helpers here or import a submodule
+// for its types:
 //
 //   net::init() catch e { return; };
 //   s := net::connect(addr::socket_addr(addr::localhost(), 8080u16)) catch e { return; };
 //   ignored := s.send_all("ping") catch e {};
 //   net::shutdown();
 //
-// Types live in their submodule (`tcp::TcpStream`, `udp::UdpSocket`, …) because
-// the language doesn't re-export a type across modules; the constructors here
-// hand those types back, so you only need the submodule import for annotations.
+// Types live in their submodule (skarn doesn't re-export types across modules), so
+// you only need the submodule import for annotations.
 
 #import std.net.os as os;
 #import std.net.os.{NetError};

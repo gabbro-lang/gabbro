@@ -1,20 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.strings — a growable StringBuilder and a library of byte-string utilities.
+// std.strings — a growable StringBuilder and byte-string utilities.
 //
-// `StringBuilder` is a dynamic byte buffer backed by an `std.heap.Arena`: it
-// grows by doubling (allocating a fresh, larger block from the arena and copying)
-// so appends are amortised O(1). Because the storage lives in the arena, the
-// built string outlives the builder and is freed when the arena is reset/deinit.
+// StringBuilder is a dynamic byte buffer backed by an Arena: it grows by doubling,
+// so appends are amortised O(1). The storage lives in the arena, so the built string
+// outlives the builder and is freed when the arena is reset/deinit.
 //
-//   a := heap::make();
 //   sb := strings::builder(&a);
 //   sb.append("x = ");
 //   sb.append_i64(-42i64);
-//   sb.append_byte('\n');
 //   io::print(sb.str());
 //
-// `StringBuilder` also implements `std.io.Writer`, so every `std.io` formatting
-// helper (write_u64, write_hex_u64, …) can target a builder through `*Writer`.
+// StringBuilder also implements std.io.Writer, so any std.io helper (write_u64,
+// write_hex_u64, ...) can target it through *Writer.
 
 #import std.heap.{ Arena, alloc_bytes };
 #import std.io.{ Writer, IoError };

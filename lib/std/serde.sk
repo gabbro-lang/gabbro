@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.serde — reflection-driven serialization. Turn any value into JSON with no
-// per-type code: the serializer walks the type's `type_info` for structure and an
-// `Any` for the field values.
+// std.serde — reflection-driven serialization: turn any value into JSON with no
+// per-type code. The serializer walks the type's type_info for structure and an Any
+// for the field values.
 //
-//   Point :: struct { x: i32, y: i32, label: []const u8 }
 //   p := Point.{ 3, 4, "hi" };
 //   js := serde::to_json(Point, p, &arena);   // {"x":3,"y":4,"label":"hi"}
 //
-// Supported today: ints (any width), floats, bool, `[]const u8`/`[]u8` (as JSON
-// strings), and structs (recursively, including nested structs and string fields).
-// Slices of non-byte elements and deserialization are the next steps.
+// Today: ints, floats, bool, []const u8/[]u8 (as JSON strings), and structs
+// (recursively). Slices of non-byte elements and deserialization are next.
 
 #import std.heap.{ Arena };
 #import std.strings.{ StringBuilder, builder, append, append_byte, append_u64, append_i64, append_f64_min, str };

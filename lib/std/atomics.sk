@@ -1,21 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.atomics — atomic operations over shared memory, the foundation for
-// lock-free code and synchronising threads.
-//
-// Every operation is **generic over the value type** and acts on a pointer to
-// the value (`&counter`). Read-modify-write helpers return the PREVIOUS value,
+// std.atomics — atomic operations over shared memory: the foundation for lock-free
+// code and synchronising threads. Every op is generic over the value type and takes
+// a pointer to it (&counter); read-modify-write helpers return the PREVIOUS value,
 // like C/LLVM.
 //
-// **Type safety is enforced at compile time** via `where`-style constraints built
-// on `core::type_info` reflection (skarn's equivalent of C3's `@require`/`@if`): a
-// bitwise op on a float, or any atomic op on a non-scalar type, is a compile error
-// with a clear message — not a confusing backend failure. See the constraints
-// below; they are what `$T: Numeric` etc. refer to.
-//
-// All helpers use **sequentially consistent** ordering — the easy-to-reason-about
-// default. For finer control call the `core::atomic_*` builtins directly with one
-// of the ordering constants below (the hardware requires a compile-time-known
-// ordering, so it can't be a runtime parameter).
+// Type safety is checked at compile time via core::type_info reflection — a bitwise
+// op on a float, or any atomic op on a non-scalar, is a clear compile error, not a
+// backend crash. All helpers use sequentially-consistent ordering; for finer control
+// call the core::atomic_* builtins with one of the ordering constants below (the
+// ordering must be compile-time known).
 
 // Memory orderings (for the `core::atomic_*` builtins)
 pub Relaxed :: 0; // atomicity only, no ordering between threads

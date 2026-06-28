@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.vec — `Vec(T)`, a growable array with an identity all skarn's own.
+// std.vec — Vec(T), a growable array with an identity all skarn's own.
 //
-// skarn containers are REGION-BOUND: a `Vec` carries a borrowed `*Arena` (its
-// region) and grows by bump-allocating a bigger backing block from it. There are
-// no per-element frees and no destructors — when the region is `reset`/`deinit`,
-// every Vec that lived in it is gone at once. That's the whole memory model:
+// skarn containers are region-bound: a Vec carries a borrowed *Arena and grows by
+// bump-allocating a bigger block from it. No per-element frees, no destructors —
+// reset/deinit the region and every Vec in it is gone at once. That's the model:
 //
-//   a := heap::make();
 //   v := vec::make(i32, &a);
 //   v.push(10); v.push(20); v.push(30);
 //   total := 0; for x in v.items() { total += x; }   // 60
 //   a.reset();   // v's storage is reclaimed — don't touch v after this
 //
-// `Vec` is the *managed* form (it remembers its region). For data that must move
-// between regions, `std.vec.un.VecU(T)` is the *unmanaged* twin: it holds no
-// region and you pass the `*Arena` to each growing call. Both share one growth
-// policy and the same slot layout, so `Vec` is just `VecU` + a region.
+// Vec is the managed form (it remembers its region). VecU(T) is the unmanaged twin:
+// no region, you pass the *Arena to each growing call. Vec is just VecU + a region.
 
 #import std.heap.{ Arena, alloc };
 

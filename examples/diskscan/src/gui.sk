@@ -550,7 +550,7 @@ paint_scanning :: fn(s: *State, mdc: usize) {
     px := bx + ((s.spin * 12i32) % (pw - 50i32));
     knob: RECT = .{ px, by, px + 50i32, by + 6i32 };
     igk := SetDCBrushColor(mdc, rgb(86u32, 154u32, 220u32));
-    igskarn := FillRect(mdc, &knob, s.dcbrush);
+    ig_fill := FillRect(mdc, &knob, s.dcbrush);
 }
 
 // (Re)render the treemap into its own cached bitmap, but only when it's dirty or

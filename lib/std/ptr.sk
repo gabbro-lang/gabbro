@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // std.ptr — pointer/address conversions and alignment arithmetic.
 //
-// Skarn has no pointer-arithmetic operators (no `p + 1`); address math goes
-// through `usize` and the `unsafe` cast/`ptr_from_int` intrinsics. This module
-// names that dance so call sites read as `ptr.add_bytes`/`ptr.is_aligned`
-// rather than ad hoc `unsafe (p as usize)` scattered through the codebase.
-//
-// Byte-stride arithmetic (advancing a `*T` by N elements) needs the size of
-// `T` in bytes, which the caller must supply — `add_bytes`/`sub_bytes` work
-// on raw addresses so any element size you already know (a `struct` layout
-// you control, a fixed record format, …) plugs in directly.
+// Skarn has no pointer-arithmetic operators (no `p + 1`); address math goes through
+// usize and the unsafe cast / ptr_from_int intrinsics. This module names that dance
+// so call sites read as ptr.add_bytes / ptr.is_aligned instead of ad hoc unsafe casts.
+// Byte-stride ops (add_bytes/sub_bytes) work on raw addresses, so you pass the element
+// size you already know.
 
 // The integer address a pointer refers to.
 pub to_addr :: fn($T: type, p: *T) -> usize {

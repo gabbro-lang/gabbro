@@ -195,7 +195,7 @@ OS-touching modules each need a Linux backing:
 | `std.process` | `GetCommandLine`, `ExitProcess` | `__libc_start_main` argv, `exit` |
 | `std.fs` | Win32 file API | `open`/`read`/`write`/`close`/`stat` |
 | `std.thread` | `CreateThread` | `pthread_create`/`pthread_join` (`-lpthread`) |
-| `std.net` | Winsocskarn (`ws2_32`) | BSD sockets (`socket`/`bind`/…, no `WSAStartup`) |
+| `std.net` | Winsock2 (`ws2_32`) | BSD sockets (`socket`/`bind`/…, no `WSAStartup`) |
 
 The pattern: split each into a thin **os shim** the way `std.net` already layers
 `std.net.os`. Select the shim per target. Two mechanisms, in preference order:

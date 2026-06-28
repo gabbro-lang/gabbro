@@ -1,28 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.fmt — formatting on top of std.io.Writer: padding/alignment,
-// width-justified numbers, and joining.
+// std.fmt — formatting on top of std.io.Writer: padding/alignment, width-justified
+// numbers, joining. Skarn has no varargs or format strings, so you compose *Writer
+// calls directly and reach for these helpers for the fiddly parts (padding to a
+// column, right-justifying a number, joining with a separator). Width-aware padding
+// measures the value with a NullWriter first, then pads — allocation-free.
 //
-// Skarn has no variadic functions or format-string placeholders, so "printf-style"
-// output is built the Skarn way: compose `*Writer` calls directly, and reach for
-// these helpers for the parts that are fiddly to hand-roll — padding a value
-// out to a column width, right-justifying a number, or joining a list with a
-// separator.
-//
-// Width-aware number padding measures the rendered value first with a
-// NullWriter (see std.io), then pads and writes — allocation-free, and exactly
-// the pattern NullWriter exists for.
-//
-// NOTE: an earlier draft of this module also shipped a `Display` interface
-// (`display(self: *Self, w: *Writer)`) so user structs could render themselves
-// through any *Writer, plus `join_display`/`display_line` built on it. That
-// pattern is cut for now — it hits a real compiler defect: an interface method
-// reached through dynamic dispatch that itself takes another interface pointer
-// and calls a method on it (e.g. `*Display.display` calling `w.write_all`)
-// either fails LLVM verification ("Invalid bitcast ... to { ptr, ptr }") or
-// segfaults the compiler outright. Confirmed with a minimal repro using two
-// freshly-defined interfaces — nothing std.io-specific. Until that's fixed,
-// implement `Writer` directly on your type instead (it only receives `[]const
-// u8`, not another interface pointer) and write through it the ordinary way.
+// No Display interface for now: dynamic dispatch to an interface method that itself
+// takes another interface pointer trips a compiler bug (bad bitcast / segfault), so
+// implement Writer directly on your type instead.
 
 #import std.io;
 

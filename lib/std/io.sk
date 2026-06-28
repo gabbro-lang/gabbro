@@ -1,44 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // std.io — synchronous, allocation-free I/O for Skarn.
 //
-// Interfaces:
-//   Writer  — anything bytes can be written to
-//   Reader  — anything bytes can be read from
-//
-// Concrete writers:
-//   Stdout     — OS standard output stream
-//   Stderr     — OS standard error stream
-//   FixedBuf   — 256-byte stack-allocated scratch buffer (implements Writer)
-//   NullWriter — discards output, counts bytes (useful for measuring output size)
-//
-// Numeric formatting (allocation-free, bounded recursion):
-//   write_u64           — unsigned decimal
-//   write_i64           — signed decimal (handles all values including i64 min)
-//   write_hex_byte      — single byte as 2 lowercase hex digits
-//   write_hex_u64       — compact lowercase hex (no leading zeros)
-//   write_hex_u64_full  — exactly 16 lowercase hex digits
-//   write_bool          — "true" or "false"
-//   write_char          — single byte
-//   write_repeat        — write the same byte N times (padding, separators)
-//
-// Stdout convenience:
-//   print, println, print_u64, print_i64, print_hex_u64, print_bool
-//
-// Stderr convenience:
-//   eprint, eprintln, eprint_u64, eprint_i64
-//
-// FixedBuf operations:
-//   fixed_buf()          — create a new empty buffer
-//   buf_len              — bytes written so far
-//   buf_remaining        — bytes before the buffer is full
-//   buf_reset            — clear and start over
-//   buf_flush_stdout     — write buffer contents to stdout
-//   buf_flush_stderr     — write buffer contents to stderr
-//   buf_flush            — write buffer contents to any *Writer
-//
-// NullWriter operations:
-//   null_writer()        — create a new null sink
-//   null_reset           — reset the byte counter
+// Writer and Reader are the interfaces. Concrete writers: Stdout, Stderr, FixedBuf
+// (a 256-byte stack scratch buffer), and NullWriter (discards but counts bytes).
+// There's allocation-free number formatting (write_u64/i64, the write_hex_* family,
+// write_bool/char/repeat) and print/println-style helpers for stdout and stderr.
 
 // Error set
 

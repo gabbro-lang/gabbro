@@ -2682,14 +2682,14 @@ const Checker = struct {
                     return error.SemanticFailed;
                 }
                 break :blk switch (value_ty) {
-                    .fallible => |fallible| blskarn: {
+                    .fallible => |fallible| fblk: {
                         if (!try self.compatible(fallible.err.*, self.current_error_ty.?)) {
                             self.emitError(expr.span, "`?` error type `{s}` is not compatible with function error type `{s}`", .{
                                 self.formatTy(fallible.err.*), self.formatTy(self.current_error_ty.?),
                             });
                             return error.SemanticFailed;
                         }
-                        break :blskarn fallible.ok.*;
+                        break :fblk fallible.ok.*;
                     },
                     else => {
                         self.emitError(try_expr.value.span, "`?` requires a fallible expression, found `{s}`", .{self.formatTy(value_ty)});

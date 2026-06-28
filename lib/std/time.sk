@@ -4,18 +4,13 @@
 //
 //   secs := time::unix_seconds();          // seconds since 1970-01-01 UTC
 //   dt   := time::utc(secs);               // → DateTime { year, month, day, ... }
-//
 //   start := time::now();                  // monotonic Instant
 //   time::sleep_ms(16u32);
 //   ns := time::since_nanos(start);        // elapsed, never goes backwards
 //
-// The OS clocks come through the platform runtime's nanosecond seam
-// (windows.sk → kernel32; linux.sk → clock_gettime/nanosleep):
-//   os_wall_nanos()       -> i64   nanoseconds since 1970-01-01 UTC
-//   os_monotonic_nanos()  -> i64   monotonic nanoseconds (arbitrary origin)
-//   os_sleep_nanos(ns)            sleep at least ns nanoseconds
-// The UTC breakdown is pure arithmetic (Howard Hinnant's civil-from-days),
-// exact for any time at or after the epoch.
+// OS clocks come through the runtime's nanosecond seam (os_wall_nanos,
+// os_monotonic_nanos, os_sleep_nanos; windows.sk → kernel32, linux.sk →
+// clock_gettime/nanosleep). The UTC breakdown is pure arithmetic (civil-from-days).
 
 // Wall clock (Unix epoch)
 

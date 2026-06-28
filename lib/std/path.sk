@@ -1,20 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // std.path — filesystem path manipulation (pure string ops, no I/O).
 //
-// Paths are plain `[]const u8` byte slices. Both `/` and `\` are treated as
-// separators (so paths from any source parse correctly), while `join` writes
-// the platform separator `SEP` (`\` on Windows). The query functions
-// (`basename`, `dirname`, `extension`, `stem`) allocate nothing — they return
-// sub-slices of their input. The builders (`join`, `with_extension`) take an
-// `*Arena`.
+// Paths are plain []const u8. Both / and \ count as separators on input, while join
+// writes the platform SEP (\ on Windows). The query functions (basename, dirname,
+// extension, stem) allocate nothing — they return sub-slices; the builders (join,
+// with_extension) take an *Arena.
 //
 //   base := path::basename("src\\std\\io.sk");     // "io.sk"
-//   dir  := path::dirname ("src\\std\\io.sk");      // "src\std"
 //   ext  := path::extension("io.sk");               // ".sk"  (with the dot)
-//   stem := path::stem("io.sk");                    // "io"
 //   full := path::join(&a, "src\\std", "io.sk");    // "src\std\io.sk"
 //
-// Invariant: `basename(p)` == `stem(p)` ++ `extension(p)`.
+// Invariant: basename(p) == stem(p) ++ extension(p).
 
 #import std.heap.{ Arena };
 #import std.strings as strings;

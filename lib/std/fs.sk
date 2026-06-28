@@ -1,24 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.fs — minimal synchronous file I/O for Skarn. Cross-platform: every OS call
-// goes through the platform runtime's file seam (windows.sk → kernel32;
-// linux.sk → openat/read/write/close/lseek/getdents64), so this module itself
-// is OS-agnostic.
+// std.fs — minimal synchronous file I/O for Skarn. OS calls go through the platform
+// runtime (windows.sk → kernel32; linux.sk → openat/read/write/..), so this file is
+// OS-agnostic. File implements std.io.Reader and Writer; there's open/create/append,
+// exists/is_dir/delete, read_all, and DirIter for directory walking, all sharing FsError.
 //
-// Provides:
-//   File     — an open file handle; implements std.io.Reader and std.io.Writer
-//   open     — open an existing file for reading
-//   create   — create (or truncate) a file for writing
-//   append   — open a file for appending, creating it if it doesn't exist
-//   exists   — check whether a path refers to an existing file or directory
-//   is_dir   — check whether a path is a directory
-//   delete   — remove a file
-//   read_all — read a whole file into an arena
-//   DirIter  — directory iteration (open_dir / dir_next / dir_is_dir / ...)
-//   FsError  — error set shared by all std.fs operations
-//
-// Paths are plain `[]const u8` byte slices; each is copied into a small stack
-// buffer and NUL-terminated before being handed to the OS. Paths that don't fit
-// (including the terminator) fail with `path_too_long`.
+// Paths are plain []const u8, copied into a small stack buffer and NUL-terminated for
+// the OS; anything too long fails with path_too_long.
 //
 //   f := fs.create("out.txt") catch err { return 1; };
 //   w: *Writer = &f;

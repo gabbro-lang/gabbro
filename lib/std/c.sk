@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.c — C ABI primitive types, for clearer `#extern` FFI declarations.
+// std.c — C ABI primitive types, for clearer #extern FFI declarations.
 //
-// These are transparent aliases (interchangeable with the underlying Skarn type),
-// sized for the C ABI on 64-bit Windows (LLP64: `long` is 32-bit, `size_t` is
-// 64-bit). Using them documents intent and eases future cross-platform sizing.
-//
-//   #import std.c.{ c_int, c_char, c_size_t };
+// Transparent aliases (interchangeable with the underlying skarn type), sized for
+// the C ABI on 64-bit Windows (LLP64: long is 32-bit, size_t is 64-bit). They
+// document intent and ease future cross-platform sizing.
 //
 //   #extern("msvcrt", "strlen")
 //   strlen :: fn(s: [*]const c_char) -> c_size_t;
-//
-//   #extern("msvcrt", "abs")
-//   abs :: fn(x: c_int) -> c_int;
 
 // integer types
 

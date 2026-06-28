@@ -1,36 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.build — Skarn's integrated build system.
-//
-// A project's `build.sk` defines `build :: fn(b: Build)`. `skarn build` runs it
-// inside the comptime VM; each builder call invokes a `__build_*` compiler
-// intrinsic that records into the driver's build plan. After `build` returns,
-// the driver compiles + links each declared artifact (via the driver and the
-// skarnld linker).
-//
-//   #import std.build.{ Build, Artifact };
+// std.build — Skarn's build system. A project's build.sk defines `build :: fn(b: Build)`.
+// `skarn build` runs it in the comptime VM; each builder call records into the build
+// plan via a __build_* intrinsic, then the driver compiles + links each artifact with
+// skarnld.
 //
 //   build :: fn(b: Build) {
 //       b.workspace("my-game");
-//       b.out_root("bin");
-//
 //       game := b.executable("game", "src/main.sk");
 //       game.release_fast();
-//       game.windowed();                 // GUI app: no console window
 //       game.link("raylib");
-//       game.lib_path("vendor/raylib/lib");
-//       game.stack_size(8 * 1024 * 1024);
-//       game.version("1.0.0");
 //       game.install();
-//
-//       if b.option("trace") { game.define("TRACE", "1"); }
-//
 //       b.run_step("run", game);
 //       b.default(game);
-//       b.summary();
 //   }
 //
-// Handles (`Build`, `Artifact`) are tiny value structs carrying an id; all build
-// state lives in the compiler. See docs/10_build_system.md for the full design.
+// Build/Artifact are tiny id-carrying handles; the real state lives in the compiler.
+// See docs/10_build_system.md for the full design.
 
 // Handles
 

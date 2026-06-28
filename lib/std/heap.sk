@@ -1,40 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.heap — runtime dynamic memory for Skarn.
+// std.heap — dynamic memory for Skarn: a bump arena. Allocation is a pointer bump
+// in the current region, so the OS only gets hit once per chunk (a VirtualAlloc
+// syscall), never per alloc. reset/restore reuse the memory, so steady state is
+// syscall-free.
 //
-// A bump arena: allocation is a pointer bump inside the current region.
+// Backings: make() grows in 64 KiB chunks on demand; reserve(max) takes `max`
+// bytes of address space up front and commits lazily; fixed(buf) runs over a
+// caller []u8 and can't grow. alloc/alloc_bytes/alloc_one/dupe allocate (try_*
+// return ! MemError, the rest abort on exhaustion). reset() rewinds, mark()/
+// restore() handle nested scratch, deinit() hands it all back.
 //
-// Why this is fast: VirtualAlloc is a syscall (~µs), but it runs at most once
-// per *chunk* (or page, for a reserved arena) — never per allocation. A 16-byte
-// alloc is a few instructions and zero syscalls. `reset`/`restore` reuse the
-// memory, so steady-state allocation is entirely syscall-free.
-//
-// Backings:
-//   make()        growable — reserves 64 KiB chunks from the OS on demand
-//   reserve(max)  reserves `max` bytes of address space up front (cheap — no
-//                 physical memory) and commits pages lazily as the bump pointer
-//                 advances. One contiguous region; allocations never fail until
-//                 `max` is exhausted. Ideal for building one large output.
-//   fixed(buf)    over a caller []u8 (stack/static) — zero syscalls, cannot grow
-//
-// Allocation:
-//   alloc_bytes / try_alloc_bytes   raw `[]u8`
-//   alloc / try_alloc               typed `[]T`
-//   alloc_one(T)                    a single `*T`
-//   dupe(T, src)                    a copy of `src` owned by the arena
-// (`try_*` return `! MemError`; the others abort on exhaustion.)
-//
-// Reuse:
-//   reset()              rewind to empty, keep memory for reuse
-//   mark() / restore(m)  save a watermark and rewind to it (nested scratch)
-//   deinit()             return everything to the OS
-//
-// Region passing: hand an `*Arena` to a callee so it allocates into *your*
-// region; the data may then outlive the callee and be returned to you.
-//
-//   build :: fn(into: *Arena, n: usize) -> []u8 {
-//       buf := into.alloc_bytes(n);     // belongs to the caller's region
-//       return buf;                     // safe — `into` outlives us
-//   }
+// Pass an *Arena to a callee and it allocates into your region, so the result can
+// outlive the call:
+//   build :: fn(into: *Arena, n: usize) -> []u8 { return into.alloc_bytes(n); }
 
 #import std.ptr.{ align_up };
 

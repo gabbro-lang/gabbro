@@ -345,7 +345,7 @@ os_proc_release :: fn(token: i64) {
 }
 
 // OS sockets (backs std.net)
-// Winsocskarn passthrough — std.net already passes Windows level/option constants.
+// Winsock2 passthrough — std.net already passes Windows level/option constants.
 
 #extern("ws2_32", "WSAStartup") ws_startup :: fn(version: u16, data: *u8) -> i32;
 #extern("ws2_32", "WSACleanup") ws_cleanup :: fn() -> i32;

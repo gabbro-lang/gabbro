@@ -2,19 +2,15 @@ const std = @import("std");
 const ast = @import("ast.zig");
 const Span = @import("lexer/span.zig").Span;
 
-// Macro expansion — Phase 2, slice 2/3 (template macros).
+// Macro expansion — Phase 2, template macros. Runs once, before sema. A
+// `name :: macro(params) { return #quote { ... }; }` is a compile-time AST template.
+// At each `#insert name(args);` we substitute the arg ASTs into the template's $param
+// holes, rename the template's locals for hygiene, and rewrite the #insert to a literal
+// #quote { <result> } that the front-end re-checks. Macro decls are dropped afterward,
+// never lowered.
 //
-// Runs once, before sema. A `name :: macro(params) { return #quote { ... }; }`
-// declaration is a compile-time AST template. At each `#insert name(args);`
-// site we substitute the call's argument ASTs into the template's `$param`
-// splice holes, rename the template's own locals to fresh names (hygiene), and
-// rewrite the `#insert` operand to a literal `#quote { <result> }` — which the
-// front-end (slice 1) already splices and re-checks. Macro declarations are
-// dropped from the module afterwards; they are never lowered.
-//
-// This is intentionally a *template* engine: a macro body must be a single
-// `return #quote { ... };`. Macros that RUN code (loops/logic) to assemble the
-// AST are a later slice (they need the VM + first-class ast.* values).
+// It's deliberately a template engine: a macro body must be one `return #quote {...}`.
+// Macros that RUN code (loops/logic) to build the AST are a later slice.
 
 pub const ExpandError = error{ SemanticFailed, OutOfMemory };
 

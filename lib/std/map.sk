@@ -1,28 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.map — hash maps with a skarn flavour.
+// std.map — hash maps with a skarn flavour. Both are open-addressed (linear probing)
+// and region-bound like the rest of skarn's containers: the tables live in an Arena,
+// so there are no per-entry frees — reset/deinit the region to reclaim the whole map.
 //
-// Two maps, both open-addressed (linear probing) and REGION-BOUND like the rest
-// of skarn's containers — the backing tables live in an `Arena`, so there are no
-// per-entry frees; a `reset`/`deinit` of the region reclaims the whole map.
+//   AutoHashMap(K, V)  keys any value type, hashing the key's raw bytes (no Hash/Eq,
+//                      no derive) — great for ints, enums, points, small POD structs.
+//   StrMap(V)          keys are []const u8, hashed/compared by CONTENTS, and copied
+//                      into the region so the map owns them.
 //
-//   AutoHashMap(K, V)  — keys ANY value type. No `Hash`/`Eq` impl, no derive,
-//                        no context object: the map hashes the key's raw bytes
-//                        and compares them byte-for-byte. Perfect for integers,
-//                        enums, points, small POD structs.
-//
-//   StrMap(V)          — keys are `[]const u8`. Hashes and compares the string
-//                        CONTENTS (not the slice header), and copies each key
-//                        into the region so it owns its keys.
-//
-//   a := heap::make();
 //   m := map::auto(i32, i32, &a);
-//   m.put(7, 100); m.put(7, 101);          // overwrites → one entry
-//   if m.get(7) |v| { ... }                // v == 101
+//   m.put(7, 100); m.put(7, 101);   // overwrites → one entry; m.get(7) is 101
 //
-// Byte-hashing caveat: `AutoHashMap` is for keys whose *value identity is their
-// bytes* — scalars, enums, packed structs, fixed arrays. Don't use it for keys
-// containing pointers/slices (e.g. a string) or structs with uninitialised
-// padding; reach for `StrMap` or a hand-rolled map there.
+// Caveat: AutoHashMap only suits keys whose identity IS their bytes. Don't use it for
+// keys holding pointers/slices (e.g. strings) or structs with padding — use StrMap.
 
 #import std.heap.{ Arena, alloc, dupe };
 

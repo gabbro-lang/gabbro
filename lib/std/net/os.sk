@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.net.os — the raw OS networking layer (Winsocskarn / ws2_32.dll).
+// std.net.os — the raw OS networking layer (Winsock2 / ws2_32.dll).
 //
-// This is the foundation the rest of std.net is built on: the raw `#extern`
-// bindings, the protocol constants, the `sockaddr_in` wire struct, the shared
-// `NetError`, and the conversions between `std.net.addr` types and the wire
-// format. Nothing here is "friendly" — `socket.sk`, `tcp.sk`, and `udp.sk` wrap
-// it into typed handles. Reach for this layer directly only when you need an
-// option or call the higher layers don't expose.
-//
-// The skarn name of each binding is decoupled from the C symbol (the `#extern`
-// 2nd arg is the real link name), so every raw call keeps a `sys_` prefix and
-// the idiomatic names stay free for the wrappers above.
+// The foundation the rest of std.net sits on: raw #extern bindings, protocol
+// constants, the sockaddr_in wire struct, the shared NetError, and the conversions
+// between std.net.addr types and the wire format. socket.sk/tcp.sk/udp.sk wrap it
+// into typed handles — reach for this layer directly only for options the higher
+// layers don't expose. Each binding's skarn name is decoupled from the C symbol (the
+// #extern 2nd arg is the real link name), so raw calls keep a sys_ prefix.
 
 #import std.net.addr as addr;
 
 // OS socket layer
-// Thin wrappers over the platform runtime's socket seam (windows.sk → Winsocskarn;
+// Thin wrappers over the platform runtime's socket seam (windows.sk → Winsock2;
 // linux.sk → socket syscalls, translating these Windows option constants). The
 // `sys_` names are kept so the wrappers above are unchanged.
 pub sys_wsa_startup  :: fn(version: u16, data: *u8) -> i32 { ignored := version; ignored2 := data; return os_net_init(); }

@@ -1,23 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.process — process info, environment variables, and child-process
-// spawning for Skarn. Cross-platform: every OS call goes through the platform
-// runtime's process seam (windows.sk → kernel32; linux.sk → getpid + /proc +
-// fork/execve/wait4/kill), so this module is OS-agnostic.
+// std.process — process info, env vars, and child-process spawning for Skarn. OS
+// calls go through the platform runtime (windows.sk → kernel32; linux.sk → getpid +
+// /proc + fork/execve/wait4/kill), so this file is OS-agnostic. It has current_pid,
+// command_line, get_env/set_env/unset_env, and Child + spawn/wait/try_wait/kill/
+// release, all sharing ProcessError. (exit/abort/@panic live in the runtime — no
+// import needed.)
 //
-// Provides:
-//   current_pid                — the calling process's PID
-//   command_line               — the OS command line as a byte slice
-//   get_env / set_env / unset_env — environment-variable access
-//   Child / spawn / wait / try_wait / kill / release — child-process management
-//   ProcessError               — error set shared by all std.process operations
-//
-// `exit`, `abort`, and `@panic` live in the always-available Skarn runtime — you
-// don't need to import this module to use them.
-//
-// PLATFORM NOTES (Linux): `command_line`/`get_env` read /proc/self/{cmdline,
-// environ}; `set_env`/`unset_env` mutate a process-wide overlay (consulted first
-// by `get_env`); `spawn` runs the command via `/bin/sh -c` and passes the child
-// the inherited environment with that overlay applied.
+// Linux: command_line/get_env read /proc/self/{cmdline,environ}; set_env/unset_env
+// mutate a process-wide overlay that get_env consults first and spawn passes to the
+// child (run via /bin/sh -c).
 
 #import std.io.{ IoError };
 

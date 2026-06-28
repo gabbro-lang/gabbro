@@ -3,14 +3,12 @@
 //
 //   d := crypto::sha256("abc");                   // → Digest (32 bytes)
 //   h := crypto::to_hex(&a, d);                   // "ba7816bf8f01cfea…"
-//   crypto::sha256_into("abc", buf[0..32usize]);  // or write into your own buffer
 //   c := crypto::crc32("123456789");              // 0xcbf43926
 //   k := crypto::fnv1a_64("key");                 // fast non-crypto hash for tables
 //
-// SHA-256 follows FIPS 180-4 and matches the standard test vectors. The hot
-// arithmetic uses the wrapping operators (`+%`, `*%`, `-%`) since every add is
-// mod 2^32 / 2^64. It's a from-scratch software implementation — fine for
-// integrity/checksums and content addressing, not audited for adversarial use.
+// SHA-256 follows FIPS 180-4 and matches the standard test vectors (wrapping +%/*%,
+// since every add is mod 2^32/2^64). From-scratch software — fine for integrity and
+// content addressing, not audited for adversarial use.
 
 #import std.heap.{ Arena };
 #import std.strings as strings;

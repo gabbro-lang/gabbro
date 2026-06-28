@@ -1,22 +1,16 @@
-// Compiler-provided `ast.*` type surface for metaprogramming (Phase 2,
-// generative Flavor A). These are ordinary Skarn types — a faithful subset of the
-// compiler's own AST in `src/ast.zig` — so user code can construct them (via
-// `#quote`), `match` on them, and return them from a comptime function. The
-// materializer (`materializeExpr`/`materializeStmt`) and reifier (`Reifier`) in
-// `ir.zig` map between these aggregates and real `ast.zig` nodes.
+// Compiler-provided ast.* types for metaprogramming (Phase 2). Ordinary Skarn types
+// mirroring a subset of the compiler's own AST (src/ast.zig), so user code can build
+// them via #quote, match on them, and return them from comptime. The materializer +
+// Reifier in ir.zig map between these and real ast.zig nodes.
 //
-// Skarn has a flat type namespace (no `ast.Block` qualified form yet), so these use
-// an `Ast` prefix. Identity fields (NodeId/Span) are intentionally omitted — the
-// compiler stamps those when reifying at the splice site. Recursive references
-// inside expression payloads use `*AstExpr` / `*AstType` to keep types finite.
+// Flat type namespace, so these use an Ast prefix. Identity fields (NodeId/Span) are
+// omitted — the compiler stamps those when reifying. Recursive payloads use *AstExpr
+// / *AstType to stay finite. Optional sub-expression = the `nothing` AstExpr; optional
+// string = "".
 //
-// Conventions: an optional sub-expression (slice bounds) uses the `nothing`
-// AstExpr as "absent"; an optional string (binding names) uses "" as "absent".
-//
-// IMPORTANT: variant ORDER is not load-bearing — the reifier looks variant names
-// up by tag from the lowered module, so this can be reordered/grown freely.
-// Struct FIELD order IS mirrored by hardcoded offsets in the reifier; keep
-// fields in the order the reifier expects (documented there).
+// IMPORTANT: variant order is NOT load-bearing (the reifier looks variants up by
+// name), but struct FIELD order IS — the reifier has hardcoded offsets, so keep fields
+// in the order it expects.
 pub const source =
     \\AstBinOp :: enum {
     \\    add, sub, mul, div, rem,

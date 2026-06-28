@@ -198,7 +198,7 @@ g.join_all();                    // wait for all
 > coordinate with `std.atomics`. See `tests/fixtures/stdlib/thread_app.sk`.
 
 ## `std.net` — networking
-TCP and UDP over Winsocskarn, layered across a subdirectory module so each piece stays
+TCP and UDP over Winsock2, layered across a subdirectory module so each piece stays
 small and focused. From the bottom up:
 
 | Module | What it gives you |

@@ -1,20 +1,7 @@
-/// LLVM codegen backend — entry point.
-///
-/// Quick start (Windows, no libc):
-///
-///   var be = LlvmBackend.init(allocator, "my_module");
-///   defer be.deinit();
-///   try be.lower(ir_module);
-///   try be.emitObject("output.o", 2);          // → .o file
-///   try be.linkWindows(.{                       // → .exe
-///       .llvm_bin  = "Y:/SDK/llvm/bin",
-///       .obj_files = &.{"output.o"},
-///       .output    = "output.exe",
-///   });
-///
-/// The Windows entry point (mainCRTStartup) is **automatically generated**
-/// when the module contains a function marked as entry (`main` or `#entry`).
-/// It calls the Skarn main, then ExitProcess — no separate skarnrt file needed.
+/// LLVM codegen backend. Usage: init a LlvmBackend, lower(ir_module), then
+/// emitObject(...) or linkWindows(...). The Windows entry point (mainCRTStartup) is
+/// generated automatically when the module has an entry fn (main or #entry) — it
+/// calls Skarn main, then ExitProcess.
 const std = @import("std");
 const ir = @import("../ir.zig");
 const ctx_mod = @import("llvm/context.zig");

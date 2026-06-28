@@ -1,20 +1,12 @@
 # Metaprogramming: Macros, Quote/Insert, and Code Generation
 
-> Status: **IMPLEMENTED.** Template macros substitute splices through *every*
-> statement and expression form (`match`, `for`, compound literals, `defer`,
-> `zone`, `unsafe`, type position, …), are hygienic, and support `#for`
-> unrolling and `#parse`. For computed (loop/logic-driven) code generation, use
-> the programmatic path (`#insert #run gen()` + first-class `ast.*` values, and
-> `#compiler` hooks) described at the end and in
-> [09](09_comptime_vm_roadmap.md) / [12](12_reflection_and_constraints.md).
+Two ways to generate code at compile time.
 
-Skarn has two complementary ways to generate code at compile time:
-
-1. **Template macros** — a syntactic, hygienic substitution engine. Best for
-   "stamp out this shape with these holes filled in." Covered first.
-2. **Programmatic generation** — run real Skarn in the comptime VM, build an AST as a
-   first-class value, and splice it. Best when the code's *structure* depends on
-   logic (loops over fields, conditionals on types). Covered last.
+Template macros are a syntactic, hygienic substitution engine — stamp out a shape
+with the holes filled in. Programmatic generation runs real Skarn in the comptime
+VM, builds an AST as a first-class value, and splices it; reach for it when the
+code's structure depends on logic (loops over fields, branching on types). Macros
+first, the programmatic path at the end.
 
 ## 1. Quote and insert
 

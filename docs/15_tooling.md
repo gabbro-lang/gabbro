@@ -1,11 +1,10 @@
 # Tooling & the language server — design
 
-> Status: **`skarn lsp` is implemented** (diagnostics, completion, hover,
-> go-to-definition, document symbols) — see §8 to wire it into your editor. The
-> `#test` comptime test lane is implemented ([docs/17](17_testing.md)); the
-> formatter, doc generator, runtime test lane, and REPL are still design. A tree-sitter
-> grammar (`tree-sitter-skarn/`) and a Zed extension (`zed-skarn/`) give syntactic
-> highlighting. This document designs the developer surface around one principle.
+`skarn lsp` works: diagnostics, completion, hover, go-to-definition, and document
+symbols — §8 wires it into your editor. The `#test` comptime lane works too
+([docs/17](17_testing.md)). A tree-sitter grammar (`tree-sitter-skarn/`) and a Zed
+extension (`zed-skarn/`) handle highlighting. A formatter, doc generator, runtime
+test lane, and REPL aren't built yet.
 
 ## 0. The principle: the compiler is a library
 

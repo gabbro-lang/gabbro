@@ -1,38 +1,23 @@
-# Skarn Reflection, `Any`, and Constraints — Design
+# Reflection, Any, and constraints
 
-> Status: **Phase 1 IMPLEMENTED** (matchable `TypeInfo` + comptime `type_info`).
-> **Phase 2 IMPLEMENTED (two-pass resolution)**: built-in composable constraints
-> (`$T: Numeric`/`Int`/`Float`/`Signed`/`Unsigned`/`Struct`/`Enum`/`Ptr`/`Bool`),
-> **user-defined `constraint Name($T) { … }` declarations** (reusable named
-> predicates, enforced at `$T: Name`), **user-defined `where { … }` blocks** that
-> inspect `type_info(T)` and may `reject("msg")`, **and output type params
-> `-> $Acc`** computed by the `where`.
-> The predicate runs *during generic resolution* on a resolution `ComptimeVm`
-> (tolerant pass-1 → build VM → strict pass-2): rejections are resolution errors
-> reported at the call site, *before* the body is checked (`§6.2`/`§6.3`).
-> Constraints compose via `require(T, Other)`. Still design: binding *rewrite*
-> (`T = u32`, a poor fit — Skarn has no implicit arg coercion) and **overload
-> fallback** (moot until Skarn has same-name overloading).
-> **Phase 3 + 4a/4b IMPLEMENTED**: `typeid_of(T)` (a stable runtime type identity
-> — a content hash, comparable at runtime, stable across compilation units);
-> `type_name(T)`/`sizeof(T)` fold at lowering so they're real **runtime** values;
-> and **`Any`** — a type-erased value (`any(x)` wraps any value; `any_as(v, T) ->
-> ?T` is a safe downcast, `any_is`, `any_id`, `any_name`). Skarn's twist on the
-> "baked type table": the type's metadata (id + name) **travels inline with the
-> value**, baked as a tree-shaken string literal — no central table to manage, and
-> reflection you don't use costs nothing. **Full navigation works**: a generic
-> walker recurses through struct fields (`any_field_at`/`_name`/`_count`), **slice
-> elements** (`any_elem`), and **pointers** (`any_deref`) — i.e. reflection-driven
-> **serialization** with no per-type code (all generated per type from static field
-> access). **`info_of(id)`** (`type_name_of`/`type_size_of` from a bare typeid) and
-> **auto-wrapping** a value into an `Any` parameter (compiler inserts `any(x)`)
-> work too. The reflection feature set is essentially complete for a first release.
-> Phases 5–6 are design. Sister to
-> [`09_comptime_vm_roadmap.md`](09_comptime_vm_roadmap.md). Describes runtime type
-> information, the `Any` type, reflection-driven serialization, and resolve-time
-> generic constraints (`where`). The goal is to match Jai's metaprogramming reach
-> and **exceed** it — not by copying its directives, but by deriving everything
-> from a few orthogonal, type-safe primitives.
+
+Reflection in Skarn is comptime and runtime, and it threads through generics.
+
+At comptime, `type_info(T)` is a matchable value — you `match` on a type's structure
+(struct fields, enum variants, scalar kind). Constraints build on it: built-in
+predicates (`$T: Numeric`/`Int`/`Float`/`Struct`/`Enum`/`Ptr`/…), named
+`constraint Name($T) { … }` declarations, and `where { … }` blocks that inspect
+`type_info(T)` and can `reject("msg")`. The predicate runs during generic resolution,
+so a bad type fails at the call site before the body is checked. A `where` can also
+compute an output type param (`-> $Acc`).
+
+At runtime, `typeid_of(T)` is a stable type identity — a content hash, comparable
+across compilation units. `type_name(T)` and `sizeof(T)` fold to real runtime values.
+`Any` is a type-erased value: `any(x)` wraps it, `any_as(v, T) -> ?T` is a safe
+downcast. The metadata travels inline with the value, baked as a tree-shaken string
+literal, so reflection you don't use costs nothing. A generic walker recurses through
+struct fields, slice elements, and pointers — enough for reflection-driven
+serialization with no per-type code.
 
 ## Design thesis
 
@@ -437,26 +422,3 @@ The unifying idea: **reflection is a value, constraints are predicates over it,
 `Any` is reflection plus a pointer, iteration is an interface, and code generation
 is a `#for` over reflected fields.** Five composable pieces instead of a dozen
 special forms — all type-checked, all phase-unified, all sandboxable.
-
-## 8. Implementation phasing
-
-Each phase is independently useful and testable.
-
-1. **`TypeInfo` as a tagged enum + comptime `type_info(T)`.** Reuse the `ast.*`
-   prelude-injection machinery. Port the existing ad-hoc reflection to `match`.
-   (Pure comptime; no runtime cost yet.)
-2. **`constraint` + `where`.** Resolve-time predicate evaluation on the VM (it can
-   already run comptime code over `type_info`); reject-with-fallback in overload
-   resolution; output type params.
-3. **`typeid` + the tree-shaken type table.** Reachability pass over runtime roots;
-   emit `TypeInfo` constants into the data segment (now that aggregate `#run`
-   constants are needed — this also motivates finishing aggregate const baking).
-4. **`Any` + safe navigation.** Auto-wrap at `Any` boundaries; `.as`/`.field`/
-   `.elem` lowering; runtime `to_json`-style serialization.
-5. **Iteration interface + struct-field `#for` + typed macro params.** The broad
-   ergonomics layer.
-6. **Capability gating.** Fold reflection/FFI into the Phase-5 capability system.
-
-Phases 1–2 are the highest leverage (constraints unblock real generic libraries),
-need no backend work, and lean on machinery that already exists. Phase 3 is the
-one with real new backend work (baking aggregate `TypeInfo` into the binary).

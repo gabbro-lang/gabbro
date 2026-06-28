@@ -1,12 +1,11 @@
 # Testing — `#test` and the comptime lane
 
-> Status: the **comptime lane is implemented** — a `#test` function runs on the
-> comptime VM *during compilation*, and a failed assertion is a compile error.
-> The runtime lane, property testing, snapshots, and reflection-driven diffs are
-> designed here as the next iterations (§5).
+A `#test` function runs on the comptime VM during compilation. A failed assertion is
+a compile error — no test binary, no runner process. That lane works today. The
+runtime lane, property testing, snapshots, and reflection diffs are designed below
+(§5), not built yet.
 
-skarn's testing story is built on two facilities the compiler already has, which let
-it do something most languages can't:
+Testing leans on two things the compiler already has:
 
 - **The comptime VM models real host memory.** A pure test can run while the
   program compiles, so a failing assertion fails the build exactly like a type

@@ -1,3 +1,0 @@
-Atomic :: struct($T: type) { value: T }
-#entry
-main :: fn() -> i32 { a: Atomic(u32) = .{ 10u32 }; return a.value as i32; }

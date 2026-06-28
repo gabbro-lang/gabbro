@@ -1,3 +1,0 @@
-Pair :: struct($T: type) { a: T, b: T }
-#entry
-main :: fn() -> i32 { p: Pair(i32) = .{ 3, 4 }; return p.a + p.b; }

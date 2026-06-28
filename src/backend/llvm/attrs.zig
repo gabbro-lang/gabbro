@@ -1,10 +1,10 @@
-/// Map K2 function attributes to LLVM function attributes.
+/// Map Skarn function attributes to LLVM function attributes.
 /// Called from functions.zig after LLVMAddFunction.
 const std = @import("std");
 const ir = @import("../../ir.zig");
 const llvm = @import("c_api.zig").llvm;
 const ModuleCg = @import("context.zig").ModuleCg;
-/// Apply all relevant K2 attributes to an LLVM function value.
+/// Apply all relevant Skarn attributes to an LLVM function value.
 pub fn applyFunctionAttrs(cg: *ModuleCg, func: ir.IrFunction, lv: llvm.LLVMValueRef) void {
     const fn_idx: c_uint = 0xFFFF_FFFF; // LLVMAttributeFunctionIndex
 

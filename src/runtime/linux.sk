@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-/// K2 Linux runtime — compiled automatically into every Linux K2 program.
+/// Skarn Linux runtime — compiled automatically into every Linux Skarn program.
 /// Provides: @panic, assert, write_stdout, write_stderr
 /// No libc. Uses direct Linux syscalls.
 
@@ -27,8 +27,8 @@ sys_exit :: fn(code: i32) {
 }
 
 // The ELF entry point (`_start`) is appended per ABI by the runtime selector:
-// linux_start_none.k2 (freestanding: call main + exit syscall) or
-// linux_start_gnu.k2 (glibc: hand off to __libc_start_main).
+// linux_start_none.sk (freestanding: call main + exit syscall) or
+// linux_start_gnu.sk (glibc: hand off to __libc_start_main).
 
 // ── Low-level I/O ─────────────────────────────────────────────────────────
 

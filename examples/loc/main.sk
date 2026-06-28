@@ -1,6 +1,6 @@
 // loc — a recursive lines-of-code counter for Windows.
 //
-//   loc [dir]      count .k2/.zig/.c/.h files under `dir` (default: current dir)
+//   loc [dir]      count .sk/.zig/.c/.h files under `dir` (default: current dir)
 //
 // Walks the directory tree with std.fs's FindFirstFile iterator, reads each
 // source file with fs::read_all, and tallies total / code / comment / blank
@@ -15,7 +15,7 @@
 Counts :: struct { files: u64, total: u64, code: u64, comment: u64, blank: u64 }
 
 is_code_file :: fn(name: []const u8) -> bool {
-    if str_ends_with(name, ".k2")  { return true; }
+    if str_ends_with(name, ".sk")  { return true; }
     if str_ends_with(name, ".zig") { return true; }
     if str_ends_with(name, ".c")   { return true; }
     if str_ends_with(name, ".h")   { return true; }

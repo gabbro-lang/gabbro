@@ -1,6 +1,6 @@
 // sha — file checksum utility (SHA-256 + CRC-32).
 //
-//   sha [file]      print digests of `file` (default: build.k2)
+//   sha [file]      print digests of `file` (default: build.sk)
 
 #import std.fs;
 #import std.heap.{ Arena, make };
@@ -26,7 +26,7 @@ first_arg :: fn(line: []const u8, def: []const u8) -> []const u8 {
 main :: fn() -> i32 {
     a := make();
     line_buf: [1024]u8 = .{};
-    path := first_arg(process::command_line(line_buf[:]), "build.k2");
+    path := first_arg(process::command_line(line_buf[:]), "build.sk");
 
     bytes := fs::read_all(path, &a) catch err { print("sha: cannot read "); print(path); print("\n"); return 1; };
 

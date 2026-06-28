@@ -5,7 +5,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-// In-process LLD via k2lld.dll (built with `-Din-process-lld`). Loaded
+// In-process LLD via skarnlld.dll (built with `-Din-process-lld`). Loaded
 // dynamically, so when the DLL is absent we transparently fall back to spawning
 // lld-link.exe. The DLL exports a single C entry point; loading it lazily avoids
 // any build-time dependency.
@@ -17,33 +17,33 @@ const win = struct {
 
 const LldLinkFn = *const fn (argc: c_int, argv: [*]const [*:0]const u8) callconv(.c) c_int;
 
-// The K2-written linker (k2lnk.dll), exporting `k2_link(in_obj, out_exe) -> int`.
-const K2LinkFn = *const fn (in_path: [*:0]const u8, out_path: [*:0]const u8) callconv(.c) c_int;
+// The Skarn-written linker (skarnld.dll), exporting `skarn_link(in_obj, out_exe) -> int`.
+const SkarnLinkFn = *const fn (in_path: [*:0]const u8, out_path: [*:0]const u8) callconv(.c) c_int;
 
-/// k2lnk links a single COFF object into an exe or DLL. It reads the compiler's
-/// `.k2imp`/`.k2exp` maps (so it needs no `.lib`), handles any DLL set, subsystem,
+/// skarnld links a single COFF object into an exe or DLL. It reads the compiler's
+/// `.skimp`/`.skexp` maps (so it needs no `.lib`), handles any DLL set, subsystem,
 /// entry, stack, and DLL output. It bails (→ LLD) only on multiple objects,
 /// arbitrary linker flags, or a C library's `/DEFAULTLIB` (static-CRT objects).
-fn k2lnkEligible(opts: WindowsLinkOptions) bool {
+fn skarnldEligible(opts: WindowsLinkOptions) bool {
     if (opts.obj_files.len != 1) return false;
     if (opts.extra_flags.len != 0) return false;
     if (opts.honor_defaultlibs) return false;
     return true;
 }
 
-/// Try the K2-written linker (k2lnk.dll) — the self-hosted fast path. Returns
+/// Try the Skarn-written linker (skarnld.dll) — the self-hosted fast path. Returns
 /// null when unavailable/ineligible (use LLD), true on success, false on a
 /// reported link failure (also falls back to LLD).
-fn tryK2lnk(allocator: std.mem.Allocator, opts: WindowsLinkOptions) ?bool {
+fn trySkarnld(allocator: std.mem.Allocator, opts: WindowsLinkOptions) ?bool {
     if (builtin.os.tag != .windows) return null;
-    if (!k2lnkEligible(opts)) return null;
-    // The file entry point (`k2_link`) uses default console-exe settings — a DLL /
+    if (!skarnldEligible(opts)) return null;
+    // The file entry point (`skarn_link`) uses default console-exe settings — a DLL /
     // GUI / custom entry / stack build must go through the in-memory path
-    // (`k2_link_mem`), which carries those. Fall to LLD here.
+    // (`skarn_link_mem`), which carries those. Fall to LLD here.
     if (opts.dll or opts.subsystem != .console or opts.entry != null or opts.stack_reserve != 0) return null;
-    const module = win.LoadLibraryA("k2lnk.dll") orelse return null;
-    const proc = win.GetProcAddress(module, "k2_link") orelse return null;
-    const link_fn: K2LinkFn = @ptrCast(proc);
+    const module = win.LoadLibraryA("skarnld.dll") orelse return null;
+    const proc = win.GetProcAddress(module, "skarn_link") orelse return null;
+    const link_fn: SkarnLinkFn = @ptrCast(proc);
     const obj_z = allocator.dupeZ(u8, opts.obj_files[0]) catch return false;
     defer allocator.free(obj_z);
     const out_z = allocator.dupeZ(u8, opts.output) catch return false;
@@ -51,9 +51,9 @@ fn tryK2lnk(allocator: std.mem.Allocator, opts: WindowsLinkOptions) ?bool {
     return link_fn(obj_z.ptr, out_z.ptr) == 0;
 }
 
-// In-memory variant: k2lnk reads the object bytes directly — no .obj on disk —
+// In-memory variant: skarnld reads the object bytes directly — no .obj on disk —
 // plus the PE settings (subsystem / entry / stack / DLL) the compiler knows.
-const K2LinkMemFn = *const fn (
+const SkarnLinkMemFn = *const fn (
     obj_ptr: [*]const u8,
     obj_len: usize,
     out_path: [*:0]const u8,
@@ -63,22 +63,22 @@ const K2LinkMemFn = *const fn (
     is_dll: u32,
 ) callconv(.c) c_int;
 
-// When k2lnk is statically linked into k2.exe (`-Dembed-linker`), it is exported
+// When skarnld is statically linked into skarn.exe (`-Dembed-linker`), it is exported
 // from the exe itself, so we find it with GetProcAddress on our own module; else
-// we load `k2lnk.dll`. (A weak `@extern` would be cleaner but COFF weak externs
+// we load `skarnld.dll`. (A weak `@extern` would be cleaner but COFF weak externs
 // don't null-check reliably in Zig — they resolve to a 0 we'd call.)
-fn resolveK2lnk() ?K2LinkMemFn {
+fn resolveSkarnld() ?SkarnLinkMemFn {
     const self = win.GetModuleHandleA(null) orelse return null;
-    if (win.GetProcAddress(self, "k2_link_mem")) |p| return @ptrCast(p); // embedded
-    const dll = win.LoadLibraryA("k2lnk.dll") orelse return null;
-    const proc = win.GetProcAddress(dll, "k2_link_mem") orelse return null;
+    if (win.GetProcAddress(self, "skarn_link_mem")) |p| return @ptrCast(p); // embedded
+    const dll = win.LoadLibraryA("skarnld.dll") orelse return null;
+    const proc = win.GetProcAddress(dll, "skarn_link_mem") orelse return null;
     return @ptrCast(proc);
 }
 
-fn tryK2lnkMem(allocator: std.mem.Allocator, obj_bytes: []const u8, opts: WindowsLinkOptions) ?bool {
+fn trySkarnldMem(allocator: std.mem.Allocator, obj_bytes: []const u8, opts: WindowsLinkOptions) ?bool {
     if (builtin.os.tag != .windows) return null;
-    if (!k2lnkEligible(opts)) return null;
-    const link_fn = resolveK2lnk() orelse return null;
+    if (!skarnldEligible(opts)) return null;
+    const link_fn = resolveSkarnld() orelse return null;
     const out_z = allocator.dupeZ(u8, opts.output) catch return false;
     defer allocator.free(out_z);
     const entry_z = allocator.dupeZ(u8, opts.entry orelse "") catch return false;
@@ -91,12 +91,12 @@ fn tryK2lnkMem(allocator: std.mem.Allocator, obj_bytes: []const u8, opts: Window
     return link_fn(obj_bytes.ptr, obj_bytes.len, out_z.ptr, subsystem, entry_z.ptr, @intCast(opts.stack_reserve), is_dll) == 0;
 }
 
-/// Try the in-process linker. Returns null if k2lld.dll is unavailable (caller
+/// Try the in-process linker. Returns null if skarnlld.dll is unavailable (caller
 /// should fall back to spawning), true on a successful link, false on failure.
 fn tryInProcess(allocator: std.mem.Allocator, args: []const []const u8) ?bool {
     if (builtin.os.tag != .windows) return null;
-    const module = win.LoadLibraryA("k2lld.dll") orelse return null;
-    const proc = win.GetProcAddress(module, "k2_lld_link_coff") orelse return null;
+    const module = win.LoadLibraryA("skarnlld.dll") orelse return null;
+    const proc = win.GetProcAddress(module, "skarn_lld_link_coff") orelse return null;
     const link_fn: LldLinkFn = @ptrCast(proc);
 
     var argv: std.ArrayList([*:0]const u8) = .empty;
@@ -141,7 +141,7 @@ pub const WindowsLinkOptions = struct {
     libs: []const []const u8 = &.{},
     /// Produce a DLL (shared library) instead of an executable. Uses `/DLL`
     /// with `/NOENTRY` (no CRT entry); `#export`ed functions are exported via
-    /// their dllexport directives. This is how `k2lnk.dll` is built.
+    /// their dllexport directives. This is how `skarnld.dll` is built.
     dll: bool = false,
     /// PE subsystem for executables (console window or not).
     subsystem: Subsystem = .console,
@@ -155,7 +155,7 @@ pub const WindowsLinkOptions = struct {
     /// Honor the `/DEFAULTLIB` directives embedded in the linked objects/archives
     /// (a C library's own system deps — opengl32, gdi32, …), instead of blanket
     /// `/NODEFAULTLIB`. Only the CRT-startup umbrella libs are suppressed (they'd
-    /// clash with K2's own entry); the C runtime is provided via `ucrt`/`vcruntime`.
+    /// clash with Skarn's own entry); the C runtime is provided via `ucrt`/`vcruntime`.
     honor_defaultlibs: bool = false,
 };
 
@@ -186,14 +186,14 @@ pub fn buildArgs(allocator: std.mem.Allocator, opts: WindowsLinkOptions) ![]cons
         // Honor the linked C library's own `/DEFAULTLIB` directives (so its system
         // deps — opengl32, gdi32, winmm, … — flow in automatically, C3-style), but
         // suppress only the CRT-startup *umbrella* libs: they provide their own
-        // `mainCRTStartup`/`_DllMainCRTStartup` which would clash with K2's entry.
+        // `mainCRTStartup`/`_DllMainCRTStartup` which would clash with Skarn's entry.
         // The actual C runtime (malloc/__chkstk/…) comes from ucrt+vcruntime, which
         // the build links explicitly and which carry no startup.
         const crt_umbrellas = [_][]const u8{ "libcmt", "libcmtd", "msvcrt", "msvcrtd", "libc", "libcd" };
         for (crt_umbrellas) |u|
             try args.append(allocator, try std.fmt.allocPrint(allocator, "/NODEFAULTLIB:{s}", .{u}));
     } else {
-        // Strict: ignore every embedded `/DEFAULTLIB` directive (K2's minimal-runtime default).
+        // Strict: ignore every embedded `/DEFAULTLIB` directive (Skarn's minimal-runtime default).
         try args.append(allocator, try allocator.dupe(u8, "/NODEFAULTLIB"));
     }
     try args.append(allocator, try allocator.dupe(u8, "kernel32.lib"));
@@ -219,7 +219,7 @@ pub fn printCommand(allocator: std.mem.Allocator, opts: WindowsLinkOptions) void
     std.debug.print("\n", .{});
 }
 
-/// The LLD path: in-process (k2lld.dll) if available, else spawn lld-link.exe.
+/// The LLD path: in-process (skarnlld.dll) if available, else spawn lld-link.exe.
 /// Reads the object(s) from disk (lld needs files).
 fn linkWithLld(allocator: std.mem.Allocator, io: std.Io, opts: WindowsLinkOptions) LinkError!void {
     const args = buildArgs(allocator, opts) catch return error.OutOfMemory;
@@ -266,9 +266,9 @@ pub const LinuxLinkOptions = struct {
 };
 
 /// Link a single ELF object into a **static, non-PIE** Linux executable via
-/// `ld.lld`. Freestanding by default (no libc) — a pure-K2 program has zero
+/// `ld.lld`. Freestanding by default (no libc) — a pure-Skarn program has zero
 /// dynamic dependencies. libc is pulled in only when the user's `#extern` /
-/// `build.k2` adds `-lc`. Runs `ld.lld` on the host (cross-linking from Windows
+/// `build.sk` adds `-lc`. Runs `ld.lld` on the host (cross-linking from Windows
 /// works since LLD is target-agnostic).
 pub fn linkLinux(
     allocator: std.mem.Allocator,
@@ -343,28 +343,28 @@ pub fn linkLinux(
     }
 }
 
-/// A concrete reason the fast k2lnk path can't be used (null = it *would* have
-/// been eligible, so the only explanation is k2lnk.dll being absent/failing —
+/// A concrete reason the fast skarnld path can't be used (null = it *would* have
+/// been eligible, so the only explanation is skarnld.dll being absent/failing —
 /// not worth warning about, e.g. in the test runner). Used to explain the
-/// slower LLD fallback to the user. These are exactly k2lnk's current gaps.
+/// slower LLD fallback to the user. These are exactly skarnld's current gaps.
 fn lldFallbackReason(opts: WindowsLinkOptions, obj_bytes: ?[]const u8) ?[]const u8 {
-    if (opts.obj_files.len != 1) return "multiple object files (k2lnk links one object)";
-    if (opts.extra_flags.len != 0) return "extra raw linker flags k2lnk can't apply";
+    if (opts.obj_files.len != 1) return "multiple object files (skarnld links one object)";
+    if (opts.extra_flags.len != 0) return "extra raw linker flags skarnld can't apply";
     if (opts.honor_defaultlibs)
-        return "honoring a C library's /DEFAULTLIB directives (k2lnk can't parse them)";
+        return "honoring a C library's /DEFAULTLIB directives (skarnld can't parse them)";
     _ = obj_bytes;
     return null;
 }
 
 fn noteLldFallback(opts: WindowsLinkOptions, obj_bytes: ?[]const u8) void {
     const reason = lldFallbackReason(opts, obj_bytes) orelse return;
-    std.debug.print("note: linked with LLD — the k2lnk fast path was skipped ({s})\n", .{reason});
+    std.debug.print("note: linked with LLD — the skarnld fast path was skipped ({s})\n", .{reason});
 }
 
-/// Link from object files on disk. Prefers the self-hosted K2 linker (k2lnk.dll),
+/// Link from object files on disk. Prefers the self-hosted Skarn linker (skarnld.dll),
 /// then LLD.
 pub fn windows(allocator: std.mem.Allocator, io: std.Io, opts: WindowsLinkOptions) LinkError!void {
-    if (tryK2lnk(allocator, opts)) |ok| {
+    if (trySkarnld(allocator, opts)) |ok| {
         if (ok) return;
     }
     noteLldFallback(opts, null);
@@ -372,10 +372,10 @@ pub fn windows(allocator: std.mem.Allocator, io: std.Io, opts: WindowsLinkOption
 }
 
 /// Link straight from in-memory object bytes — no `.obj` on disk. Hands the
-/// bytes to k2lnk; only when k2lnk can't handle it (absent/ineligible/failed)
+/// bytes to skarnld; only when skarnld can't handle it (absent/ineligible/failed)
 /// does it spill the object to `opts.obj_files[0]` and fall back to LLD.
 pub fn windowsMem(allocator: std.mem.Allocator, io: std.Io, obj_bytes: []const u8, opts: WindowsLinkOptions) LinkError!void {
-    if (tryK2lnkMem(allocator, obj_bytes, opts)) |ok| {
+    if (trySkarnldMem(allocator, obj_bytes, opts)) |ok| {
         if (ok) return;
     }
     noteLldFallback(opts, obj_bytes);

@@ -1,5 +1,5 @@
 // Thin C function pointers: `extern fn(...)` is a bare, directly-callable address
-// (not k2's fat `{fn, env}` closure). This is what makes a dynamically-loaded
+// (not skarn's fat `{fn, env}` closure). This is what makes a dynamically-loaded
 // symbol — a `wglGetProcAddress`'d OpenGL function, a `GetProcAddress` result, a
 // COM vtable slot — callable. Returns 42.
 
@@ -20,7 +20,7 @@ cstr :: fn(s: []const u8, buf: []u8) -> *const u8 {
 
 #entry
 main :: fn() -> i32 {
-    // 1. Call a k2 function through its raw address (reinterpreted as a thin fn ptr).
+    // 1. Call a skarn function through its raw address (reinterpreted as a thin fn ptr).
     f := unsafe (core::fn_ptr(add5) as extern fn(i32) -> i32);
     if f(30) != 35 { return 1; }
 

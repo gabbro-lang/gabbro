@@ -1,9 +1,9 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
 // Phase 3 — the `#compiler` message loop. A `#compiler` hook is a function the
 // compiler runs at compile time; its returned `[]const u8` is parsed as
-// top-level K2 declarations and added to the program. `core::compiler_decls()` lets a
+// top-level Skarn declarations and added to the program. `core::compiler_decls()` lets a
 // hook INSPECT the program (every top-level decl's name + kind) and generate
 // code conditionally. These are the headline capabilities `#insert` (a
 // statement-only splice) cannot provide.
@@ -23,10 +23,10 @@ test "compiler-hook: a hook builds source with the REAL StringBuilder (host memo
     // pointers). A `#compiler` hook runs at compile time and cannot fall back to
     // runtime, so this only works because the comptime VM now models real host
     // memory. The hook emits a `sum_<T>` for every user struct.
-    var fe = try k2.compileFileWithRuntime(a, std.testing.io, "tests/fixtures/hostmem/derive_sb.sk");
+    var fe = try skarn.compileFileWithRuntime(a, std.testing.io, "tests/fixtures/hostmem/derive_sb.sk");
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(a, fe);
+    try skarn.ir_mod.validateModule(m);
     try std.testing.expect(hasFunction(m, "sum_Point"));
     try std.testing.expect(hasFunction(m, "sum_Vec3"));
 }
@@ -59,10 +59,10 @@ test "compiler-hook: a hook reads a declaration's BODY text (R1b-A)" {
         \\}
         \\main :: fn() -> i32 { return answer(); }
     ;
-    var fe = try k2.compile(a, "body.sk", src);
+    var fe = try skarn.compile(a, "body.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(a, fe);
+    try skarn.ir_mod.validateModule(m);
     try std.testing.expect(hasFunction(m, "answer"));
 }
 
@@ -84,10 +84,10 @@ test "compiler-hook: `compiler_remove` drops an existing declaration (R1b-B)" {
         \\}
         \\main :: fn() -> i32 { return 0; }
     ;
-    var fe = try k2.compile(a, "remove.sk", src);
+    var fe = try skarn.compile(a, "remove.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(a, fe);
+    try skarn.ir_mod.validateModule(m);
     try std.testing.expect(!hasFunction(m, "scratch")); // removed
     try std.testing.expect(hasFunction(m, "main"));
 }
@@ -113,10 +113,10 @@ test "compiler-hook: a `#compiler(final)` hook runs AFTER generation and sees ge
         \\}
         \\main :: fn() -> i32 { return answer(); }
     ;
-    var fe = try k2.compile(a, "final_phase.sk", src);
+    var fe = try skarn.compile(a, "final_phase.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(a, fe);
+    try skarn.ir_mod.validateModule(m);
     try std.testing.expect(hasFunction(m, "answer"));
 }
 
@@ -137,7 +137,7 @@ test "compiler-hook: a `#compiler(final)` hook can halt the build (whole-program
         \\}
         \\main :: fn() -> i32 { return 0; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "final_policy.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "final_policy.sk", bad));
 }
 
 test "compiler-hook: `compiler_error` halts the build with a custom diagnostic (R1b)" {
@@ -155,7 +155,7 @@ test "compiler-hook: `compiler_error` halts the build with a custom diagnostic (
         \\}
         \\main :: fn() -> i32 { return 0; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "policy.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "policy.sk", bad));
 }
 
 test "compiler-hook: a hook that does NOT call compiler_error compiles normally" {
@@ -166,10 +166,10 @@ test "compiler-hook: a hook that does NOT call compiler_error compiles normally"
         \\#compiler ok :: fn() -> []const u8 { return "gen :: fn() -> i32 { return 1; }"; }
         \\main :: fn() -> i32 { return gen(); }
     ;
-    var fe = try k2.compile(a, "ok.sk", src);
+    var fe = try skarn.compile(a, "ok.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(a, fe);
+    try skarn.ir_mod.validateModule(m);
     try std.testing.expect(hasFunction(m, "gen"));
 }
 
@@ -202,10 +202,10 @@ test "compiler-hook: rich introspection — reads struct fields and enum variant
         \\}
         \\main :: fn() -> i32 { return answer(); }
     ;
-    var fe = try k2.compile(a, "hook_introspect.sk", src);
+    var fe = try skarn.compile(a, "hook_introspect.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(a, fe);
+    try skarn.ir_mod.validateModule(m);
     try std.testing.expect(hasFunction(m, "answer"));
 }
 
@@ -222,10 +222,10 @@ test "compiler-hook: generated top-level declaration is added to the module" {
         \\}
         \\main :: fn() -> i32 { return doubled(21); }
     ;
-    var fe = try k2.compile(a, "hook_gen.sk", src);
+    var fe = try skarn.compile(a, "hook_gen.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(a, fe);
+    try skarn.ir_mod.validateModule(m);
 
     // The generated `doubled` must exist as a real lowered function.
     try std.testing.expect(hasFunction(m, "doubled"));
@@ -261,10 +261,10 @@ test "compiler-hook: core::compiler_decls() inspection drives conditional genera
         \\}
         \\main :: fn() -> i32 { return answer(); }
     ;
-    var fe = try k2.compile(a, "hook_inspect.sk", src);
+    var fe = try skarn.compile(a, "hook_inspect.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(a, fe);
+    try skarn.ir_mod.validateModule(m);
     try std.testing.expect(hasFunction(m, "answer"));
 }
 
@@ -278,10 +278,10 @@ test "compiler-hook: no hook means no compiler-prelude injection" {
     const src =
         \\main :: fn() -> i32 { return 7; }
     ;
-    var fe = try k2.compile(a, "no_hook.sk", src);
+    var fe = try skarn.compile(a, "no_hook.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(a, fe);
+    try skarn.ir_mod.validateModule(m);
     try std.testing.expect(!hasFunction(m, "Decl"));
     try std.testing.expect(hasFunction(m, "main"));
 }

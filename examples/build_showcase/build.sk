@@ -1,10 +1,10 @@
 // A tour of the std.build API. Run from this directory:
 //
-//   k2 build                 # build the default artifact into bin/
-//   k2 build run             # build, then run it
-//   k2 build --list          # list artifacts and steps
-//   k2 build -Dtrace         # enable the `trace` build option
-//   k2 build --release        # force release optimization
+//   skarn build                 # build the default artifact into bin/
+//   skarn build run             # build, then run it
+//   skarn build --list          # list artifacts and steps
+//   skarn build -Dtrace         # enable the `trace` build option
+//   skarn build --release        # force release optimization
 //
 #import std.build.{ Build, Artifact };
 
@@ -13,7 +13,7 @@ build :: fn(b: Build) {
     b.out_root("bin");                 // every artifact goes in bin/
 
     // ── A GUI executable ──────────────────────────────────────────────
-    app := b.executable("app", "src/main.k2");
+    app := b.executable("app", "src/main.sk");
     app.release_fast();                // optimize for speed
     app.windowed();                    // GUI subsystem: no console window
     app.stack_size(8 * 1024 * 1024);   // 8 MiB stack
@@ -25,13 +25,13 @@ build :: fn(b: Build) {
     app.link("user32");
     app.link_flag("/DEBUG:NONE");
 
-    // A configurable build option: `k2 build -Dtrace`.
+    // A configurable build option: `skarn build -Dtrace`.
     if b.option("trace") {
         app.define("TRACE", "1");
     }
 
     // ── A companion shared library ────────────────────────────────────
-    plugin := b.shared("plugin", "src/plugin.k2");
+    plugin := b.shared("plugin", "src/plugin.sk");
     plugin.release_small();
 
     // ── Steps & default ───────────────────────────────────────────────

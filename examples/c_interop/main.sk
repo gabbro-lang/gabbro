@@ -1,11 +1,11 @@
-// Calling a C library from K2 with by-value structs (the raylib pattern).
+// Calling a C library from Skarn with by-value structs (the raylib pattern).
 //
-// The structs are declared on the K2 side to match the C layout; `#extern`
+// The structs are declared on the Skarn side to match the C layout; `#extern`
 // binds each C function and pulls `cabi.lib` into the link. On Win64 the
 // compiler coerces small structs (Vector2, Color) into registers and passes
 // large ones (Rectangle) by pointer — automatically, matching the C ABI.
 //
-//   k2 build main.k2 -o demo.exe --lib-path .
+//   skarn build main.sk -o demo.exe --lib-path .
 //   ./demo.exe   # exit code 132
 //
 // See README.md for the full build (compiling cabi.c first).

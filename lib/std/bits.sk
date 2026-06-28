@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // std.bits — bit-twiddling for fixed-width unsigned integers.
 //
-// K2 has no generic `Integer` interface to constrain `$T: type`, so these
+// Skarn has no generic `Integer` interface to constrain `$T: type`, so these
 // come as concrete u32/u64 pairs (the same shape as `write_u64`/`write_i64`
 // in std.io). All the usual operators — `& | ^ << >> ~` — type-check directly
 // on integers; this module names the idioms built on top of them: counting

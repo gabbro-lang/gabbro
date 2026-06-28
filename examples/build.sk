@@ -1,4 +1,4 @@
-// Example project build script. Run with `k2 build` (once dir-mode lands).
+// Example project build script. Run with `skarn build` (once dir-mode lands).
 // See docs/10_build_system.md for the full design.
 
 #import std.build.{ Build, executable, shared, release, debug, link, lib_path,
@@ -6,7 +6,7 @@
 
 build :: fn(b: Build) {
     // The main executable.
-    game := b.executable("game", "src/main.k2");
+    game := b.executable("game", "src/main.sk");
     game.release();
     game.link("raylib");
     game.link("user32");
@@ -14,19 +14,19 @@ build :: fn(b: Build) {
     game.output("bin/game.exe");
     game.define("MAX_ENTITIES", "4096");
 
-    // A build-time dependency (its own build.k2 runs sandboxed).
+    // A build-time dependency (its own build.sk runs sandboxed).
     rl := b.require_path("raylib", "vendor/raylib");
     game.depend(rl);
 
     // A second artifact: a hot-reloadable gameplay DLL.
-    logic := b.shared("logic", "src/logic.k2");
+    logic := b.shared("logic", "src/logic.sk");
     logic.debug();
     logic.output("bin/logic.dll");
 
-    // Steps: `k2 build run`, `k2 build test`.
+    // Steps: `skarn build run`, `skarn build test`.
     b.run_step("run", game);
     b.test_dir("test", "tests/");
 
-    // What bare `k2 build` produces.
+    // What bare `skarn build` produces.
     b.default(game);
 }

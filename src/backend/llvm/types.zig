@@ -54,7 +54,7 @@ pub fn lower(cg: *ModuleCg, ty: ir.IrType) llvm.LLVMTypeRef {
         // All other pointer-like types are opaque `ptr` (LLVM 15+).
         .ptr => llvm.LLVMPointerTypeInContext(ctx, 0),
 
-        // A k2 function value is a fat closure `{ fn, env }`; a THIN `extern fn(...)`
+        // A skarn function value is a fat closure `{ fn, env }`; a THIN `extern fn(...)`
         // pointer (a raw C-ABI address) is a bare pointer.
         .fn_ptr => |fp| if (fp.thin) llvm.LLVMPointerTypeInContext(ctx, 0) else cg.getClosureType(),
 
@@ -94,7 +94,7 @@ pub fn lowerSlice(cg: *ModuleCg, tys: []const ir.IrType) ![]llvm.LLVMTypeRef {
 /// Fallible functions (!T) get return type { T, i32 } where i32 is the error discriminant.
 pub fn fnType(cg: *ModuleCg, func: ir.IrFunction) !llvm.LLVMTypeRef {
     // At the C (`#extern`) boundary a `fn(...)` param/return is a THIN function
-    // pointer, not k2's fat `{fn, env}` closure (C cannot call a closure).
+    // pointer, not skarn's fat `{fn, env}` closure (C cannot call a closure).
     const is_extern = func.extern_name != null;
     const param_tys = try cg.allocator.alloc(llvm.LLVMTypeRef, func.params.len);
     defer cg.allocator.free(param_tys);

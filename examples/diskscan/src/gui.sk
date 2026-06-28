@@ -141,7 +141,7 @@ in3 :: fn(e: []const u8, a: []const u8, b: []const u8, c: []const u8) -> bool {
 color_for :: fn(n: *Node) -> u32 {
     if n.is_dir { return rgb(96u32, 104u32, 120u32); }
     e := ext_of(n.name);
-    if in3(e, "k2", "zig", "c")       { return rgb(86u32, 154u32, 220u32); }   // code (blue)
+    if in3(e, "sk", "zig", "c")       { return rgb(86u32, 154u32, 220u32); }   // code (blue)
     if in3(e, "h", "rs", "py")        { return rgb(86u32, 154u32, 220u32); }
     if in3(e, "js", "ts", "go")       { return rgb(86u32, 154u32, 220u32); }
     if in3(e, "png", "jpg", "jpeg")   { return rgb(96u32, 196u32, 120u32); }   // image (green)
@@ -550,7 +550,7 @@ paint_scanning :: fn(s: *State, mdc: usize) {
     px := bx + ((s.spin * 12i32) % (pw - 50i32));
     knob: RECT = .{ px, by, px + 50i32, by + 6i32 };
     igk := SetDCBrushColor(mdc, rgb(86u32, 154u32, 220u32));
-    igk2 := FillRect(mdc, &knob, s.dcbrush);
+    igskarn := FillRect(mdc, &knob, s.dcbrush);
 }
 
 // (Re)render the treemap into its own cached bitmap, but only when it's dirty or

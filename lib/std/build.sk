@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.build — K2's integrated build system.
+// std.build — Skarn's integrated build system.
 //
-// A project's `build.k2` defines `build :: fn(b: Build)`. `k2 build` runs it
+// A project's `build.sk` defines `build :: fn(b: Build)`. `skarn build` runs it
 // inside the comptime VM; each builder call invokes a `__build_*` compiler
 // intrinsic that records into the driver's build plan. After `build` returns,
 // the driver compiles + links each declared artifact (via the driver and the
-// k2lnk linker).
+// skarnld linker).
 //
 //   #import std.build.{ Build, Artifact };
 //
@@ -13,7 +13,7 @@
 //       b.workspace("my-game");
 //       b.out_root("bin");
 //
-//       game := b.executable("game", "src/main.k2");
+//       game := b.executable("game", "src/main.sk");
 //       game.release_fast();
 //       game.windowed();                 // GUI app: no console window
 //       game.link("raylib");
@@ -110,12 +110,12 @@ pub link_flag :: fn(self: Artifact, flag: []const u8) {
 
 // Link the host's libc — the portable "I need a C runtime" switch. Needed when
 // linking a C library that calls into libc (e.g. a static raylib.lib using
-// malloc/free, which K2's libc-less link doesn't provide). Resolved per host:
+// malloc/free, which Skarn's libc-less link doesn't provide). Resolved per host:
 //   Windows → the UCRT (malloc/free/…) + VC runtime (__chkstk/…); the matching
 //             search paths are added automatically.
 //   Linux   → glibc: a dynamically-linked `libc.so.6` and the glibc entry point,
 //             so `#extern("c", …)` resolves and the C runtime is initialized.
-// (Same as `k2 build --libc`, and the CLI `--libc` / `--target *-gnu` for a
+// (Same as `skarn build --libc`, and the CLI `--libc` / `--target *-gnu` for a
 //  single-file build.)
 pub link_libc :: fn(self: Artifact) {
     __build_linklibc(self.id);
@@ -126,7 +126,7 @@ pub link_libc :: fn(self: Artifact) {
 // `.static` links the archive and auto-links the C runtime (a static C lib
 // brings its code but not the CRT it depends on). The library NAME you pass to
 // `link()` stays the same either way — only the search path + this mode differ,
-// which keeps a build.k2 portable across static/dynamic and (later) platforms.
+// which keeps a build.sk portable across static/dynamic and (later) platforms.
 pub LinkMode :: enum { dynamic, static }
 
 pub link_mode :: fn(self: Artifact, mode: LinkMode) {
@@ -146,7 +146,7 @@ pub runtime_file :: fn(self: Artifact, path: []const u8) {
     __build_runtimefile(self.id, path);
 }
 
-// When a static C library is linked, K2 honors that library's OWN `/DEFAULTLIB`
+// When a static C library is linked, Skarn honors that library's OWN `/DEFAULTLIB`
 // directives by default, so its system dependencies (opengl32, gdi32, winmm, …)
 // are pulled in automatically — you don't list them. Call `no_default_libs()` to
 // opt out: keep the strict, minimal-runtime linking and specify every system
@@ -217,7 +217,7 @@ pub define :: fn(self: Artifact, key: []const u8, val: []const u8) {
 
 // ── Dependencies ──────────────────────────────────────────────────────────────
 
-// A dependency resolved from a local directory (its own build.k2 runs sandboxed).
+// A dependency resolved from a local directory (its own build.sk runs sandboxed).
 pub require_path :: fn(self: Build, name: []const u8, dir: []const u8) -> i32 {
     return __build_require(name, dir, 0);
 }
@@ -249,7 +249,7 @@ pub summary :: fn(self: Build) {
     __build_summary(1);
 }
 
-// ── Build options (`k2 build -Dname` / `-Dname=value`) ───────────────────────────
+// ── Build options (`skarn build -Dname` / `-Dname=value`) ───────────────────────────
 
 // True if `-Dname` was passed on the command line.
 pub option :: fn(self: Build, name: []const u8) -> bool {
@@ -263,7 +263,7 @@ pub option_str :: fn(self: Build, name: []const u8, default: []const u8) -> []co
 
 // ── Steps & default ───────────────────────────────────────────────────────────
 
-// A run step: `k2 build <name>` builds `target`, then runs it.
+// A run step: `skarn build <name>` builds `target`, then runs it.
 pub run_step :: fn(self: Build, name: []const u8, target: Artifact) {
     __build_run(name, target.id);
 }
@@ -273,7 +273,7 @@ pub test_dir :: fn(self: Build, name: []const u8, dir: []const u8) {
     __build_test(name, dir);
 }
 
-// Set which artifact bare `k2 build` produces.
+// Set which artifact bare `skarn build` produces.
 pub default :: fn(self: Build, target: Artifact) {
     __build_default(target.id);
 }

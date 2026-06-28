@@ -1,8 +1,8 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
 test "LLVM lowering selects signed, unsigned, and floating-point operations" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -26,11 +26,11 @@ test "LLVM lowering selects signed, unsigned, and floating-point operations" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "llvm_ops.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "llvm_ops.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "llvm_ops");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "llvm_ops");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -56,7 +56,7 @@ test "LLVM lowering selects signed, unsigned, and floating-point operations" {
 }
 
 test "LLVM lowering accepts full-width u64 constants" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -67,11 +67,11 @@ test "LLVM lowering accepts full-width u64 constants" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "full_width_u64.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "full_width_u64.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "full_width_u64");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "full_width_u64");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -80,7 +80,7 @@ test "LLVM lowering accepts full-width u64 constants" {
 }
 
 test "inferred local takes its width from a suffixed integer literal" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -88,7 +88,7 @@ test "inferred local takes its width from a suffixed integer literal" {
     // `target := 0i64` must give `target` an i64 slot. A regression here typed
     // it i32 (only `u32`/`usize` suffixes were recognized), so the later
     // `store i64 …` smashed 8 bytes into a 4-byte alloca — truncating the value
-    // and corrupting the adjacent local. (Surfaced as the k2lnk relocation bug.)
+    // and corrupting the adjacent local. (Surfaced as the skarnld relocation bug.)
     const src =
         \\widen :: fn() -> i64 {
         \\    target := 0i64;
@@ -97,11 +97,11 @@ test "inferred local takes its width from a suffixed integer literal" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "inferred_i64.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "inferred_i64.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "inferred_i64");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "inferred_i64");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -112,7 +112,7 @@ test "inferred local takes its width from a suffixed integer literal" {
 }
 
 test "LLVM lowering applies #align to struct allocas" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -130,11 +130,11 @@ test "LLVM lowering applies #align to struct allocas" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "align_struct.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "align_struct.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "align_struct");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "align_struct");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -145,7 +145,7 @@ test "LLVM lowering applies #align to struct allocas" {
 }
 
 test "LLVM force unwrap calls the embedded runtime panic" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -156,22 +156,22 @@ test "LLVM force unwrap calls the embedded runtime panic" {
         \\}
     ;
 
-    var fe = try k2.compileWithRuntime(arena.allocator(), "force_unwrap.sk", src);
+    var fe = try skarn.compileWithRuntime(arena.allocator(), "force_unwrap.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "force_unwrap");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "force_unwrap");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
 
     try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "@panic") != null);
     try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "attempted to unwrap an empty optional") != null);
-    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "force_unwrap.k2:2:12") != null);
+    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "force_unwrap.sk:2:12") != null);
 }
 
 test "LLVM optional equality compares presence instead of aggregate values" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -181,11 +181,11 @@ test "LLVM optional equality compares presence instead of aggregate values" {
         \\is_empty :: fn(value: ?i32) -> bool { return null == value; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "optional_equality.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "optional_equality.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "optional_equality");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "optional_equality");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -194,7 +194,7 @@ test "LLVM optional equality compares presence instead of aggregate values" {
 }
 
 test "LLVM optional payload is coerced to its declared integer width" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -207,11 +207,11 @@ test "LLVM optional payload is coerced to its declared integer width" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "optional_payload_width.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "optional_payload_width.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "optional_payload_width");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "optional_payload_width");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -225,7 +225,7 @@ test "LLVM optional payload is coerced to its declared integer width" {
 }
 
 test "LLVM panic lowering synthesizes the runtime declaration when absent" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -236,22 +236,22 @@ test "LLVM panic lowering synthesizes the runtime declaration when absent" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "standalone_unwrap.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "standalone_unwrap.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "standalone_unwrap");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "standalone_unwrap");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
 
     try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "declare void") != null);
     try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "@panic") != null);
-    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "standalone_unwrap.k2:2:12") != null);
+    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "standalone_unwrap.sk:2:12") != null);
 }
 
 test "LLVM error/fallible ABI: fail and return lower to { ok, i32 } struct" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -272,11 +272,11 @@ test "LLVM error/fallible ABI: fail and return lower to { ok, i32 } struct" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "fallible.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "fallible.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "fallible");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "fallible");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -292,7 +292,7 @@ test "LLVM error/fallible ABI: fail and return lower to { ok, i32 } struct" {
 }
 
 test "LLVM fallible return coerces to its declared integer width" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -305,11 +305,11 @@ test "LLVM fallible return coerces to its declared integer width" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "fallible_width.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "fallible_width.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "fallible_width");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "fallible_width");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -318,7 +318,7 @@ test "LLVM fallible return coerces to its declared integer width" {
 }
 
 test "LLVM debug: division by zero inserts a runtime check" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -327,11 +327,11 @@ test "LLVM debug: division by zero inserts a runtime check" {
         \\divide :: fn(a: i32, b: i32) -> i32 { return a / b; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "div_check.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "div_check.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "div_check");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "div_check");
     defer backend.deinit();
     // opt_level=0 (debug) — checks should be present.
     try backend.lower(module);
@@ -341,11 +341,11 @@ test "LLVM debug: division by zero inserts a runtime check" {
     try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "check_fail") != null);
     try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "check_ok") != null);
     try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "division by zero") != null);
-    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "div_check.k2:1:") != null);
+    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "div_check.sk:1:") != null);
 }
 
 test "LLVM debug: integer overflow inserts a located runtime check" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -355,22 +355,22 @@ test "LLVM debug: integer overflow inserts a located runtime check" {
         \\multiply :: fn(a: u32, b: u32) -> u32 { return a * b; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "overflow.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "overflow.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "overflow");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "overflow");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
 
     try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "llvm.sadd.with.overflow") != null);
     try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "llvm.umul.with.overflow") != null);
-    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "integer overflow at overflow.k2:1:") != null);
+    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "integer overflow at overflow.sk:1:") != null);
 }
 
 test "LLVM release: division omits debug runtime check" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -379,11 +379,11 @@ test "LLVM release: division omits debug runtime check" {
         \\divide :: fn(a: i32, b: i32) -> i32 { return a / b; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "div_release.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "div_release.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "div_release");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "div_release");
     defer backend.deinit();
     backend.setOptLevel(2);
     try backend.lower(module);
@@ -393,7 +393,7 @@ test "LLVM release: division omits debug runtime check" {
 }
 
 test "LLVM debug: shift overflow inserts a runtime check" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -402,11 +402,11 @@ test "LLVM debug: shift overflow inserts a runtime check" {
         \\shift_it :: fn(a: u32, b: u32) -> u32 { return a << b; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "shift_check.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "shift_check.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "shift_check");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "shift_check");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -416,7 +416,7 @@ test "LLVM debug: shift overflow inserts a runtime check" {
 }
 
 test "LLVM debug: slice bounds check inserts a runtime check" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -425,11 +425,11 @@ test "LLVM debug: slice bounds check inserts a runtime check" {
         \\get :: fn(data: []const u8, i: usize) -> u8 { return data[i]; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "bounds.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "bounds.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "bounds");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "bounds");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -439,7 +439,7 @@ test "LLVM debug: slice bounds check inserts a runtime check" {
 }
 
 test "LLVM debug: array bounds check uses static array length" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -448,20 +448,20 @@ test "LLVM debug: array bounds check uses static array length" {
         \\get :: fn(data: [4]u8, i: usize) -> u8 { return data[i]; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "array_bounds.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "array_bounds.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "array_bounds");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "array_bounds");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
 
-    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "index out of bounds at array_bounds.k2:1:") != null);
+    try std.testing.expect(std.mem.indexOf(u8, llvm_ir, "index out of bounds at array_bounds.sk:1:") != null);
 }
 
 test "LLVM float casts emit correct instructions" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -476,11 +476,11 @@ test "LLVM float casts emit correct instructions" {
         \\widen_u :: fn(x: u8) -> u32 { return x as u32; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "float_casts.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "float_casts.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "float_casts");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "float_casts");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -495,7 +495,7 @@ test "LLVM float casts emit correct instructions" {
 }
 
 test "LLVM lowering reads and writes fields through struct pointers" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -513,11 +513,11 @@ test "LLVM lowering reads and writes fields through struct pointers" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "pointer_fields.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "pointer_fields.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "pointer_fields");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "pointer_fields");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -528,7 +528,7 @@ test "LLVM lowering reads and writes fields through struct pointers" {
 }
 
 test "LLVM zones are backed by std.heap (make/deinit over VirtualAlloc)" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -543,11 +543,11 @@ test "LLVM zones are backed by std.heap (make/deinit over VirtualAlloc)" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "zones.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "zones.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "zones");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "zones");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -561,7 +561,7 @@ test "LLVM zones are backed by std.heap (make/deinit over VirtualAlloc)" {
 }
 
 test "LLVM borrow parameters erase to their underlying ABI type" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -569,11 +569,11 @@ test "LLVM borrow parameters erase to their underlying ABI type" {
     const src =
         \\touch :: fn(data: borrow []u8) { data[0] = 1u8; }
     ;
-    var fe = try k2.compile(arena.allocator(), "borrow_abi.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "borrow_abi.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "borrow_abi");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "borrow_abi");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());
@@ -584,7 +584,7 @@ test "LLVM borrow parameters erase to their underlying ABI type" {
 }
 
 test "LLVM lowering applies #cold / #section / #weak / #link_name (Phase 3)" {
-    if (comptime !k2.llvm_enabled) return;
+    if (comptime !skarn.llvm_enabled) return;
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -601,11 +601,11 @@ test "LLVM lowering applies #cold / #section / #weak / #link_name (Phase 3)" {
         \\main :: fn() -> i32 { return rare() + sec() + wk() + rn(); }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "attrs.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "attrs.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
 
-    var backend = k2.LlvmBackend.init(arena.allocator(), "attrs");
+    var backend = skarn.LlvmBackend.init(arena.allocator(), "attrs");
     defer backend.deinit();
     try backend.lower(module);
     const llvm_ir = try backend.getIrText(arena.allocator());

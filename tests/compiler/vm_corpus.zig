@@ -1,6 +1,6 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
-const ir = k2.ir_mod;
+const skarn = @import("skarn_compiler");
+const ir = skarn.ir_mod;
 
 // VM comptime corpus. The VM is now the sole comptime engine (the AST
 // tree-walker has been deleted), so this is a pure regression test: every
@@ -233,7 +233,7 @@ test "vm corpus: wide #run coverage" {
         \\C_math :: #run mathfold();
     ;
 
-    var fe = try k2.compile(a, "corpus.sk", src);
+    var fe = try skarn.compile(a, "corpus.sk", src);
     defer fe.deinit(a);
 
     const stats = ir.evalCorpus(a, fe);

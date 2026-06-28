@@ -1,7 +1,7 @@
 const std = @import("std");
 const ast = @import("ast.zig");
 const basalt = @import("basalt.zig");
-pub const k2_runtime = @import("runtime.zig");
+pub const skarn_runtime = @import("runtime.zig");
 const backend = @import("backend.zig");
 const diagnostic = @import("diagnostic.zig");
 const driver = @import("driver.zig");
@@ -87,7 +87,7 @@ else
 /// without `-Dmsvc-lib-path` / `--lib-path`).
 pub const msvc = @import("msvc.zig");
 
-/// C binding generator (`k2 bindgen`) — powered by libclang, only available
+/// C binding generator (`skarn bindgen`) — powered by libclang, only available
 /// when compiled with `-Dllvm-path=<path>` (libclang ships in the same SDK).
 pub const bindgen = if (build_options.enable_llvm)
     @import("bindgen.zig")

@@ -348,7 +348,7 @@ pub const FnPtrTy = struct {
     params: []const Ty,
     ret: *const Ty,
     /// `extern fn(...)` — a thin C-ABI function pointer (a bare address), directly
-    /// callable, as opposed to k2's fat `{fn, env}` closure. See ast.FnType.
+    /// callable, as opposed to skarn's fat `{fn, env}` closure. See ast.FnType.
     thin: bool = false,
 };
 
@@ -789,8 +789,8 @@ pub fn collectSymbols(allocator: std.mem.Allocator, module: ast.Module) Semantic
     defer first_file.deinit();
     var colliding = std.StringHashMap(void).init(allocator);
     defer colliding.deinit();
-    // C symbols claimed by a *renamed* extern (its k2 name differs from the C
-    // symbol). A plain k2 decl that happens to share that bare name (e.g. a
+    // C symbols claimed by a *renamed* extern (its skarn name differs from the C
+    // symbol). A plain skarn decl that happens to share that bare name (e.g. a
     // `connect` wrapper over a `sys_connect :: #extern(.., "connect")` binding)
     // must take a module-qualified link name too — otherwise its internal body
     // and the external decl would emit the same LLVM symbol and clash.
@@ -835,11 +835,11 @@ pub fn collectSymbols(allocator: std.mem.Allocator, module: ast.Module) Semantic
         };
         const id = try table.insertLinked(allocator, table.root_scope, name, link, kind, item.span(), item.fileName(), item.isPublic());
         // An extern function links against its C symbol (the `#extern` 2nd arg),
-        // not its k2 declaration name. The root-scope key stays the bare/collision
+        // not its skarn declaration name. The root-scope key stays the bare/collision
         // name (so resolution is unchanged and two externs may share one C symbol
         // across modules without colliding), but the *linkage* name — emitted for
         // the LLVM declaration and every call site via `linkNameFor` — becomes the
-        // C symbol. When the k2 name already equals the C name this is a no-op.
+        // C symbol. When the skarn name already equals the C name this is a no-op.
         switch (item) {
             .function => |f| if (externName(f.attrs)) |c_sym| {
                 table.symbols.items[id].link_name = c_sym;
@@ -2575,7 +2575,7 @@ const Checker = struct {
             .float => |text| blk: {
                 const suffix = floatLiteralSuffix(text);
                 if (suffix.len != 0 and !std.mem.eql(u8, suffix, "f32") and !std.mem.eql(u8, suffix, "f64"))
-                    self.emitError(expr.span, "unsupported float width `{s}`: k2 floats are `f32` or `f64`", .{suffix});
+                    self.emitError(expr.span, "unsupported float width `{s}`: skarn floats are `f32` or `f64`", .{suffix});
                 break :blk floatLiteralType(text);
             },
             .string => try self.sliceOf(.u8),
@@ -2682,14 +2682,14 @@ const Checker = struct {
                     return error.SemanticFailed;
                 }
                 break :blk switch (value_ty) {
-                    .fallible => |fallible| blk2: {
+                    .fallible => |fallible| blskarn: {
                         if (!try self.compatible(fallible.err.*, self.current_error_ty.?)) {
                             self.emitError(expr.span, "`?` error type `{s}` is not compatible with function error type `{s}`", .{
                                 self.formatTy(fallible.err.*), self.formatTy(self.current_error_ty.?),
                             });
                             return error.SemanticFailed;
                         }
-                        break :blk2 fallible.ok.*;
+                        break :blskarn fallible.ok.*;
                     },
                     else => {
                         self.emitError(try_expr.value.span, "`?` requires a fallible expression, found `{s}`", .{self.formatTy(value_ty)});
@@ -3054,7 +3054,7 @@ const Checker = struct {
             return .void;
         }
         // core::fn_ptr(f) — the raw thin function pointer of a top-level function,
-        // typed `*void` so it can be handed to a C callback / thread entry (k2's
+        // typed `*void` so it can be handed to a C callback / thread entry (skarn's
         // ordinary fn value is a fat `{fn, env}` closure a C ABI cannot call). The
         // argument must be a plain function reference; it is resolved in IR.
         if (is_core and std.mem.eql(u8, name, "fn_ptr")) {
@@ -4676,9 +4676,9 @@ const Checker = struct {
         if (intWidthName(name)) |w| {
             const p: []const u8 = if (w.signed) "i" else "u";
             if (w.bits > 64) {
-                self.emitError(span, "unsupported integer width `{s}`: k2 integers are at most 64-bit — use `{s}64` or `{s}size`", .{ name, p, p });
+                self.emitError(span, "unsupported integer width `{s}`: skarn integers are at most 64-bit — use `{s}64` or `{s}size`", .{ name, p, p });
             } else {
-                self.emitError(span, "unsupported integer width `{s}`: k2 has `{s}8`, `{s}16`, `{s}32`, `{s}64` (and `{s}size`), plus sub-byte `{s}1`–`{s}7`", .{ name, p, p, p, p, p, p, p });
+                self.emitError(span, "unsupported integer width `{s}`: skarn has `{s}8`, `{s}16`, `{s}32`, `{s}64` (and `{s}size`), plus sub-byte `{s}1`–`{s}7`", .{ name, p, p, p, p, p, p, p });
             }
             return;
         }
@@ -5396,7 +5396,7 @@ fn floatLiteralType(text: []const u8) Ty {
     return .float_lit;
 }
 
-/// The integer-literal suffixes k2 accepts (mirrors `intLiteralType`).
+/// The integer-literal suffixes skarn accepts (mirrors `intLiteralType`).
 const int_literal_suffixes = [_][]const u8{
     "usize", "isize", "u64", "u32", "u16", "u8",
     "i64",   "i32",   "i16", "i8",  "byte",
@@ -5434,7 +5434,7 @@ fn isValidIntSuffix(suffix: []const u8) bool {
     return false;
 }
 
-/// Split off a float literal's trailing type-suffix (possibly empty). k2 float
+/// Split off a float literal's trailing type-suffix (possibly empty). skarn float
 /// literals are `<digits>.<digits>` so the suffix is whatever follows the
 /// fractional digits — only `f32`/`f64` are valid.
 fn floatLiteralSuffix(text: []const u8) []const u8 {

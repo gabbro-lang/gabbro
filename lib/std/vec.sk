@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.vec — `Vec(T)`, a growable array with an identity all k2's own.
+// std.vec — `Vec(T)`, a growable array with an identity all skarn's own.
 //
-// k2 containers are REGION-BOUND: a `Vec` carries a borrowed `*Arena` (its
+// skarn containers are REGION-BOUND: a `Vec` carries a borrowed `*Arena` (its
 // region) and grows by bump-allocating a bigger backing block from it. There are
 // no per-element frees and no destructors — when the region is `reset`/`deinit`,
 // every Vec that lived in it is gone at once. That's the whole memory model:
@@ -105,7 +105,7 @@ pub Vec :: struct($T: type) {
     pub clear :: fn(self: *Self) { self.count = 0usize; }
 
     // A deep copy of the live elements into region `into` (which may differ from
-    // this Vec's region — the k2 way to let data escape a scratch arena).
+    // this Vec's region — the skarn way to let data escape a scratch arena).
     pub clone_into :: fn(self: *Self, into: *Arena) -> Vec(T) {
         n: usize = self.count;
         if n < 1usize { n = 1usize; }

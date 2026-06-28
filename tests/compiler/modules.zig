@@ -1,5 +1,5 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
 // Multi-file tests use compileMulti with pre-loaded sources, so they exercise
 // module resolution without filesystem access.
@@ -21,7 +21,7 @@ test "modules: compileMulti with two source files" {
         \\}
     ;
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "math.sk", .source = math_src },
         .{ .file_name = "main.sk", .source = main_src },
     });
@@ -29,8 +29,8 @@ test "modules: compileMulti with two source files" {
 
     try std.testing.expectEqual(@as(usize, 4), fe.module.items.len);
 
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
     try std.testing.expectEqual(@as(usize, 3), m.functions.len);
 }
 
@@ -47,14 +47,14 @@ test "modules: public symbols from imported file are visible" {
         \\check :: fn(v: i32) -> bool { return utils::clamp(v); }
     ;
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "utils.sk", .source = utils },
         .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "modules: namespace import forms — as alias and .* glob" {
@@ -74,19 +74,19 @@ test "modules: namespace import forms — as alias and .* glob" {
         \\go :: fn() -> i32 { return twice(21); }
     ;
 
-    var fe1 = try k2.compileMulti(arena.allocator(), &.{
+    var fe1 = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "lib.sk", .source = lib },
         .{ .file_name = "aliased.sk", .source = aliased },
     });
     defer fe1.deinit(arena.allocator());
-    try k2.ir_mod.validateModule(try k2.lowerFrontend(arena.allocator(), fe1));
+    try skarn.ir_mod.validateModule(try skarn.lowerFrontend(arena.allocator(), fe1));
 
-    var fe2 = try k2.compileMulti(arena.allocator(), &.{
+    var fe2 = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "lib.sk", .source = lib },
         .{ .file_name = "globbed.sk", .source = globbed },
     });
     defer fe2.deinit(arena.allocator());
-    try k2.ir_mod.validateModule(try k2.lowerFrontend(arena.allocator(), fe2));
+    try skarn.ir_mod.validateModule(try skarn.lowerFrontend(arena.allocator(), fe2));
 }
 
 test "modules: two modules may define the same name (collision mangling)" {
@@ -102,15 +102,15 @@ test "modules: two modules may define the same name (collision mangling)" {
         \\#import b;
         \\main :: fn() -> i32 { return a::greet() + b::greet() * 10; }
     ;
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "a.sk", .source = a },
         .{ .file_name = "b.sk", .source = b },
         .{ .file_name = "main.sk", .source = main },
     });
     defer fe.deinit(arena.allocator());
 
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // Two distinct `greet` functions must exist (mangled apart), plus `main`.
     var greets: usize = 0;
@@ -134,12 +134,12 @@ test "modules: cross-module UFCS finds a method in the type's module" {
         \\#import lib.{ Box };
         \\run :: fn(b: Box) -> i32 { return b.get(); }
     ;
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "lib.sk", .source = lib },
         .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
-    try k2.ir_mod.validateModule(try k2.lowerFrontend(arena.allocator(), fe));
+    try skarn.ir_mod.validateModule(try skarn.lowerFrontend(arena.allocator(), fe));
 }
 
 test "modules: #run of a namespace call folds at comptime" {
@@ -151,14 +151,14 @@ test "modules: #run of a namespace call folds at comptime" {
         \\#import lib;
         \\main :: fn() -> i32 { return #run lib::twice(21); }
     ;
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "lib.sk", .source = lib },
         .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // `#run lib::twice(21)` must fold to a constant — `main` should contain no
     // runtime call instruction.
@@ -183,7 +183,7 @@ test "modules: bare import is namespace-only (no unqualified access)" {
         \\#import lib;
         \\run :: fn() -> i32 { return helper(); }
     ;
-    const result = k2.compileMulti(arena.allocator(), &.{
+    const result = skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "lib.sk", .source = lib },
         .{ .file_name = "app.sk", .source = app },
     });
@@ -198,7 +198,7 @@ test "modules: compile parses imports without resolving them" {
         \\#import std.io;
         \\hello :: fn() -> i32 { return 42; }
     ;
-    var fe = try k2.compile(arena.allocator(), "hello.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "hello.sk", src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectEqual(@as(usize, 2), fe.module.items.len);
 }
@@ -216,7 +216,7 @@ test "modules: selective import exposes only selected public names" {
         \\run :: fn() -> i32 { return add(1, 2); }
     ;
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "math.sk", .source = math_src },
         .{ .file_name = "app.sk", .source = app_src },
     });
@@ -241,11 +241,11 @@ test "modules: unselected and private names are not visible" {
         \\run :: fn() -> i32 { return other_value(); }
     ;
 
-    try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
+    try std.testing.expectError(error.SemanticFailed, skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "dependency.sk", .source = dependency },
         .{ .file_name = "private_use.sk", .source = private_use },
     }));
-    try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
+    try std.testing.expectError(error.SemanticFailed, skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "dependency.sk", .source = dependency },
         .{ .file_name = "unselected_use.sk", .source = unselected_use },
     }));
@@ -260,11 +260,11 @@ test "modules: selective imports reject missing and private declarations" {
         \\pub #inline shown :: fn() -> i32 { return hidden(); }
     ;
 
-    try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
+    try std.testing.expectError(error.SemanticFailed, skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "dependency.sk", .source = dependency },
         .{ .file_name = "private.sk", .source = "#import dependency.{hidden};" },
     }));
-    try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
+    try std.testing.expectError(error.SemanticFailed, skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "dependency.sk", .source = dependency },
         .{ .file_name = "missing.sk", .source = "#import dependency.{missing};" },
     }));
@@ -274,7 +274,7 @@ test "modules: missing modules are errors" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    try std.testing.expectError(error.IoError, k2.compileMulti(arena.allocator(), &.{
+    try std.testing.expectError(error.IoError, skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "app.sk", .source = "#import missing;" },
     }));
 }
@@ -283,7 +283,7 @@ test "modules: std root resolves independently of importing directory" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "std/io.sk", .source = "pub write_stdout :: fn() {}" },
         .{ .file_name = "app/main.sk", .source = "#import std.io.{write_stdout}; run :: fn() { write_stdout(); }" },
     });
@@ -305,7 +305,7 @@ test "modules: public constants and types respect visibility" {
         \\read :: fn(value: *Value) -> i32 { return value.item; }
     ;
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "dependency.sk", .source = dependency },
         .{ .file_name = "app.sk", .source = app },
     });
@@ -316,22 +316,22 @@ test "modules: compileFile resolves local imports from disk" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compileFile(
+    var fe = try skarn.compileFile(
         arena.allocator(),
         std.testing.io,
         "tests/fixtures/modules/main.sk",
     );
     defer fe.deinit(arena.allocator());
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "modules: compileMulti normalizes logical module paths" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = ".\\app\\dependency.sk", .source = "pub answer :: fn() -> i32 { return 42; }" },
         .{ .file_name = "./app/main.sk", .source = "#import dependency.{answer}; run :: fn() -> i32 { return answer(); }" },
     });
@@ -342,45 +342,45 @@ test "modules: configured std root loads std.mem" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compileFile(
+    var fe = try skarn.compileFile(
         arena.allocator(),
         std.testing.io,
         "tests/fixtures/stdlib/mem_app.sk",
     );
     defer fe.deinit(arena.allocator());
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "modules: configured std root loads std.io" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compileFileWithRuntime(
+    var fe = try skarn.compileFileWithRuntime(
         arena.allocator(),
         std.testing.io,
         "tests/fixtures/stdlib/io_app.sk",
     );
     defer fe.deinit(arena.allocator());
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "modules: game stdlib (std.math + std.rand + std.color) resolves and lowers" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compileFileWithRuntime(
+    var fe = try skarn.compileFileWithRuntime(
         arena.allocator(),
         std.testing.io,
         "tests/fixtures/stdlib/game_app.sk",
     );
     defer fe.deinit(arena.allocator());
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "modules: general stdlib (std.path + std.time + std.crypto) resolves and lowers" {
@@ -391,10 +391,10 @@ test "modules: general stdlib (std.path + std.time + std.crypto) resolves and lo
         "tests/fixtures/stdlib/time_app.sk",
         "tests/fixtures/stdlib/crypto_app.sk",
     }) |fixture| {
-        var fe = try k2.compileFileWithRuntime(arena.allocator(), std.testing.io, fixture);
+        var fe = try skarn.compileFileWithRuntime(arena.allocator(), std.testing.io, fixture);
         defer fe.deinit(arena.allocator());
-        const module = try k2.lowerFrontend(arena.allocator(), fe);
-        try k2.ir_mod.validateModule(module);
+        const module = try skarn.lowerFrontend(arena.allocator(), fe);
+        try skarn.ir_mod.validateModule(module);
     }
 }
 
@@ -402,15 +402,15 @@ test "modules: configured std root loads std.heap" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compileFileWithRuntime(
+    var fe = try skarn.compileFileWithRuntime(
         arena.allocator(),
         std.testing.io,
         "tests/fixtures/stdlib/heap_app.sk",
     );
     defer fe.deinit(arena.allocator());
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "modules: imported self functions are extension methods" {
@@ -426,14 +426,14 @@ test "modules: imported self functions are extension methods" {
         \\run :: fn() -> i32 { return 20.doubled().add(2); }
     ;
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "helpers.sk", .source = helpers },
         .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "parser: namespace-qualified generic type in a typed local (ns::Name(args))" {
@@ -448,7 +448,7 @@ test "parser: namespace-qualified generic type in a typed local (ns::Name(args))
         \\    return 0;
         \\}
     ;
-    const module = try k2.parseSource(arena.allocator(), "q.sk", src);
+    const module = try skarn.parseSource(arena.allocator(), "q.sk", src);
     const ty = module.items[0].function.body.?.statements[0].local_typed.ty;
     try std.testing.expect(ty == .generic_inst);
     try std.testing.expectEqualStrings("Atomic", ty.generic_inst.name);
@@ -473,21 +473,21 @@ test "modules: namespace-qualified generic type resolves + lowers (ns::Name(args
         \\    return p.a + p.b;
         \\}
     ;
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "lib.sk", .source = lib },
         .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "modules: unimported self functions are not extension methods" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
+    try std.testing.expectError(error.SemanticFailed, skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "helpers.sk", .source = "pub doubled :: fn(self: i32) -> i32 { return self * 2; }" },
         .{ .file_name = "app.sk", .source = "run :: fn() -> i32 { return 20.doubled(); }" },
     }));
@@ -511,12 +511,12 @@ test "modules: generic extension methods retain explicit type arguments" {
         \\}
     ;
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "helpers.sk", .source = helpers },
         .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }

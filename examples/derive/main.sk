@@ -1,5 +1,5 @@
 // derive — a metaprogramming showcase:
-//   1. `#run` runs ordinary K2 in the comptime VM and bakes the result as a
+//   1. `#run` runs ordinary Skarn in the comptime VM and bakes the result as a
 //      constant (Jai-style compile-time execution).
 //   2. `core::type_info` reflects a struct's schema at runtime with no codegen.
 

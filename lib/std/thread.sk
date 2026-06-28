@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // std.thread — native OS threads and structured helpers. Cross-platform: thread
-// creation/join/etc. go through the platform runtime's thread seam (windows.k2 →
-// CreateThread; linux.k2 → clone with an allocated child stack), so this module
+// creation/join/etc. go through the platform runtime's thread seam (windows.sk →
+// CreateThread; linux.sk → clone with an allocated child stack), so this module
 // is OS-agnostic.
 //
-// k2 favours *real OS threads* over async/await: no function colouring, no hidden
+// skarn favours *real OS threads* over async/await: no function colouring, no hidden
 // executor — a thread is a stack plus an entry point. Each thread runs an entry
 // `fn(*void) -> u32` with a single context pointer; the return value becomes the
 // thread's exit code.
 //
-// Because k2's ordinary function value is a fat `{fn, env}` closure that a C ABI
+// Because skarn's ordinary function value is a fat `{fn, env}` closure that a C ABI
 // cannot call, hand the entry over as `core::fn_ptr(my_worker)` — the raw thin
 // function pointer. The context pointer you pass MUST outlive the thread.
 //

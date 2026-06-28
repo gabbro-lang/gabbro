@@ -2,8 +2,8 @@
 // std.fmt — formatting on top of std.io.Writer: padding/alignment,
 // width-justified numbers, and joining.
 //
-// K2 has no variadic functions or format-string placeholders, so "printf-style"
-// output is built the K2 way: compose `*Writer` calls directly, and reach for
+// Skarn has no variadic functions or format-string placeholders, so "printf-style"
+// output is built the Skarn way: compose `*Writer` calls directly, and reach for
 // these helpers for the parts that are fiddly to hand-roll — padding a value
 // out to a column width, right-justifying a number, or joining a list with a
 // separator.

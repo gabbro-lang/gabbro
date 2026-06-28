@@ -1,10 +1,10 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
-const instructions = k2.vm_instructions;
-const engine = k2.vm_engine;
-const compiler = k2.vm_compiler;
-const Value = k2.vm_value.Value;
+const instructions = skarn.vm_instructions;
+const engine = skarn.vm_engine;
+const compiler = skarn.vm_compiler;
+const Value = skarn.vm_value.Value;
 const Instr = instructions.Instr;
 
 // ── Engine: hand-assembled bytecode ──────────────────────────────────────
@@ -109,9 +109,9 @@ test "engine: zones unwind on early return" {
     try std.testing.expectEqual(@as(usize, 0), vm.zone_stack.depth());
 }
 
-// ── End-to-end: K2 source → IR → bytecode → run ──────────────────────────
+// ── End-to-end: Skarn source → IR → bytecode → run ──────────────────────────
 
-/// Compile K2 source, lower to IR, compile the named function's module, and
+/// Compile Skarn source, lower to IR, compile the named function's module, and
 /// invoke it with `args`. Caller owns nothing; everything is freed here.
 fn runSource(
     src: []const u8,
@@ -122,9 +122,9 @@ fn runSource(
     defer arena.deinit();
     const a = arena.allocator();
 
-    var fe = try k2.compile(a, "vm_test.sk", src);
+    var fe = try skarn.compile(a, "vm_test.sk", src);
     defer fe.deinit(a);
-    const ir_module = try k2.lowerFrontend(a, fe);
+    const ir_module = try skarn.lowerFrontend(a, fe);
 
     var bc = try compiler.compileModule(std.testing.allocator, ir_module);
     defer bc.deinit(std.testing.allocator);
@@ -166,9 +166,9 @@ test "e2e: #run calls a function, folded to a constant" {
         \\square :: fn(x: i32) -> i32 { return x * x; }
         \\ANSWER :: #run square(7);
     ;
-    var fe = try k2.compile(a, "run.sk", src);
+    var fe = try skarn.compile(a, "run.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
+    const m = try skarn.lowerFrontend(a, fe);
 
     const g = for (m.globals) |gg| {
         if (std.mem.eql(u8, gg.name, "ANSWER")) break gg;
@@ -198,9 +198,9 @@ test "e2e: #run sizeof folds scalar, struct, and array sizes" {
         \\SP :: #run core::sizeof(Point);
         \\SA :: #run core::sizeof([4]i32);
     ;
-    var fe = try k2.compile(a, "sz.sk", src);
+    var fe = try skarn.compile(a, "sz.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
+    const m = try skarn.lowerFrontend(a, fe);
 
     try std.testing.expectEqual(@as(i128, 4), try globalInt(m, "SI"));
     try std.testing.expectEqual(@as(i128, 8), try globalInt(m, "SP"));
@@ -225,9 +225,9 @@ test "e2e: #run enum match folds to a constant" {
         \\}
         \\R :: #run rank(Dir.east);
     ;
-    var fe = try k2.compile(a, "enum.sk", src);
+    var fe = try skarn.compile(a, "enum.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
+    const m = try skarn.lowerFrontend(a, fe);
     try std.testing.expectEqual(@as(i128, 3), try globalInt(m, "R"));
 }
 
@@ -253,9 +253,9 @@ test "e2e: #run optionals (?? coalesce and !! unwrap)" {
         \\NONE :: #run none_or();
         \\UNW  :: #run unwrapped();
     ;
-    var fe = try k2.compile(a, "opt.sk", src);
+    var fe = try skarn.compile(a, "opt.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
+    const m = try skarn.lowerFrontend(a, fe);
     try std.testing.expectEqual(@as(i128, 5), try globalInt(m, "SOME"));
     try std.testing.expectEqual(@as(i128, 99), try globalInt(m, "NONE"));
     try std.testing.expectEqual(@as(i128, 7), try globalInt(m, "UNW"));
@@ -280,9 +280,9 @@ test "e2e: #run interface dynamic dispatch" {
         \\}
         \\AREA :: #run go();
     ;
-    var fe = try k2.compile(a, "iface.sk", src);
+    var fe = try skarn.compile(a, "iface.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
+    const m = try skarn.lowerFrontend(a, fe);
     try std.testing.expectEqual(@as(i128, 25), try globalInt(m, "AREA"));
 }
 
@@ -308,9 +308,9 @@ test "e2e: #run fallible with catch" {
         \\OKV :: #run safe(5);
         \\BADV :: #run safe(-3);
     ;
-    var fe = try k2.compile(a, "fallible.sk", src);
+    var fe = try skarn.compile(a, "fallible.sk", src);
     defer fe.deinit(a);
-    const m = try k2.lowerFrontend(a, fe);
+    const m = try skarn.lowerFrontend(a, fe);
     try std.testing.expectEqual(@as(i128, 10), try globalInt(m, "OKV"));
     try std.testing.expectEqual(@as(i128, -1), try globalInt(m, "BADV"));
 }

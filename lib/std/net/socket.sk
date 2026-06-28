@@ -3,7 +3,7 @@
 //
 // `Socket` wraps a Winsock `SOCKET` and carries the operations that are common
 // to every protocol: closing, half-close, and the socket options (timeouts,
-// address reuse, non-blocking mode, broadcast). `tcp.k2` and `udp.k2` embed a
+// address reuse, non-blocking mode, broadcast). `tcp.sk` and `udp.sk` embed a
 // `Socket` and add the protocol-specific verbs on top, so option handling lives
 // in exactly one place.
 
@@ -11,7 +11,7 @@
 #import std.net.os.{NetError};
 #import std.net.addr as addr;
 
-// 1/0 for a bool — k2 has no if-expression and bools aren't matchable, and the
+// 1/0 for a bool — skarn has no if-expression and bools aren't matchable, and the
 // socket options below all take a BOOL-as-int.
 bint :: fn(b: bool) -> i32 { if b { return 1; } return 0; }
 

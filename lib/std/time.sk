@@ -10,7 +10,7 @@
 //   ns := time::since_nanos(start);        // elapsed, never goes backwards
 //
 // The OS clocks come through the platform runtime's nanosecond seam
-// (windows.k2 → kernel32; linux.k2 → clock_gettime/nanosleep):
+// (windows.sk → kernel32; linux.sk → clock_gettime/nanosleep):
 //   os_wall_nanos()       -> i64   nanoseconds since 1970-01-01 UTC
 //   os_monotonic_nanos()  -> i64   monotonic nanoseconds (arbitrary origin)
 //   os_sleep_nanos(ns)            sleep at least ns nanoseconds

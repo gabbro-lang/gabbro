@@ -1,5 +1,5 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
 test "built-in constraint: a satisfying type is accepted (`$T: Numeric`)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -9,10 +9,10 @@ test "built-in constraint: a satisfying type is accepted (`$T: Numeric`)" {
         \\dbl :: fn($T: Numeric, x: T) -> T { return x +% x; }
         \\use :: fn() -> i32 { return dbl(20u8) as i32 + dbl(11) as i32; }  // 40 + 22
     ;
-    var fe = try k2.compile(arena.allocator(), "ok_constraint.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "ok_constraint.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
     // Numeric accepted both u8 and i32 (the literal) → two instantiations.
     try std.testing.expect(fe.types.generic_instantiations.items.len >= 1);
 }
@@ -27,7 +27,7 @@ test "built-in constraint: a non-satisfying type is rejected with a clear messag
         \\dbl :: fn($T: Numeric, x: T) -> T { return x; }
         \\use :: fn() -> i32 { p: P = .{ 0 }; _ := dbl(p); return 0; }
     ;
-    var fe = k2.compile(arena.allocator(), "bad_constraint.sk", src);
+    var fe = skarn.compile(arena.allocator(), "bad_constraint.sk", src);
     if (fe) |*f| {
         f.deinit(arena.allocator());
         try std.testing.expect(false); // should not compile
@@ -47,11 +47,11 @@ test "where clause: a satisfying type is accepted (user predicate over type_info
         \\{ return x +% x; }
         \\use :: fn() -> i32 { return dbl(21); }
     ;
-    var fe = try k2.compile(arena.allocator(), "where_ok.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "where_ok.sk", src);
     defer fe.deinit(arena.allocator());
     // The where predicate runs at lowering (on the comptime VM); a numeric T accepts.
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "where clause: a non-satisfying type is rejected during resolution (two-pass)" {
@@ -70,7 +70,7 @@ test "where clause: a non-satisfying type is rejected during resolution (two-pas
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "where_bad.sk", src),
+        skarn.compile(arena.allocator(), "where_bad.sk", src),
     );
 }
 
@@ -84,10 +84,10 @@ test "named constraint: `Name :: constraint($T)` accepts a satisfying type" {
         \\dbl :: fn($T: MyNum, x: T) -> T { return x +% x; }
         \\use :: fn() -> i32 { return dbl(21); }
     ;
-    var fe = try k2.compile(arena.allocator(), "constraint_ok.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "constraint_ok.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "named constraint: a non-satisfying type is rejected with the predicate's message" {
@@ -102,7 +102,7 @@ test "named constraint: a non-satisfying type is rejected with the predicate's m
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "constraint_bad.sk", src),
+        skarn.compile(arena.allocator(), "constraint_bad.sk", src),
     );
 }
 
@@ -117,10 +117,10 @@ test "named constraint: `core::require(T, Other)` composition accepts when all h
         \\use :: fn($T: Ordered, x: T) -> T { return x +% x; }
         \\go :: fn() -> i32 { return use(21); }
     ;
-    var fe = try k2.compile(arena.allocator(), "require_ok.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "require_ok.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "named constraint: `require` propagates the required constraint's rejection" {
@@ -137,7 +137,7 @@ test "named constraint: `require` propagates the required constraint's rejection
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "require_bad.sk", src),
+        skarn.compile(arena.allocator(), "require_bad.sk", src),
     );
 }
 
@@ -155,10 +155,10 @@ test "struct constraint: `struct($T: Name)` accepts a satisfying type (+ method)
         \\}
         \\use :: fn() -> i32 { c: Cell(i32) = .{ 7 }; return c.get(); }
     ;
-    var fe = try k2.compile(arena.allocator(), "struct_constraint_ok.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "struct_constraint_ok.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "struct constraint: a non-satisfying type is rejected at instantiation" {
@@ -175,7 +175,7 @@ test "struct constraint: a non-satisfying type is rejected at instantiation" {
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "struct_constraint_bad.sk", src),
+        skarn.compile(arena.allocator(), "struct_constraint_bad.sk", src),
     );
 }
 
@@ -196,7 +196,7 @@ test "struct constraint: a non-satisfying type is rejected through an in-struct 
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "struct_constraint_method_bad.sk", src),
+        skarn.compile(arena.allocator(), "struct_constraint_method_bad.sk", src),
     );
 }
 
@@ -220,10 +220,10 @@ test "where clause: output type param `-> $Acc` computed from type_info (two-pas
         \\}
         \\use :: fn() -> i32 { return acc_of(100u8) + acc_of(8i32); }
     ;
-    var fe = try k2.compile(arena.allocator(), "out_ty.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "out_ty.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
     // Two instantiations (u8 and i32), both with the body checked against Acc.
     try std.testing.expect(fe.types.generic_instantiations.items.len >= 2);
 }
@@ -241,7 +241,7 @@ test "where clause: output type param + reject coexist (reject a float)" {
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "out_ty_reject.sk", src),
+        skarn.compile(arena.allocator(), "out_ty_reject.sk", src),
     );
 }
 
@@ -261,15 +261,15 @@ test "generic function: inferred $T, monomorphized to i32" {
         \\    return x - y;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "generics.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "generics.sk", src);
     defer fe.deinit(arena.allocator());
 
     // Both calls use i32 — only one instantiation
     try std.testing.expectEqual(@as(usize, 1), fe.types.generic_instantiations.items.len);
     try std.testing.expectEqualStrings("min__T_i32", fe.types.generic_instantiations.items[0].mangled_name);
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 
     var found = false;
     for (module.functions) |f| {
@@ -291,13 +291,13 @@ test "generic function: two separate instantiations produce two IR functions" {
         \\    return b;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "generics2.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "generics2.sk", src);
     defer fe.deinit(arena.allocator());
 
     try std.testing.expectEqual(@as(usize, 2), fe.types.generic_instantiations.items.len);
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 
     var found_i32 = false;
     var found_bool = false;
@@ -321,7 +321,7 @@ test "generic function: same-type uses deduplicate to one instantiation" {
         \\    return a + b;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "dedup.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "dedup.sk", src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectEqual(@as(usize, 1), fe.types.generic_instantiations.items.len);
 }
@@ -334,10 +334,10 @@ test "generic function: two T params — second must match first" {
         \\eq_check :: fn(a: $T, b: T) -> bool { return a == b; }
         \\use :: fn() -> bool { return eq_check(1, 2); }
     ;
-    var fe = try k2.compile(arena.allocator(), "eq.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "eq.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "generic function: type mismatch between T params fails sema" {
@@ -350,7 +350,7 @@ test "generic function: type mismatch between T params fails sema" {
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "bad_generic.sk", bad),
+        skarn.compile(arena.allocator(), "bad_generic.sk", bad),
     );
 }
 
@@ -368,9 +368,9 @@ test "generic function: explicit $T: type param" {
         \\    return zeroed(i32);
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "zeroed.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "zeroed.sk", src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectEqual(@as(usize, 1), fe.types.generic_instantiations.items.len);
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }

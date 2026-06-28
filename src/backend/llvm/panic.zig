@@ -4,7 +4,7 @@ const llvm = @import("c_api.zig").llvm;
 const values = @import("values.zig");
 const ModuleCg = @import("context.zig").ModuleCg;
 
-/// Lower a compiler-generated panic through the shared K2 runtime contract.
+/// Lower a compiler-generated panic through the shared Skarn runtime contract.
 /// The declaration is synthesized when a library consumer lowers IR without
 /// prepending the embedded runtime.
 pub fn lower(cg: *ModuleCg, panic: ir.Panic) void {

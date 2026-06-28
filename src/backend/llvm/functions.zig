@@ -89,8 +89,8 @@ fn declareOne(cg: *ModuleCg, func: ir.IrFunction) !void {
     if (func.extern_name) |_| llvm.LLVMSetLinkage(lv, llvm.LLVMExternalLinkage);
     attrs.applyFunctionAttrs(cg, func, lv);
 
-    // A defined K2 function that isn't the entry point, `#export`ed, or external
-    // gets INTERNAL linkage. K2 emits the whole program as one object, so these
+    // A defined Skarn function that isn't the entry point, `#export`ed, or external
+    // gets INTERNAL linkage. Skarn emits the whole program as one object, so these
     // are module-private — and a global symbol like `exit`/`abort` would clash
     // with the C runtime once `link_libc` is used. (Also lets LLVM drop dead ones.)
     // `#weak` (overridable symbol) and `#keep` (survives stripping) need non-internal

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.heap — runtime dynamic memory for K2.
+// std.heap — runtime dynamic memory for Skarn.
 //
 // A bump arena: allocation is a pointer bump inside the current region.
 //
@@ -39,8 +39,8 @@
 #import std.ptr.{ align_up };
 
 // ── OS page memory ──────────────────────────────────────────────────────────
-// Page reserve/commit/release is provided by the platform runtime (windows.k2
-// → VirtualAlloc/VirtualFree; linux.k2 → mmap/mprotect/munmap), so this module
+// Page reserve/commit/release is provided by the platform runtime (windows.sk
+// → VirtualAlloc/VirtualFree; linux.sk → mmap/mprotect/munmap), so this module
 // stays OS-agnostic:
 //   os_reserve(size)       -> usize   reserve address space, no physical pages
 //   os_commit(addr, size)  -> bool    back [addr, addr+size) with RW pages
@@ -60,7 +60,7 @@ DEFAULT_CHUNK :: 65536usize;
 // area that follows is aligned.
 CHUNK_HEADER :: 32usize;
 
-// Every allocation is aligned to 16 bytes — the strictest alignment any K2
+// Every allocation is aligned to 16 bytes — the strictest alignment any Skarn
 // scalar/pointer needs.
 ALIGN :: 16usize;
 

@@ -1,10 +1,10 @@
 // Build script for diskscan — a fast, multithreaded disk-usage analyzer with a
 // native Win32 GUI. Two artifacts share one scanner:
 //
-//   k2 build              build both (CLI + GUI) into ./out, release
-//   k2 build run          build + run the CLI on the current directory
-//   k2 build gui          build + launch the GUI
-//   k2 build -Ddebug      unoptimized build with safety checks
+//   skarn build              build both (CLI + GUI) into ./out, release
+//   skarn build run          build + run the CLI on the current directory
+//   skarn build gui          build + launch the GUI
+//   skarn build -Ddebug      unoptimized build with safety checks
 //
 #import std.build.{ Build, Optimize, executable, optimize, release, debug,
                     subsystem, console, windowed, version, description,
@@ -16,7 +16,7 @@ build :: fn(b: Build) {
     dev: bool = b.option("debug");
 
     // ── CLI: console subsystem ───────────────────────────────────────────────
-    cli := b.executable("diskscan", "src/cli.k2");
+    cli := b.executable("diskscan", "src/cli.sk");
     cli.description("Fast multithreaded disk-usage analyzer (CLI)");
     cli.version(VERSION);
     cli.console();
@@ -25,7 +25,7 @@ build :: fn(b: Build) {
     cli.install();
 
     // ── GUI: windowed subsystem (no console window) ──────────────────────────
-    gui := b.executable("diskscan-gui", "src/gui.k2");
+    gui := b.executable("diskscan-gui", "src/gui.sk");
     gui.description("Disk-usage analyzer with a native browser GUI");
     gui.version(VERSION);
     gui.windowed();
@@ -34,9 +34,9 @@ build :: fn(b: Build) {
     gui.install();
 
     // ── steps ────────────────────────────────────────────────────────────────
-    // No `default` is set, so a bare `k2 build` builds *both* artifacts; the
+    // No `default` is set, so a bare `skarn build` builds *both* artifacts; the
     // named steps build-and-run one of them.
-    b.run_step("run", cli);     // k2 build run   → CLI on the current dir
-    b.run_step("gui", gui);     // k2 build gui   → launch the GUI
+    b.run_step("run", cli);     // skarn build run   → CLI on the current dir
+    b.run_step("gui", gui);     // skarn build gui   → launch the GUI
     b.summary();
 }

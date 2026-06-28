@@ -1,5 +1,5 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
 test "arithmetic and bitwise operators" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -12,13 +12,13 @@ test "arithmetic and bitwise operators" {
         \\shifts  :: fn(a: u32) -> u32 { return (a << 2) >> 1; }
         \\rem     :: fn(a: i32, b: i32) -> i32 { return a % b; }
     ;
-    var fe = try k2.compile(arena.allocator(), "arith.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "arith.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
     var opt = m;
-    try k2.ir_mod.runDefaultPasses(arena.allocator(), &opt);
-    try k2.ir_mod.validateModule(opt);
+    try skarn.ir_mod.runDefaultPasses(arena.allocator(), &opt);
+    try skarn.ir_mod.validateModule(opt);
 }
 
 test "comparison and logical operators" {
@@ -29,10 +29,10 @@ test "comparison and logical operators" {
         \\cmp :: fn(a: i32, b: i32) -> bool { return a <= b && b > 0 || a >= 0; }
         \\neg :: fn(x: bool) -> bool { return !x; }
     ;
-    var fe = try k2.compile(arena.allocator(), "cmp.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "cmp.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "compound assignment operators" {
@@ -51,10 +51,10 @@ test "compound assignment operators" {
         \\    return x;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "compound.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "compound.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "break and continue in while loop" {
@@ -76,10 +76,10 @@ test "break and continue in while loop" {
         \\    return result;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "break.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "break.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "CFG analysis rejects missing return on non-void function" {
@@ -91,7 +91,7 @@ test "CFG analysis rejects missing return on non-void function" {
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "bad.sk", bad),
+        skarn.compile(arena.allocator(), "bad.sk", bad),
     );
 }
 
@@ -104,7 +104,7 @@ test "break outside loop fails" {
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "bad_break.sk", bad),
+        skarn.compile(arena.allocator(), "bad_break.sk", bad),
     );
 }
 
@@ -120,11 +120,11 @@ test "constant folding folds binary ops in function body" {
         \\    return x;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "fold.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "fold.sk", src);
     defer fe.deinit(arena.allocator());
-    var m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.runDefaultPasses(arena.allocator(), &m);
-    try k2.ir_mod.validateModule(m);
+    var m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.runDefaultPasses(arena.allocator(), &m);
+    try skarn.ir_mod.validateModule(m);
     // Verify the function exists and its IR is valid
     try std.testing.expectEqual(@as(usize, 1), m.functions.len);
 }
@@ -145,10 +145,10 @@ test "zone block desugars to std.heap.Arena make/new/deinit" {
         \\    return true;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "zone.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "zone.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // The handle is a real std.heap.Arena: entering the zone calls `make`, the
     // body's `new`/`new_slice` lower as ordinary calls, and the zone exit calls
@@ -194,10 +194,10 @@ test "zone RAII: return inside zone deinits the arena first" {
         \\    return 0;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "raii.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "raii.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // A `return` inside the zone must tear the arena down first: the instruction
     // right before that `return` terminator is the `deinit` call.
@@ -231,7 +231,7 @@ test "zone ownership: allocations cannot escape" {
         \\    }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "zone_return.sk", returned));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "zone_return.sk", returned));
 
     const outer_assignment =
         \\bad :: fn() {
@@ -241,7 +241,7 @@ test "zone ownership: allocations cannot escape" {
         \\    }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "zone_outer.sk", outer_assignment));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "zone_outer.sk", outer_assignment));
 
     const passed_to_function =
         \\consume :: fn(value: *i32) {}
@@ -251,7 +251,7 @@ test "zone ownership: allocations cannot escape" {
         \\    }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "zone_call.sk", passed_to_function));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "zone_call.sk", passed_to_function));
 }
 
 test "zone borrowing: borrowed parameters may use and forward zone-owned values" {
@@ -273,10 +273,10 @@ test "zone borrowing: borrowed parameters may use and forward zone-owned values"
         \\    }
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "zone_borrow.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "zone_borrow.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "zone borrowing: borrowed values cannot be retained or returned" {
@@ -288,36 +288,36 @@ test "zone borrowing: borrowed values cannot be retained or returned" {
         \\    return data;
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "borrow_return.sk", returned));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "borrow_return.sk", returned));
 
     const ordinary_call =
         \\retain :: fn(data: []u8) {}
         \\bad :: fn(data: borrow []u8) { retain(data); }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "borrow_call.sk", ordinary_call));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "borrow_call.sk", ordinary_call));
 
     const stored =
         \\bad :: fn(data: borrow []u8, out: *[]u8) {
         \\    *out = data;
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "borrow_store.sk", stored));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "borrow_store.sk", stored));
 }
 
 test "zone borrowing: qualifier is restricted to checked pointer and slice parameters" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "borrow_scalar.sk",
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "borrow_scalar.sk",
         \\bad :: fn(value: borrow i32) {}
     ));
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "borrow_return_type.sk",
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "borrow_return_type.sk",
         \\bad :: fn() -> borrow []u8;
     ));
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "borrow_extern.sk",
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "borrow_extern.sk",
         \\bad :: fn(value: borrow []u8);
     ));
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "borrow_field.sk",
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "borrow_field.sk",
         \\Bad :: struct { value: borrow []u8, }
     ));
 }
@@ -331,7 +331,7 @@ test "zone ownership: only Arena is currently supported" {
         \\    zone scratch: Pool {}
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "zone_kind.sk", src));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "zone_kind.sk", src));
 }
 
 test "zone ownership: scalar reads may be passed and returned" {
@@ -347,7 +347,7 @@ test "zone ownership: scalar reads may be passed and returned" {
         \\    }
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "zone_scalar.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "zone_scalar.sk", src);
     defer fe.deinit(arena.allocator());
 }
 
@@ -362,10 +362,10 @@ test "defer: basic expression deferred to block end" {
         \\    return true;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "defer.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "defer.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     const func = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "work")) break f;
@@ -402,10 +402,10 @@ test "defer: LIFO order — last defer runs first" {
         \\    defer b();
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "defer_order.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "defer_order.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     const func = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "work")) break f;
@@ -441,10 +441,10 @@ test "defer inside zone block" {
         \\    return true;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "defer_zone.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "defer_zone.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     const work = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "work")) break f;
@@ -477,10 +477,10 @@ test "zone RAII: fail deinits the arena before propagation" {
         \\    }
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "zone_fail.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "zone_fail.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     const work = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "work")) break f;
@@ -507,10 +507,10 @@ test "unsafe_expr: unsafe prefix on expression is transparent" {
         \\    return unsafe core::unaligned_read(u8, ptr);
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "unsafe_expr.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "unsafe_expr.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "asm: zero-input volatile instruction (pause)" {
@@ -523,10 +523,10 @@ test "asm: zero-input volatile instruction (pause)" {
         \\    }
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "asm_pause.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "asm_pause.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "asm: input operands and typed output (syscall pattern)" {
@@ -544,10 +544,10 @@ test "asm: input operands and typed output (syscall pattern)" {
         \\    );
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "asm_syscall.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "asm_syscall.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // Verify the asm produces an inline_asm instruction with correct structure.
     const fn_ = for (m.functions) |f| {
@@ -577,7 +577,7 @@ test "asm: unsafe required — bare asm fails outside unsafe" {
     const bad =
         \\bad :: fn() { core::asm(volatile, "pause", inputs: {}, outputs: {}, clobbers: {}); }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_asm.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad_asm.sk", bad));
 }
 
 test "?? nil-coalesce: unwrap or default" {
@@ -594,10 +594,10 @@ test "?? nil-coalesce: unwrap or default" {
         \\    return find(ok) ?? -1;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "nil_coalesce.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "nil_coalesce.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // with_default should have a conditional branch (for the ?? check)
     const fn_ = for (m.functions) |f| {
@@ -624,17 +624,17 @@ test "!! force-unwrap: unwrap or panic" {
         \\    return find()!!;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "force_unwrap.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "force_unwrap.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // unwrap should have a null check and a structured panic terminator with
     // the source location of the force-unwrap expression.
     const fn_ = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "unwrap")) break f;
     } else return error.FunctionNotFound;
-    var panic: ?k2.ir_mod.Panic = null;
+    var panic: ?skarn.ir_mod.Panic = null;
     for (fn_.blocks) |block| {
         if (block.terminator) |t| switch (t) {
             .panic => |p| panic = p,
@@ -662,13 +662,13 @@ test "generated panic locations retain their defining source file" {
         \\main :: fn() -> i32 { return 0; }
     ;
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
         .{ .file_name = "helper.sk", .source = helper_src },
         .{ .file_name = "app.sk", .source = app_src },
     });
     defer fe.deinit(arena.allocator());
-    var module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.runDefaultPasses(arena.allocator(), &module);
+    var module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.runDefaultPasses(arena.allocator(), &module);
 
     const helper = for (module.functions) |function| {
         if (std.mem.eql(u8, function.name, "unwrap_helper")) break function;
@@ -693,7 +693,7 @@ test "?? type mismatch fails sema" {
     const bad =
         \\bad :: fn(v: ?i32) -> i32 { return v ?? "wrong"; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
 }
 
 test "!! on non-optional fails sema" {
@@ -703,7 +703,7 @@ test "!! on non-optional fails sema" {
     const bad =
         \\bad :: fn(v: i32) -> i32 { return v!!; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
 }
 
 test "if-else with both branches returning" {
@@ -719,10 +719,10 @@ test "if-else with both branches returning" {
         \\    }
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "abs.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "abs.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "@panic runtime parses, checks, and lowers" {
@@ -743,10 +743,10 @@ test "@panic runtime parses, checks, and lowers" {
         \\    if !cond { core::panic("assertion failed\n"); }
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "runtime/windows.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "runtime/windows.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     const panic_fn = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "@panic")) break f;
@@ -768,10 +768,10 @@ test "postfix as casts lower to cast instructions" {
         \\    return widened + (back as i64) + (roundtrip as i64);
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "casts.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "casts.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     const func = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "casts")) break f;
@@ -790,7 +790,7 @@ test "pointer as cast requires unsafe" {
     const bad =
         \\bad :: fn(addr: usize) -> *u32 { return addr as *u32; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_cast.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad_cast.sk", bad));
 }
 
 test "for range and slice loops lower with continue-safe increment blocks" {
@@ -821,10 +821,10 @@ test "for range and slice loops lower with continue-safe increment blocks" {
         \\    }
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "for.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "for.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     const range_fn = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "sum_range")) break f;
@@ -858,10 +858,10 @@ test "const: *const T is accepted as a parameter type" {
         \\    _ := sum(&pair);
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "const_ptr.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "const_ptr.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "const: *T is implicitly promoted to *const T" {
@@ -876,9 +876,9 @@ test "const: *T is implicitly promoted to *const T" {
         \\    return consume(p);
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "const_promote.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "const_promote.sk", src);
     defer fe.deinit(arena.allocator());
-    try k2.ir_mod.validateModule(try k2.lowerFrontend(arena.allocator(), fe));
+    try skarn.ir_mod.validateModule(try skarn.lowerFrontend(arena.allocator(), fe));
 }
 
 test "const: writing to field through *const T is rejected" {
@@ -891,7 +891,7 @@ test "const: writing to field through *const T is rejected" {
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "const_write.sk", bad),
+        skarn.compile(arena.allocator(), "const_write.sk", bad),
     );
 }
 
@@ -904,7 +904,7 @@ test "const: field write through *const T is rejected" {
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "const_field_write.sk", bad),
+        skarn.compile(arena.allocator(), "const_field_write.sk", bad),
     );
 }
 
@@ -927,9 +927,9 @@ test "static constraints: $T: Interface accepts conforming type" {
         \\process :: fn($T: Printer, item: *T) {}
         \\use :: fn(c: *Console) { process(c); }
     ;
-    var fe = try k2.compile(arena.allocator(), "constraint_ok.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "constraint_ok.sk", src);
     defer fe.deinit(arena.allocator());
-    try k2.ir_mod.validateModule(try k2.lowerFrontend(arena.allocator(), fe));
+    try skarn.ir_mod.validateModule(try skarn.lowerFrontend(arena.allocator(), fe));
 }
 
 test "static constraints: $T: Interface rejects non-conforming type" {
@@ -945,6 +945,6 @@ test "static constraints: $T: Interface rejects non-conforming type" {
     ;
     try std.testing.expectError(
         error.SemanticFailed,
-        k2.compile(arena.allocator(), "constraint_bad.sk", bad),
+        skarn.compile(arena.allocator(), "constraint_bad.sk", bad),
     );
 }

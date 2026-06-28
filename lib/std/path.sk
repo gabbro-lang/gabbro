@@ -8,11 +8,11 @@
 // sub-slices of their input. The builders (`join`, `with_extension`) take an
 // `*Arena`.
 //
-//   base := path::basename("src\\std\\io.k2");     // "io.k2"
-//   dir  := path::dirname ("src\\std\\io.k2");      // "src\std"
-//   ext  := path::extension("io.k2");               // ".k2"  (with the dot)
-//   stem := path::stem("io.k2");                    // "io"
-//   full := path::join(&a, "src\\std", "io.k2");    // "src\std\io.k2"
+//   base := path::basename("src\\std\\io.sk");     // "io.sk"
+//   dir  := path::dirname ("src\\std\\io.sk");      // "src\std"
+//   ext  := path::extension("io.sk");               // ".sk"  (with the dot)
+//   stem := path::stem("io.sk");                    // "io"
+//   full := path::join(&a, "src\\std", "io.sk");    // "src\std\io.sk"
 //
 // Invariant: `basename(p)` == `stem(p)` ++ `extension(p)`.
 
@@ -94,7 +94,7 @@ pub is_absolute :: fn(p: []const u8) -> bool {
 pub is_relative :: fn(p: []const u8) -> bool { return !is_absolute(p); }
 
 // True if `p`'s extension equals `want` (a leading dot in `want` is optional, so
-// both `has_extension(p, "k2")` and `has_extension(p, ".k2")` work).
+// both `has_extension(p, "sk")` and `has_extension(p, ".sk")` work).
 pub has_extension :: fn(p: []const u8, want: []const u8) -> bool {
     e := extension(p);
     if want.len > 0usize {

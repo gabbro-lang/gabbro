@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.io — synchronous, allocation-free I/O for K2.
+// std.io — synchronous, allocation-free I/O for Skarn.
 //
 // Interfaces:
 //   Writer  — anything bytes can be written to

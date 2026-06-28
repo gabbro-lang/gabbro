@@ -1,18 +1,18 @@
-//! k2 compiler CLI
+//! skarn compiler CLI
 //!
 //! Usage:
-//!   k2 check  <file.k2>                    — parse + type-check only
-//!   k2 build  <file.k2> [-o out.exe]       — compile to native exe (Windows)
-//!   k2 ir     <file.k2>                    — dump LLVM IR to stdout
-//!   k2 object <file.k2> [-o out.o]         — emit object file only
+//!   skarn check  <file.sk>                    — parse + type-check only
+//!   skarn build  <file.sk> [-o out.exe]       — compile to native exe (Windows)
+//!   skarn ir     <file.sk>                    — dump LLVM IR to stdout
+//!   skarn object <file.sk> [-o out.o]         — emit object file only
 //!
 //! Build with LLVM:  zig build -Dllvm-path=Y:/SDK/clang+llvm-22.1.6-x86_64-pc-windows-msvc
 
 const std = @import("std");
 const builtin = @import("builtin");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
-const version = k2.version; // single source: build.zig.zon (+git-sha for dev)
+const version = skarn.version; // single source: build.zig.zon (+git-sha for dev)
 
 // The Windows console defaults to a legacy OEM code page, which mangles the
 // UTF-8 bytes we print (✓, box-drawing). Switch it to UTF-8 (65001) at startup.
@@ -35,7 +35,7 @@ const Progress = struct {
     // ASCII spinner — braille glyphs aren't in most console fonts.
     const frames = [_][]const u8{ "|", "/", "-", "\\" };
 
-    fn step(self: *Progress, phase: k2.Phase) void {
+    fn step(self: *Progress, phase: skarn.Phase) void {
         if (self.quiet) return;
         const f = frames[self.frame % frames.len];
         self.frame += 1;
@@ -48,7 +48,7 @@ const Progress = struct {
     }
 };
 
-fn progressStep(ctx: ?*anyopaque, phase: k2.Phase) void {
+fn progressStep(ctx: ?*anyopaque, phase: skarn.Phase) void {
     const p: *Progress = @ptrCast(@alignCast(ctx.?));
     p.step(phase);
 }
@@ -107,12 +107,12 @@ pub fn main(init: std.process.Init) u8 {
         return 0;
     }
     if (eqAny(cmd, &.{ "version", "--version", "-v" })) {
-        std.debug.print("k2 {s}\n", .{version});
+        std.debug.print("skarn {s}\n", .{version});
         return 0;
     }
 
-    // `k2 build` with no source file (or a step/target name, or flags) runs the
-    // project's build.k2 in the build system. Only `k2 build <file>.k2` for an
+    // `skarn build` with no source file (or a step/target name, or flags) runs the
+    // project's build.sk in the build system. Only `skarn build <file>.sk` for an
     // existing file is a direct single-file build (handled below).
     if (std.mem.eql(u8, cmd, "build")) {
         const arg2: ?[]const u8 = if (args.len >= 3) args[2] else null;
@@ -122,14 +122,14 @@ pub fn main(init: std.process.Init) u8 {
         if (!is_direct) return cmdBuildDir(allocator, io, args[2..]);
     }
 
-    // `k2 bindgen <header.h>` generates K2 FFI bindings from a C header.
+    // `skarn bindgen <header.h>` generates Skarn FFI bindings from a C header.
     if (std.mem.eql(u8, cmd, "bindgen")) return cmdBindgen(allocator, io, init.environ_map, args[2..]);
 
-    // `k2 lsp` starts the language server (JSON-RPC over stdio). No source file.
-    if (std.mem.eql(u8, cmd, "lsp")) return k2.runLsp(allocator, io);
+    // `skarn lsp` starts the language server (JSON-RPC over stdio). No source file.
+    if (std.mem.eql(u8, cmd, "lsp")) return skarn.runLsp(allocator, io);
 
     if (args.len < 3) {
-        std.debug.print("k2: '{s}' needs a source file\n\n", .{cmd});
+        std.debug.print("skarn: '{s}' needs a source file\n\n", .{cmd});
         printUsage();
         return 1;
     }
@@ -142,20 +142,20 @@ pub fn main(init: std.process.Init) u8 {
     defer if (opts.llvm_bin_owned) allocator.free(opts.llvm_bin);
     var discovered_msvc: ?[]const u8 = null;
     defer if (discovered_msvc) |p| allocator.free(p);
-    if (k2.llvm_path.len != 0) {
-        opts.llvm_bin = std.fmt.allocPrint(allocator, "{s}/bin", .{k2.llvm_path}) catch return 1;
+    if (skarn.llvm_path.len != 0) {
+        opts.llvm_bin = std.fmt.allocPrint(allocator, "{s}/bin", .{skarn.llvm_path}) catch return 1;
         opts.llvm_bin_owned = true;
         opts.opt_level = if (@import("builtin").mode == .Debug) 0 else 2;
     }
-    if (k2.windows_sdk_lib_path.len != 0) {
-        opts.lib_paths.append(allocator, k2.windows_sdk_lib_path) catch return 1;
+    if (skarn.windows_sdk_lib_path.len != 0) {
+        opts.lib_paths.append(allocator, skarn.windows_sdk_lib_path) catch return 1;
     }
     // CRT search paths (harmless if no CRT lib is linked) — make `--libc` /
     // `link_libc()` resolvable: ucrt.lib (SDK) + vcruntime.lib (MSVC).
-    if (k2.ucrt_lib_path.len != 0) opts.lib_paths.append(allocator, k2.ucrt_lib_path) catch return 1;
-    if (k2.msvc_lib_path.len != 0) {
-        opts.lib_paths.append(allocator, k2.msvc_lib_path) catch return 1;
-    } else if (k2.msvc.discoverLibX64(allocator, io)) |p| {
+    if (skarn.ucrt_lib_path.len != 0) opts.lib_paths.append(allocator, skarn.ucrt_lib_path) catch return 1;
+    if (skarn.msvc_lib_path.len != 0) {
+        opts.lib_paths.append(allocator, skarn.msvc_lib_path) catch return 1;
+    } else if (skarn.msvc.discoverLibX64(allocator, io)) |p| {
         discovered_msvc = p;
         opts.lib_paths.append(allocator, p) catch return 1;
     }
@@ -189,7 +189,7 @@ pub fn main(init: std.process.Init) u8 {
             else if (std.mem.indexOf(u8, t, "windows") != null)
                 .windows
             else {
-                std.debug.print("k2: unknown --target `{s}` (expected linux, linux-gnu, or windows)\n", .{t});
+                std.debug.print("skarn: unknown --target `{s}` (expected linux, linux-gnu, or windows)\n", .{t});
                 return 1;
             };
             // `-gnu` selects the dynamically-linked glibc ABI; otherwise Linux is
@@ -220,7 +220,7 @@ pub fn main(init: std.process.Init) u8 {
         } else if (eqAny(a, &.{ "--libc", "-lc" })) {
             opts.link_libc = true;
         } else {
-            std.debug.print("k2: unknown option '{s}'\n", .{a});
+            std.debug.print("skarn: unknown option '{s}'\n", .{a});
             return 1;
         }
     }
@@ -233,18 +233,18 @@ pub fn main(init: std.process.Init) u8 {
         opts.extra_libs.append(allocator, "vcruntime") catch return 1;
     }
 
-    // ── Relocatable runtime: find the stdlib + the LLVM/linker dir wherever k2 is
+    // ── Relocatable runtime: find the stdlib + the LLVM/linker dir wherever skarn is
     // installed, so the binary isn't tied to its build machine. Resolved paths
     // live on the process arena (cleaned at exit).
     {
         const ra = init.arena.allocator();
         const exe_dir: ?[]const u8 = std.process.executableDirPathAlloc(io, ra) catch null;
-        // std root (dir containing `std/`): --std-path > $K2_STD > $K2_HOME/lib >
+        // std root (dir containing `std/`): --std-path > $SKARN_STD > $SKARN_HOME/lib >
         // exe-relative (lib, ../lib, ../../lib) > build-baked.
         if (resolveStdRoot(ra, io, init.environ_map, opts.std_path, exe_dir)) |root|
-            k2.pipeline_mod.stdlib_root_override = root;
+            skarn.pipeline_mod.stdlib_root_override = root;
         // LLVM/linker dir (lld + the LLVM-C/clang DLLs): --llvm-path (set above) >
-        // $K2_LLVM > lld next to k2.exe > build-baked (set above).
+        // $SKARN_LLVM > lld next to skarn.exe > build-baked (set above).
         if (!opts.llvm_from_flag) {
             if (resolveLlvmBin(ra, io, init.environ_map, exe_dir)) |bin| {
                 if (opts.llvm_bin_owned) allocator.free(opts.llvm_bin);
@@ -256,7 +256,7 @@ pub fn main(init: std.process.Init) u8 {
 
     const cwd = std.Io.Dir.cwd();
     const source = cwd.readFileAlloc(io, src_path, allocator, .unlimited) catch |err| {
-        std.debug.print("k2: cannot read '{s}': {s}\n", .{ src_path, @errorName(err) });
+        std.debug.print("skarn: cannot read '{s}': {s}\n", .{ src_path, @errorName(err) });
         return 1;
     };
     defer allocator.free(source);
@@ -276,21 +276,21 @@ pub fn main(init: std.process.Init) u8 {
         return cmdBuild(allocator, io, src_path, source, obj, exe, &opts);
     }
 
-    std.debug.print("k2: unknown command '{s}'\n\n", .{cmd});
+    std.debug.print("skarn: unknown command '{s}'\n\n", .{cmd});
     printUsage();
     return 1;
 }
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
-/// `k2 bindgen <header.h> [--lib <name>] [-o <out.k2>] [-I... -D...] [-- <clang args>]`
+/// `skarn bindgen <header.h> [--lib <name>] [-o <out.sk>] [-I... -D...] [-- <clang args>]`
 fn cmdBindgen(allocator: std.mem.Allocator, io: std.Io, env: anytype, args: []const []const u8) u8 {
-    if (!k2.llvm_enabled) {
-        std.debug.print("k2 bindgen: requires an LLVM-enabled build (libclang).\n    Rebuild: zig build -Dllvm-path=<path>\n", .{});
+    if (!skarn.llvm_enabled) {
+        std.debug.print("skarn bindgen: requires an LLVM-enabled build (libclang).\n    Rebuild: zig build -Dllvm-path=<path>\n", .{});
         return 1;
     }
     if (args.len == 0) {
-        std.debug.print("k2 bindgen: needs a header file\n    usage: k2 bindgen <header.h> [--lib <name>] [-o <out.k2>] [-- <clang args>]\n", .{});
+        std.debug.print("skarn bindgen: needs a header file\n    usage: skarn bindgen <header.h> [--lib <name>] [-o <out.sk>] [-- <clang args>]\n", .{});
         return 1;
     }
     const header = args[0];
@@ -317,7 +317,7 @@ fn cmdBindgen(allocator: std.mem.Allocator, io: std.Io, env: anytype, args: []co
         } else if (std.mem.startsWith(u8, a, "-I") or std.mem.startsWith(u8, a, "-D")) {
             clang_args.append(allocator, a) catch return 1;
         } else {
-            std.debug.print("k2 bindgen: unknown option '{s}'\n", .{a});
+            std.debug.print("skarn bindgen: unknown option '{s}'\n", .{a});
             return 1;
         }
     }
@@ -331,15 +331,15 @@ fn cmdBindgen(allocator: std.mem.Allocator, io: std.Io, env: anytype, args: []co
     defer if (exe_dir) |d| allocator.free(d);
     loadLibclang(allocator, io, env, exe_dir) catch return 1;
 
-    k2.bindgen.generate(allocator, io, header, lib, out_path, clang_args.items, exe_dir) catch |err| {
-        std.debug.print("k2 bindgen: failed: {s}\n", .{@errorName(err)});
+    skarn.bindgen.generate(allocator, io, header, lib, out_path, clang_args.items, exe_dir) catch |err| {
+        std.debug.print("skarn bindgen: failed: {s}\n", .{@errorName(err)});
         return 1;
     };
     return 0;
 }
 
-/// Find libclang and load it (bindgen only). Order: `$K2_LIBCLANG` (file or dir)
-/// > beside k2.exe > `<exe>/bindgen` > `$K2_LLVM/bin` > the build-time LLVM dir >
+/// Find libclang and load it (bindgen only). Order: `$SKARN_LIBCLANG` (file or dir)
+/// > beside skarn.exe > `<exe>/bindgen` > `$SKARN_LLVM/bin` > the build-time LLVM dir >
 /// the bare name (OS loader search). Prints how to get it on total failure.
 fn loadLibclang(allocator: std.mem.Allocator, io: std.Io, env: anytype, exe_dir: ?[]const u8) !void {
     const name = switch (@import("builtin").os.tag) {
@@ -347,12 +347,12 @@ fn loadLibclang(allocator: std.mem.Allocator, io: std.Io, env: anytype, exe_dir:
         .macos => "libclang.dylib",
         else => "libclang.so",
     };
-    // 1. $K2_LIBCLANG — a direct path to the library, or a dir containing it.
-    if (env.get("K2_LIBCLANG")) |v| {
+    // 1. $SKARN_LIBCLANG — a direct path to the library, or a dir containing it.
+    if (env.get("SKARN_LIBCLANG")) |v| {
         if (fileExists(io, v) and tryLoadClang(v)) return;
         if (tryLoadClangIn(allocator, io, v, name)) return;
     }
-    // 2/3. Beside k2.exe, then `<exe>/bindgen` (the component layout).
+    // 2/3. Beside skarn.exe, then `<exe>/bindgen` (the component layout).
     if (exe_dir) |ed| {
         if (tryLoadClangIn(allocator, io, ed, name)) return;
         if (std.fmt.allocPrint(allocator, "{s}/bindgen", .{ed})) |sub| {
@@ -360,15 +360,15 @@ fn loadLibclang(allocator: std.mem.Allocator, io: std.Io, env: anytype, exe_dir:
             if (tryLoadClangIn(allocator, io, sub, name)) return;
         } else |_| {}
     }
-    // 4/5. `$K2_LLVM/bin`, then the build-time LLVM dir (dev/CI fallback).
-    if (env.get("K2_LLVM")) |r| {
+    // 4/5. `$SKARN_LLVM/bin`, then the build-time LLVM dir (dev/CI fallback).
+    if (env.get("SKARN_LLVM")) |r| {
         if (std.fmt.allocPrint(allocator, "{s}/bin", .{r})) |b| {
             defer allocator.free(b);
             if (tryLoadClangIn(allocator, io, b, name)) return;
         } else |_| {}
     }
-    if (k2.llvm_path.len != 0) {
-        if (std.fmt.allocPrint(allocator, "{s}/bin", .{k2.llvm_path})) |b| {
+    if (skarn.llvm_path.len != 0) {
+        if (std.fmt.allocPrint(allocator, "{s}/bin", .{skarn.llvm_path})) |b| {
             defer allocator.free(b);
             if (tryLoadClangIn(allocator, io, b, name)) return;
         } else |_| {}
@@ -377,19 +377,19 @@ fn loadLibclang(allocator: std.mem.Allocator, io: std.Io, env: anytype, exe_dir:
     if (tryLoadClang(name)) return;
 
     std.debug.print(
-        \\k2 bindgen: could not find {s}.
+        \\skarn bindgen: could not find {s}.
         \\    bindgen is an optional feature — libclang is not bundled with the core compiler.
         \\    Provide it any of these ways:
-        \\      - put {s} next to k2.exe (or in a 'bindgen' folder beside it)
-        \\      - set K2_LIBCLANG to its full path
-        \\      - set K2_LLVM to an LLVM install (uses its bin/<libclang>)
+        \\      - put {s} next to skarn.exe (or in a 'bindgen' folder beside it)
+        \\      - set SKARN_LIBCLANG to its full path
+        \\      - set SKARN_LLVM to an LLVM install (uses its bin/<libclang>)
         \\
     , .{ name, name });
     return error.LibclangNotFound;
 }
 
 fn tryLoadClang(path: []const u8) bool {
-    k2.bindgen.loadClang(path) catch return false;
+    skarn.bindgen.loadClang(path) catch return false;
     return true;
 }
 
@@ -401,8 +401,8 @@ fn tryLoadClangIn(allocator: std.mem.Allocator, io: std.Io, dir: []const u8, nam
 }
 
 fn cmdCheck(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source: []const u8) u8 {
-    var fe = k2.compileFileWithRuntime(allocator, io, path) catch |err| {
-        std.debug.print("k2: {s}\n", .{@errorName(err)});
+    var fe = skarn.compileFileWithRuntime(allocator, io, path) catch |err| {
+        std.debug.print("skarn: {s}\n", .{@errorName(err)});
         return 1;
     };
     defer fe.deinit(allocator);
@@ -413,13 +413,13 @@ fn cmdCheck(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source: 
 }
 
 fn cmdIr(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source: []const u8) u8 {
-    if (!k2.llvm_enabled) return noLlvm();
-    var fe = k2.compileFileWithRuntime(allocator, io, path) catch return 1;
+    if (!skarn.llvm_enabled) return noLlvm();
+    var fe = skarn.compileFileWithRuntime(allocator, io, path) catch return 1;
     defer fe.deinit(allocator);
     printDiags(allocator, fe.diagnostics(), path, source);
-    var module = k2.lowerFrontend(allocator, fe) catch return 1;
-    k2.ir_mod.runDefaultPasses(allocator, &module) catch return 1;
-    var be = k2.LlvmBackend.init(allocator, "k2");
+    var module = skarn.lowerFrontend(allocator, fe) catch return 1;
+    skarn.ir_mod.runDefaultPasses(allocator, &module) catch return 1;
+    var be = skarn.LlvmBackend.init(allocator, "sk");
     defer be.deinit();
     be.lower(module) catch return 1;
     const text = be.getIrText(allocator) catch return 1;
@@ -432,10 +432,10 @@ fn cmdIr(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source: []c
 }
 
 fn cmdObject(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source: []const u8, obj_path: []const u8, opts: *Options) u8 {
-    if (!k2.llvm_enabled) return noLlvm();
+    if (!skarn.llvm_enabled) return noLlvm();
     var progress = Progress{ .quiet = opts.quiet };
-    var timings: k2.Timings = .{};
-    k2.compileFileWithLlvm(allocator, io, .{
+    var timings: skarn.Timings = .{};
+    skarn.compileFileWithLlvm(allocator, io, .{
         .file_name = path,
         .source = source,
         .obj_path = obj_path,
@@ -451,7 +451,7 @@ fn cmdObject(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source:
         .timings = &timings,
     }) catch |err| {
         progress.clear();
-        std.debug.print("k2: {s}\n", .{@errorName(err)});
+        std.debug.print("skarn: {s}\n", .{@errorName(err)});
         return 1;
     };
     progress.clear();
@@ -461,10 +461,10 @@ fn cmdObject(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source:
 }
 
 fn cmdBuild(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source: []const u8, obj_path: []const u8, exe_path: []const u8, opts: *Options) u8 {
-    if (!k2.llvm_enabled) return noLlvm();
+    if (!skarn.llvm_enabled) return noLlvm();
     var progress = Progress{ .quiet = opts.quiet };
-    var timings: k2.Timings = .{};
-    k2.compileFileWithLlvm(allocator, io, .{
+    var timings: skarn.Timings = .{};
+    skarn.compileFileWithLlvm(allocator, io, .{
         .file_name = path,
         .source = source,
         .obj_path = obj_path,
@@ -482,7 +482,7 @@ fn cmdBuild(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source: 
         .timings = &timings,
     }) catch |err| {
         progress.clear();
-        std.debug.print("k2: {s}\n", .{@errorName(err)});
+        std.debug.print("skarn: {s}\n", .{@errorName(err)});
         return 1;
     };
     progress.clear();
@@ -491,18 +491,18 @@ fn cmdBuild(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source: 
     return 0;
 }
 
-// ── Build system (`k2 build` with a build.k2) ──────────────────────────────────
+// ── Build system (`skarn build` with a build.sk) ──────────────────────────────────
 
 fn cmdBuildDir(allocator: std.mem.Allocator, io: std.Io, rest: []const []const u8) u8 {
-    if (!k2.llvm_enabled) return noLlvm();
+    if (!skarn.llvm_enabled) return noLlvm();
 
-    var opts = k2.build_driver.RunOptions{};
+    var opts = skarn.build_driver.RunOptions{};
 
     var llvm_bin: []const u8 = "";
     var llvm_bin_owned = false;
     defer if (llvm_bin_owned) allocator.free(llvm_bin);
-    if (k2.llvm_path.len != 0) {
-        llvm_bin = std.fmt.allocPrint(allocator, "{s}/bin", .{k2.llvm_path}) catch return 1;
+    if (skarn.llvm_path.len != 0) {
+        llvm_bin = std.fmt.allocPrint(allocator, "{s}/bin", .{skarn.llvm_path}) catch return 1;
         llvm_bin_owned = true;
     }
 
@@ -510,12 +510,12 @@ fn cmdBuildDir(allocator: std.mem.Allocator, io: std.Io, rest: []const []const u
     defer lib_paths.deinit(allocator);
     var discovered_msvc: ?[]const u8 = null;
     defer if (discovered_msvc) |p| allocator.free(p);
-    if (k2.windows_sdk_lib_path.len != 0) lib_paths.append(allocator, k2.windows_sdk_lib_path) catch return 1;
-    // CRT search paths so a build.k2 `app.link_libc()` resolves (harmless otherwise).
-    if (k2.ucrt_lib_path.len != 0) lib_paths.append(allocator, k2.ucrt_lib_path) catch return 1;
-    if (k2.msvc_lib_path.len != 0) {
-        lib_paths.append(allocator, k2.msvc_lib_path) catch return 1;
-    } else if (k2.msvc.discoverLibX64(allocator, io)) |p| {
+    if (skarn.windows_sdk_lib_path.len != 0) lib_paths.append(allocator, skarn.windows_sdk_lib_path) catch return 1;
+    // CRT search paths so a build.sk `app.link_libc()` resolves (harmless otherwise).
+    if (skarn.ucrt_lib_path.len != 0) lib_paths.append(allocator, skarn.ucrt_lib_path) catch return 1;
+    if (skarn.msvc_lib_path.len != 0) {
+        lib_paths.append(allocator, skarn.msvc_lib_path) catch return 1;
+    } else if (skarn.msvc.discoverLibX64(allocator, io)) |p| {
         discovered_msvc = p;
         lib_paths.append(allocator, p) catch return 1;
     }
@@ -554,7 +554,7 @@ fn cmdBuildDir(allocator: std.mem.Allocator, io: std.Io, rest: []const []const u
             // A build option: `-Dname` (flag) or `-Dname=value`, read by `b.option*`.
             options.append(allocator, arg[2..]) catch return 1;
         } else if (arg.len > 0 and arg[0] == '-') {
-            std.debug.print("k2 build: unknown option '{s}'\n", .{arg});
+            std.debug.print("skarn build: unknown option '{s}'\n", .{arg});
             return 1;
         } else if (opts.target == null) {
             opts.target = arg;
@@ -567,12 +567,12 @@ fn cmdBuildDir(allocator: std.mem.Allocator, io: std.Io, rest: []const []const u
 
     const build_path = "build.sk";
     if (!fileExists(io, build_path)) {
-        std.debug.print("k2 build: no build.k2 in the current directory\n", .{});
+        std.debug.print("skarn build: no build.sk in the current directory\n", .{});
         return 1;
     }
 
-    k2.build_driver.run(allocator, io, build_path, opts) catch |err| {
-        std.debug.print("k2 build: {s}\n", .{@errorName(err)});
+    skarn.build_driver.run(allocator, io, build_path, opts) catch |err| {
+        std.debug.print("skarn build: {s}\n", .{@errorName(err)});
         return 1;
     };
     return 0;
@@ -594,13 +594,13 @@ fn dirHasFile(io: std.Io, dir: []const u8, rel: []const u8) bool {
 }
 
 /// Find the standard-library root (the directory containing `std/`), returning a
-/// path allocated on `ra` (the process arena). Order: `--std-path` > `$K2_STD` >
-/// `$K2_HOME/lib` > exe-relative (`lib`, `../lib`, `../../lib`) > build-baked.
+/// path allocated on `ra` (the process arena). Order: `--std-path` > `$SKARN_STD` >
+/// `$SKARN_HOME/lib` > exe-relative (`lib`, `../lib`, `../../lib`) > build-baked.
 fn resolveStdRoot(ra: std.mem.Allocator, io: std.Io, env: anytype, flag: []const u8, exe_dir: ?[]const u8) ?[]const u8 {
     if (flag.len > 0) return ra.dupe(u8, flag) catch null;
-    if (env.get("K2_STD")) |v|
+    if (env.get("SKARN_STD")) |v|
         if (dirHasFile(io, v, "std/io.sk")) return ra.dupe(u8, v) catch null;
-    if (env.get("K2_HOME")) |home| {
+    if (env.get("SKARN_HOME")) |home| {
         if (std.fmt.allocPrint(ra, "{s}/lib", .{home}) catch null) |c|
             if (dirHasFile(io, c, "std/io.sk")) return c;
     }
@@ -610,20 +610,20 @@ fn resolveStdRoot(ra: std.mem.Allocator, io: std.Io, env: anytype, flag: []const
             if (dirHasFile(io, cand, "std/io.sk")) return cand;
         }
     }
-    if (k2.stdlib_root.len > 0 and dirHasFile(io, k2.stdlib_root, "std/io.sk"))
-        return ra.dupe(u8, k2.stdlib_root) catch null;
+    if (skarn.stdlib_root.len > 0 and dirHasFile(io, skarn.stdlib_root, "std/io.sk"))
+        return ra.dupe(u8, skarn.stdlib_root) catch null;
     return null;
 }
 
-/// Find the LLVM/linker bin dir (the LLVM DLLs + any linker shipped beside k2).
-/// Order: `$K2_LLVM/bin` > the exe's own dir > null (keep what `--llvm-path` /
+/// Find the LLVM/linker bin dir (the LLVM DLLs + any linker shipped beside skarn).
+/// Order: `$SKARN_LLVM/bin` > the exe's own dir > null (keep what `--llvm-path` /
 /// the build-baked path resolved). Marker is `LLVM-C.dll`: it's in both an LLVM
-/// install and the k2 core bin, and unlike `lld-link.exe` it survives the switch
-/// to in-process linking (k2lld.dll). The Linux cross-linker `ld.lld.exe`, when
+/// install and the skarn core bin, and unlike `lld-link.exe` it survives the switch
+/// to in-process linking (skarnlld.dll). The Linux cross-linker `ld.lld.exe`, when
 /// shipped, lives in this same dir, so cross-compiles resolve it here too.
 fn resolveLlvmBin(ra: std.mem.Allocator, io: std.Io, env: anytype, exe_dir: ?[]const u8) ?[]const u8 {
     const lld = if (@import("builtin").os.tag == .windows) "LLVM-C.dll" else "ld.lld";
-    if (env.get("K2_LLVM")) |v| {
+    if (env.get("SKARN_LLVM")) |v| {
         if (std.fmt.allocPrint(ra, "{s}/bin", .{v}) catch null) |b|
             if (dirHasFile(io, b, lld)) return b;
     }
@@ -638,7 +638,7 @@ fn ms(ns: u64) f64 {
     return @as(f64, @floatFromInt(ns)) / 1_000_000.0;
 }
 
-fn printTimings(t: k2.Timings, _: []const u8) void {
+fn printTimings(t: skarn.Timings, _: []const u8) void {
     std.debug.print("\n", .{});
     printRow("front-end", t.frontend_ns);
     printRow("lowering", t.lower_ns);
@@ -648,7 +648,7 @@ fn printTimings(t: k2.Timings, _: []const u8) void {
     printRow("link", t.link_ns);
     std.debug.print("  ───────────────────────\n", .{});
     printRow("total", t.total_ns);
-    // Comptime time is a slice of front-end + lowering — K2's signature cost.
+    // Comptime time is a slice of front-end + lowering — Skarn's signature cost.
     if (t.comptime_ns != 0) {
         std.debug.print("  (of which comptime: {d: >7.2} ms)\n", .{ms(t.comptime_ns)});
     }
@@ -666,7 +666,7 @@ fn eqAny(s: []const u8, options: []const []const u8) bool {
 }
 
 fn noLlvm() u8 {
-    std.debug.print("k2: LLVM backend not enabled.\n" ++
+    std.debug.print("skarn: LLVM backend not enabled.\n" ++
         "    Rebuild: zig build -Dllvm-path=<path>\n", .{});
     return 1;
 }
@@ -676,9 +676,9 @@ fn deriveOut(allocator: std.mem.Allocator, src: []const u8, ext: []const u8) []c
     return std.fmt.allocPrint(allocator, "{s}{s}", .{ stem, ext }) catch src;
 }
 
-fn printDiags(allocator: std.mem.Allocator, diags: []const k2.Diagnostic, path: []const u8, source: []const u8) void {
+fn printDiags(allocator: std.mem.Allocator, diags: []const skarn.Diagnostic, path: []const u8, source: []const u8) void {
     for (diags) |d| {
-        const rendered = k2.renderDiagnostic(allocator, path, source, d) catch continue;
+        const rendered = skarn.renderDiagnostic(allocator, path, source, d) catch continue;
         defer allocator.free(rendered);
         std.debug.print("{s}\n", .{rendered});
     }
@@ -686,32 +686,32 @@ fn printDiags(allocator: std.mem.Allocator, diags: []const k2.Diagnostic, path: 
 
 fn printUsage() void {
     std.debug.print(
-        \\k2 {s} — a systems language with compile-time metaprogramming
+        \\skarn {s} — a systems language with compile-time metaprogramming
         \\
-        \\usage:  k2 <command> <file.k2> [options]
+        \\usage:  skarn <command> <file.sk> [options]
         \\
         \\commands:
-        \\  build                  run ./build.k2 (the build system) — see below
+        \\  build                  run ./build.sk (the build system) — see below
         \\  build    <name>        build a named artifact, or `run`/a step
-        \\  build    <file.k2>     compile and link a single file directly
-        \\  check    <file.k2>     parse and type-check only
-        \\  object   <file.k2>     compile to an object file (.o)
-        \\  ir       <file.k2>     print LLVM IR to stdout
-        \\  bindgen  <header.h>    generate K2 FFI bindings from a C header
+        \\  build    <file.sk>     compile and link a single file directly
+        \\  check    <file.sk>     parse and type-check only
+        \\  object   <file.sk>     compile to an object file (.o)
+        \\  ir       <file.sk>     print LLVM IR to stdout
+        \\  bindgen  <header.h>    generate Skarn FFI bindings from a C header
         \\  version                print the compiler version
         \\  help                   show this message
         \\
-        \\C bindings (k2 bindgen, requires an LLVM-enabled build):
-        \\  k2 bindgen <h> --lib <name> -o <out.k2>   generate bindings for a C library
-        \\  k2 bindgen <h> -I<dir> -D<sym>            pass include dirs / defines to clang
-        \\  k2 bindgen <h> -- <clang args...>         forward arbitrary args to clang
+        \\C bindings (skarn bindgen, requires an LLVM-enabled build):
+        \\  skarn bindgen <h> --lib <name> -o <out.sk>   generate bindings for a C library
+        \\  skarn bindgen <h> -I<dir> -D<sym>            pass include dirs / defines to clang
+        \\  skarn bindgen <h> -- <clang args...>         forward arbitrary args to clang
         \\
-        \\build system (k2 build, with a build.k2 in the current directory):
-        \\  k2 build               build the default artifact (or all of them)
-        \\  k2 build run [-- args] build the default exe, then run it
-        \\  k2 build <name>        build a named artifact or run a named step
-        \\  k2 build --list        list the project's artifacts and steps
-        \\  k2 build --release     build at release optimization
+        \\build system (skarn build, with a build.sk in the current directory):
+        \\  skarn build               build the default artifact (or all of them)
+        \\  skarn build run [-- args] build the default exe, then run it
+        \\  skarn build <name>        build a named artifact or run a named step
+        \\  skarn build --list        list the project's artifacts and steps
+        \\  skarn build --release     build at release optimization
         \\
         \\options:
         \\  -o <path>              output file (default: derived from the source name)

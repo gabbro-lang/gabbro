@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-/// K2 Windows runtime — compiled automatically into every Windows K2 program.
+/// Skarn Windows runtime — compiled automatically into every Windows Skarn program.
 /// Provides: @panic, assert, write_stdout, write_stderr
 /// No libc. Uses kernel32.dll only (always available on Windows).
 
@@ -21,7 +21,7 @@ WriteFile :: fn(
 ExitProcess :: fn(code: u32);
 
 // Closes an open object handle (files, processes, threads, ...). Declared
-// here — rather than in std.fs / std.process — because k2's symbol table is
+// here — rather than in std.fs / std.process — because skarn's symbol table is
 // flat and global; multiple stdlib modules need this primitive, and `#extern`
 // functions must keep their real Win32 export name (it doubles as the link
 // symbol), so there's no way to give each module its own private copy.
@@ -345,7 +345,7 @@ os_proc_release :: fn(token: i64) {
 }
 
 // ── OS sockets (backs std.net) ───────────────────────────────────────────────
-// Winsock2 passthrough — std.net already passes Windows level/option constants.
+// Winsocskarn passthrough — std.net already passes Windows level/option constants.
 
 #extern("ws2_32", "WSAStartup") ws_startup :: fn(version: u16, data: *u8) -> i32;
 #extern("ws2_32", "WSACleanup") ws_cleanup :: fn() -> i32;

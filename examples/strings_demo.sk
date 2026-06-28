@@ -1,5 +1,5 @@
 // std.strings showcase: a growable StringBuilder + byte-string utilities.
-// Build:  k2 build examples/strings_demo.k2 && strings_demo.exe
+// Build:  skarn build examples/strings_demo.sk && strings_demo.exe
 
 #import std.heap;
 #import std.strings;

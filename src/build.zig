@@ -1,11 +1,11 @@
-//! The `k2 build` build system driver.
+//! The `skarn build` build system driver.
 //!
-//! Runs a project's `build.k2` `build :: fn(b: Build)` entry inside the comptime
+//! Runs a project's `build.sk` `build :: fn(b: Build)` entry inside the comptime
 //! VM (via `ir.runBuildHook`), recording each `std.build` call into a `BuildPlan`
 //! through the VM's host-call bridge, then compiles + links the declared
-//! artifacts with the normal LLVM/k2lnk driver.
+//! artifacts with the normal LLVM/skarnld driver.
 //!
-//! See docs/10_build_system.md for the design and `std/build.k2` for the API.
+//! See docs/10_build_system.md for the design and `std/build.sk` for the API.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -76,7 +76,7 @@ pub const Dep = struct {
     kind: u8, // 0 path, 1 git
 };
 
-/// The configuration a `build.k2` produces. All strings are duped into `arena`,
+/// The configuration a `build.sk` produces. All strings are duped into `arena`,
 /// so the plan outlives the FrontEnd the build script ran against.
 pub const BuildPlan = struct {
     arena: std.heap.ArenaAllocator,
@@ -332,14 +332,14 @@ fn hasFlag(options: []const []const u8, name: []const u8) bool {
 // ── Options + entry ──────────────────────────────────────────────────────────
 
 pub const RunOptions = struct {
-    /// A requested target/step name (`k2 build <name>`), or null for the default.
+    /// A requested target/step name (`skarn build <name>`), or null for the default.
     target: ?[]const u8 = null,
     /// Override every artifact to a release optimization level.
     release: bool = false,
     /// Just print the artifacts and steps, build nothing.
     list: bool = false,
     quiet: bool = false,
-    /// Force-link the C runtime for every artifact (`k2 build --libc`), even if
+    /// Force-link the C runtime for every artifact (`skarn build --libc`), even if
     /// auto-detection didn't flag a static C lib. An escape hatch.
     link_libc: bool = false,
     /// LLVM bin dir + default library search paths, forwarded from the CLI.
@@ -347,11 +347,11 @@ pub const RunOptions = struct {
     lib_paths: []const []const u8 = &.{},
     /// Extra args passed through to a `run` step's executable.
     run_args: []const []const u8 = &.{},
-    /// `-Dname` / `-Dname=value` build options, exposed to `b.option*` in build.k2.
+    /// `-Dname` / `-Dname=value` build options, exposed to `b.option*` in build.sk.
     options: []const []const u8 = &.{},
 };
 
-/// Run `build_path` (a build.k2) and execute the resulting plan.
+/// Run `build_path` (a build.sk) and execute the resulting plan.
 pub fn run(gpa: std.mem.Allocator, io: std.Io, build_path: []const u8, opts: RunOptions) BuildError!void {
     var plan = BuildPlan.init(gpa);
     defer plan.deinit();
@@ -414,7 +414,7 @@ fn executePlan(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir: [
             }
         }
         if (target_idx == null) {
-            std.debug.print("k2 build: no artifact or step named '{s}'\n", .{name});
+            std.debug.print("skarn build: no artifact or step named '{s}'\n", .{name});
             return error.UnknownTarget;
         }
     }
@@ -462,8 +462,8 @@ fn buildArtifact(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir:
     }
 
     // Library search paths: the CLI defaults + the artifact's own + the project
-    // dir itself, so a `raylib.lib` sitting next to `build.k2` links regardless of
-    // the working directory `k2 build` was invoked from.
+    // dir itself, so a `raylib.lib` sitting next to `build.sk` links regardless of
+    // the working directory `skarn build` was invoked from.
     var lib_paths: std.ArrayList([]const u8) = .empty;
     lib_paths.appendSlice(a, opts.lib_paths) catch return error.OutOfMemory;
     for (art.lib_paths.items) |lp| {
@@ -480,8 +480,8 @@ fn buildArtifact(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir:
     // archive needs the C runtime; an import library's sibling DLL is copied next
     // to the output. We search the artifact's own lib paths PLUS the project dir
     // itself — the linker also looks in the working directory, so running
-    // `k2 build` from a vendor lib folder (where `raylib.lib` sits next to
-    // `build.k2`) still triggers detection. Explicit static_link()/runtime_file()
+    // `skarn build` from a vendor lib folder (where `raylib.lib` sits next to
+    // `build.sk`) still triggers detection. Explicit static_link()/runtime_file()
     // still apply on top of this.
     var search_dirs: std.ArrayList([]const u8) = .empty;
     for (art.lib_paths.items) |lp|
@@ -501,7 +501,7 @@ fn buildArtifact(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir:
                     // `static_link()` asserts intent: warn if the resolved lib is
                     // actually an import library (you'll get a dynamic link).
                     if (art.link_mode == 1)
-                        std.debug.print("k2 build: warning: '{s}' requested static linking, but '{s}/{s}.lib' is an import library — the link will be DYNAMIC. Point lib_path at the static archive.\n", .{ lib_name, dir, lib_name });
+                        std.debug.print("skarn build: warning: '{s}' requested static linking, but '{s}/{s}.lib' is an import library — the link will be DYNAMIC. Point lib_path at the static archive.\n", .{ lib_name, dir, lib_name });
                     auto_dlls.append(a, joinPath(a, dir, dll) catch continue) catch {};
                     if (!opts.quiet) std.debug.print("  {s} → dynamic ({s})\n", .{ lib_name, dll });
                 },
@@ -549,7 +549,7 @@ fn buildArtifact(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir:
         .honor_defaultlibs = honor_defaultlibs,
         .link_libc = need_libc,
     }) catch |err| {
-        std.debug.print("k2 build: failed to build '{s}': {s}\n", .{ art.name, @errorName(err) });
+        std.debug.print("skarn build: failed to build '{s}': {s}\n", .{ art.name, @errorName(err) });
         return error.CompileFailed;
     };
 
@@ -566,7 +566,7 @@ fn buildArtifact(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir:
         const dst = joinPath(a, out_dir, std.fs.path.basename(csrc)) catch continue;
         if (std.mem.eql(u8, csrc, dst)) continue; // already in place
         const data = readSource(gpa, io, csrc) orelse {
-            std.debug.print("k2 build: runtime file not found: {s}\n", .{csrc});
+            std.debug.print("skarn build: runtime file not found: {s}\n", .{csrc});
             continue;
         };
         defer gpa.free(data);
@@ -600,7 +600,7 @@ fn runArtifact(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir: [
     }
 }
 
-/// Run a `test_dir` step: compile + run every `*.k2` file directly under `dir`
+/// Run a `test_dir` step: compile + run every `*.sk` file directly under `dir`
 /// as a standalone program. A test passes when it exits 0. Reports each result
 /// and a pass/fail tally; fails the step if any test fails.
 fn runTestDir(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir: []const u8, dir_rel: []const u8, opts: RunOptions) BuildError!void {
@@ -608,11 +608,11 @@ fn runTestDir(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir: []
     const dir_abs = joinPath(a, base_dir, dir_rel) catch return error.OutOfMemory;
 
     var dir = std.Io.Dir.cwd().openDir(io, dir_abs, .{ .iterate = true }) catch {
-        std.debug.print("k2 build: cannot open test directory '{s}'\n", .{dir_abs});
+        std.debug.print("skarn build: cannot open test directory '{s}'\n", .{dir_abs});
         return error.RunFailed;
     };
     defer dir.close(io);
-    std.Io.Dir.cwd().createDirPath(io, ".zig-cache/k2test") catch {};
+    std.Io.Dir.cwd().createDirPath(io, ".zig-cache/skarntest") catch {};
 
     if (!opts.quiet) std.debug.print("running tests in {s}/\n", .{dir_abs});
     var passed: u32 = 0;
@@ -624,7 +624,7 @@ fn runTestDir(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir: []
         // `entry.name` is only valid until the next iteration — copy it.
         const name = a.dupe(u8, entry.name) catch continue;
         const src_path = joinPath(a, dir_abs, name) catch continue;
-        const exe = std.fmt.allocPrint(a, ".zig-cache/k2test/{s}.exe", .{name}) catch continue;
+        const exe = std.fmt.allocPrint(a, ".zig-cache/skarntest/{s}.exe", .{name}) catch continue;
         const obj = std.fmt.allocPrint(a, "{s}.o", .{exe}) catch continue;
         const src = readSource(gpa, io, src_path) orelse continue;
         defer gpa.free(src);

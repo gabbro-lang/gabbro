@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.fs — minimal synchronous file I/O for K2. Cross-platform: every OS call
-// goes through the platform runtime's file seam (windows.k2 → kernel32;
-// linux.k2 → openat/read/write/close/lseek/getdents64), so this module itself
+// std.fs — minimal synchronous file I/O for Skarn. Cross-platform: every OS call
+// goes through the platform runtime's file seam (windows.sk → kernel32;
+// linux.sk → openat/read/write/close/lseek/getdents64), so this module itself
 // is OS-agnostic.
 //
 // Provides:

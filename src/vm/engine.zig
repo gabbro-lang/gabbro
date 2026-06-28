@@ -35,7 +35,7 @@ const Frame = struct {
     zone_watermark: usize,
 };
 
-/// The K2 compile-time virtual machine.
+/// The Skarn compile-time virtual machine.
 /// A side-effecting bridge to the embedding host, invoked by the `host_call`
 /// opcode. The build driver installs one so `std.build`'s `__build_*` intrinsics
 /// record into a BuildPlan. `op` is a `BuildOp`; `args` are the call arguments

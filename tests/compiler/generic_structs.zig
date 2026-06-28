@@ -1,5 +1,5 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
 test "generic struct: declaration and basic instantiation" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -21,10 +21,10 @@ test "generic struct: declaration and basic instantiation" {
         \\    return p.first + p.second;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "pair.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "pair.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // The instantiated struct should appear in module.structs
     var found_pair_i32 = false;
@@ -56,10 +56,10 @@ test "generic struct: ArrayList-style container" {
         \\    return list.len;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "list.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "list.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // Two separate instantiations: ArrayList(i32) and ArrayList(u8)
     var count: usize = 0;
@@ -85,10 +85,10 @@ test "generic struct: two type params" {
         \\    return 0;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "map.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "map.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     var found = false;
     for (m.structs) |s| {
@@ -110,10 +110,10 @@ test "generic struct: same type used twice gives one instantiation" {
         \\a :: fn(b: *Box(i32)) -> i32 { return b.value; }
         \\c :: fn(b: *Box(i32)) -> i32 { return b.value + 1; }
     ;
-    var fe = try k2.compile(arena.allocator(), "box.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "box.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     var count: usize = 0;
     for (m.structs) |s| {

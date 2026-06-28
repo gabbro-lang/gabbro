@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.map — hash maps with a k2 flavour.
+// std.map — hash maps with a skarn flavour.
 //
 // Two maps, both open-addressed (linear probing) and REGION-BOUND like the rest
-// of k2's containers — the backing tables live in an `Arena`, so there are no
+// of skarn's containers — the backing tables live in an `Arena`, so there are no
 // per-entry frees; a `reset`/`deinit` of the region reclaims the whole map.
 //
 //   AutoHashMap(K, V)  — keys ANY value type. No `Hash`/`Eq` impl, no derive,

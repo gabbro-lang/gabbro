@@ -1,5 +1,0 @@
-; Exports the self-hosted linker's in-process entry from k2.exe when k2lnk is
-; statically linked in (`zig build -Dembed-linker`). link.zig finds it with
-; GetProcAddress on k2.exe's own module; without it, it loads k2lnk.dll instead.
-EXPORTS
-    k2_link_mem

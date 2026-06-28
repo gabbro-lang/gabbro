@@ -1,7 +1,7 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
-test "k2 errors: declarations fail propagate catch and split defer" {
+test "skarn errors: declarations fail propagate catch and split defer" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
@@ -59,11 +59,11 @@ test "k2 errors: declarations fail propagate catch and split defer" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "errors.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "errors.sk", src);
     defer fe.deinit(arena.allocator());
 
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 
     try std.testing.expectEqual(@as(usize, 1), module.errors.len);
     try std.testing.expectEqualStrings("NetError", module.errors[0].name);
@@ -83,11 +83,11 @@ test "k2 errors: declarations fail propagate catch and split defer" {
     try std.testing.expect(hasBuiltin(download, "catch_handler"));
 
     var opt = module;
-    try k2.ir_mod.runDefaultPasses(arena.allocator(), &opt);
-    try k2.ir_mod.validateModule(opt);
+    try skarn.ir_mod.runDefaultPasses(arena.allocator(), &opt);
+    try skarn.ir_mod.validateModule(opt);
 }
 
-test "k2 errors: fail payload type is checked" {
+test "skarn errors: fail payload type is checked" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
@@ -98,10 +98,10 @@ test "k2 errors: fail payload type is checked" {
         \\}
     ;
 
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_error_payload.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad_error_payload.sk", bad));
 }
 
-test "k2 errors: anonymous inline error sets are checked" {
+test "skarn errors: anonymous inline error sets are checked" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
@@ -118,13 +118,13 @@ test "k2 errors: anonymous inline error sets are checked" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "anon_errors.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "anon_errors.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
-test "k2 errors: unknown variants in inline error sets fail" {
+test "skarn errors: unknown variants in inline error sets fail" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
@@ -134,10 +134,10 @@ test "k2 errors: unknown variants in inline error sets fail" {
         \\}
     ;
 
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_error_variant.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad_error_variant.sk", bad));
 }
 
-test "k2 errors: postfix try outside fallible function fails" {
+test "skarn errors: postfix try outside fallible function fails" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
@@ -148,17 +148,17 @@ test "k2 errors: postfix try outside fallible function fails" {
         \\}
     ;
 
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_try.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad_try.sk", bad));
 }
 
-fn findFunction(module: k2.IrModule, name: []const u8) ?k2.ir_mod.IrFunction {
+fn findFunction(module: skarn.IrModule, name: []const u8) ?skarn.ir_mod.IrFunction {
     for (module.functions) |function| {
         if (std.mem.eql(u8, function.name, name)) return function;
     }
     return null;
 }
 
-fn hasFail(function: k2.ir_mod.IrFunction) bool {
+fn hasFail(function: skarn.ir_mod.IrFunction) bool {
     for (function.blocks) |block| {
         if (block.terminator) |term| switch (term) {
             .fail => return true,
@@ -168,7 +168,7 @@ fn hasFail(function: k2.ir_mod.IrFunction) bool {
     return false;
 }
 
-fn hasCall(function: k2.ir_mod.IrFunction, name: []const u8) bool {
+fn hasCall(function: skarn.ir_mod.IrFunction, name: []const u8) bool {
     for (function.blocks) |block| {
         for (block.instrs) |instr| switch (instr.kind) {
             .call => |call| if (std.mem.eql(u8, call.callee, name)) return true,
@@ -178,7 +178,7 @@ fn hasCall(function: k2.ir_mod.IrFunction, name: []const u8) bool {
     return false;
 }
 
-fn hasBuiltin(function: k2.ir_mod.IrFunction, name: []const u8) bool {
+fn hasBuiltin(function: skarn.ir_mod.IrFunction, name: []const u8) bool {
     for (function.blocks) |block| {
         for (block.instrs) |instr| switch (instr.kind) {
             .builtin => |builtin| if (std.mem.eql(u8, builtin.name, name)) return true,

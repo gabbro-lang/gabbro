@@ -1,5 +1,5 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
 test "runtime: @panic and assert are available via compileWithRuntime" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -14,10 +14,10 @@ test "runtime: @panic and assert are available via compileWithRuntime" {
         \\}
     ;
     // compile() alone would fail ("unknown function `assert`")
-    var fe = try k2.compileWithRuntime(arena.allocator(), "main.sk", src);
+    var fe = try skarn.compileWithRuntime(arena.allocator(), "main.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 
     // The complete core runtime contract should be present.
     const fn_names = [_][]const u8{ "assert", "assert_msg", "@panic", "write_stdout", "write_stderr", "exit", "abort" };
@@ -33,21 +33,21 @@ test "runtime: @panic and assert are available via compileWithRuntime" {
 }
 
 test "runtime: supported platform sources are explicit and independently valid" {
-    try std.testing.expect(k2.k2_runtime.runtimeSourceFor(.windows, false) != null);
-    try std.testing.expect(k2.k2_runtime.runtimeSourceFor(.linux, false) != null);
-    try std.testing.expect(k2.k2_runtime.runtimeSourceFor(.linux, true) != null); // linux-gnu
-    try std.testing.expect(k2.k2_runtime.runtimeSourceFor(.macos, false) == null);
+    try std.testing.expect(skarn.skarn_runtime.runtimeSourceFor(.windows, false) != null);
+    try std.testing.expect(skarn.skarn_runtime.runtimeSourceFor(.linux, false) != null);
+    try std.testing.expect(skarn.skarn_runtime.runtimeSourceFor(.linux, true) != null); // linux-gnu
+    try std.testing.expect(skarn.skarn_runtime.runtimeSourceFor(.macos, false) == null);
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "<runtime-linux>", .source = k2.k2_runtime.runtimeSourceFor(.linux, false).? },
+    var fe = try skarn.compileMulti(arena.allocator(), &.{
+        .{ .file_name = "<runtime-linux>", .source = skarn.skarn_runtime.runtimeSourceFor(.linux, false).? },
         .{ .file_name = "main.sk", .source = "main :: fn() -> i32 { return 0; }" },
     });
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "runtime: compile() without runtime — assert not available" {
@@ -58,7 +58,7 @@ test "runtime: compile() without runtime — assert not available" {
         \\use :: fn() { assert(true); }
     ;
     // compile() has no runtime → assert is unknown → SemanticFailed
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bare.sk", src));
+    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bare.sk", src));
 }
 
 test "runtime: write_stdout is available for programs" {
@@ -67,13 +67,13 @@ test "runtime: write_stdout is available for programs" {
 
     const src =
         \\main :: fn() -> i32 {
-        \\    return write_stdout("Hello, K2!\n") as i32;
+        \\    return write_stdout("Hello, Skarn!\n") as i32;
         \\}
     ;
-    var fe = try k2.compileWithRuntime(arena.allocator(), "hello.sk", src);
+    var fe = try skarn.compileWithRuntime(arena.allocator(), "hello.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }
 
 test "runtime: exit and abort are terminating calls" {
@@ -88,10 +88,10 @@ test "runtime: exit and abort are terminating calls" {
         \\    abort();
         \\}
     ;
-    var fe = try k2.compileWithRuntime(arena.allocator(), "terminate.sk", src);
+    var fe = try skarn.compileWithRuntime(arena.allocator(), "terminate.sk", src);
     defer fe.deinit(arena.allocator());
-    const module = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(module);
+    const module = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(module);
 }
 
 test "runtime: @panic is #noreturn — CFG allows body without return" {
@@ -108,8 +108,8 @@ test "runtime: @panic is #noreturn — CFG allows body without return" {
         \\    return x;
         \\}
     ;
-    var fe = try k2.compileWithRuntime(arena.allocator(), "validate.sk", src);
+    var fe = try skarn.compileWithRuntime(arena.allocator(), "validate.sk", src);
     defer fe.deinit(arena.allocator());
-    const m = try k2.lowerFrontend(arena.allocator(), fe);
-    try k2.ir_mod.validateModule(m);
+    const m = try skarn.lowerFrontend(arena.allocator(), fe);
+    try skarn.ir_mod.validateModule(m);
 }

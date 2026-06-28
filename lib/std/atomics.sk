@@ -7,7 +7,7 @@
 // like C/LLVM.
 //
 // **Type safety is enforced at compile time** via `where`-style constraints built
-// on `core::type_info` reflection (k2's equivalent of C3's `@require`/`@if`): a
+// on `core::type_info` reflection (skarn's equivalent of C3's `@require`/`@if`): a
 // bitwise op on a float, or any atomic op on a non-scalar type, is a compile error
 // with a clear message — not a confusing backend failure. See the constraints
 // below; they are what `$T: Numeric` etc. refer to.

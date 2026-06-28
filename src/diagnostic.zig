@@ -54,39 +54,39 @@ pub const Diagnostic = struct {
 /// Call as: printIce("what failed", @src())
 pub fn printIce(message: []const u8, comptime src: std.builtin.SourceLocation) void {
     std.debug.print(
-        "k2: internal compiler error: {s}\n    [at {s}:{d} in {s}]\n",
+        "skarn: internal compiler error: {s}\n    [at {s}:{d} in {s}]\n",
         .{ message, src.file, src.line, src.fn_name },
     );
 }
 
-/// Print a user-facing error tied to a K2 source location (not an ICE — this is
+/// Print a user-facing error tied to a Skarn source location (not an ICE — this is
 /// for genuine user errors discovered during lowering, e.g. a `#run` expression
 /// the comptime VM cannot evaluate).
 pub fn printErrorAt(
     message: []const u8,
-    k2_file: []const u8,
-    k2_source: []const u8,
+    skarn_file: []const u8,
+    skarn_source: []const u8,
     span: Span,
 ) void {
-    const location = span.line_col(k2_source);
+    const location = span.line_col(skarn_source);
     std.debug.print(
         "{s}:{d}:{d}: error: {s}\n",
-        .{ k2_file, location.line, location.col, message },
+        .{ skarn_file, location.line, location.col, message },
     );
 }
 
-/// Print an ICE with an associated K2 source location.
+/// Print an ICE with an associated Skarn source location.
 pub fn printIceAt(
     message: []const u8,
-    k2_file: []const u8,
-    k2_source: []const u8,
+    skarn_file: []const u8,
+    skarn_source: []const u8,
     span: Span,
     comptime src: std.builtin.SourceLocation,
 ) void {
-    const location = span.line_col(k2_source);
+    const location = span.line_col(skarn_source);
     std.debug.print(
         "{s}:{d}:{d}: internal compiler error: {s}\n    [at {s}:{d} in {s}]\n",
-        .{ k2_file, location.line, location.col, message, src.file, src.line, src.fn_name },
+        .{ skarn_file, location.line, location.col, message, src.file, src.line, src.fn_name },
     );
 }
 
@@ -100,7 +100,7 @@ pub fn renderDiagnostic(
     errdefer out.deinit(allocator);
 
     if (diagnostic.kind == .ice) {
-        // ICEs may or may not have a K2 source location.
+        // ICEs may or may not have a Skarn source location.
         if (diagnostic.file.len > 0 and (diagnostic.span.start != 0 or diagnostic.span.end != 0)) {
             const location = diagnostic.span.line_col(source);
             try out.print(allocator, "{s}:{d}:{d}: ", .{ path, location.line, location.col });

@@ -30,7 +30,7 @@ pub CreateFileA :: fn(name: *const u8, access: u32, share: u32, sec: ?*void, dis
 pub GetFileInformationByHandleEx :: fn(handle: usize, class: u32, buf: *void, size: u32) -> bool;
 
 // NOTE: CloseHandle is already provided globally by the runtime prelude
-// (src/runtime/windows.k2) — call it bare, don't redeclare it.
+// (src/runtime/windows.sk) — call it bare, don't redeclare it.
 
 #extern("kernel32", "WideCharToMultiByte")
 pub WideCharToMultiByte :: fn(cp: u32, flags: u32, wstr: *const u16, wlen: i32, out: *u8, outlen: i32, def: ?*const u8, used: ?*bool) -> i32;

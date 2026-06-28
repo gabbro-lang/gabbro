@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // std.process — process info, environment variables, and child-process
-// spawning for K2. Cross-platform: every OS call goes through the platform
-// runtime's process seam (windows.k2 → kernel32; linux.k2 → getpid + /proc +
+// spawning for Skarn. Cross-platform: every OS call goes through the platform
+// runtime's process seam (windows.sk → kernel32; linux.sk → getpid + /proc +
 // fork/execve/wait4/kill), so this module is OS-agnostic.
 //
 // Provides:
@@ -11,7 +11,7 @@
 //   Child / spawn / wait / try_wait / kill / release — child-process management
 //   ProcessError               — error set shared by all std.process operations
 //
-// `exit`, `abort`, and `@panic` live in the always-available K2 runtime — you
+// `exit`, `abort`, and `@panic` live in the always-available Skarn runtime — you
 // don't need to import this module to use them.
 //
 // PLATFORM NOTES (Linux): `command_line`/`get_env` read /proc/self/{cmdline,
@@ -111,7 +111,7 @@ pub Child :: struct {
 }
 
 // Launch `command` (program plus arguments, exactly as you'd type at a shell —
-// e.g. `"k2 build --release"`) as a new process. The child inherits the parent's
+// e.g. `"skarn build --release"`) as a new process. The child inherits the parent's
 // console/standard handles. On Linux the command runs via `/bin/sh -c`.
 pub spawn :: fn(command: []const u8) -> Child ! ProcessError {
     cmd_buf: [1024]u8 = .{};

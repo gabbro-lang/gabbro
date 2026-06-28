@@ -1,11 +1,11 @@
 // Compiler-provided `ast.*` type surface for metaprogramming (Phase 2,
-// generative Flavor A). These are ordinary K2 types — a faithful subset of the
+// generative Flavor A). These are ordinary Skarn types — a faithful subset of the
 // compiler's own AST in `src/ast.zig` — so user code can construct them (via
 // `#quote`), `match` on them, and return them from a comptime function. The
 // materializer (`materializeExpr`/`materializeStmt`) and reifier (`Reifier`) in
 // `ir.zig` map between these aggregates and real `ast.zig` nodes.
 //
-// K2 has a flat type namespace (no `ast.Block` qualified form yet), so these use
+// Skarn has a flat type namespace (no `ast.Block` qualified form yet), so these use
 // an `Ast` prefix. Identity fields (NodeId/Span) are intentionally omitted — the
 // compiler stamps those when reifying at the splice site. Recursive references
 // inside expression payloads use `*AstExpr` / `*AstType` to keep types finite.
@@ -137,7 +137,7 @@ pub const compiler_source =
 /// `materializeTypeInfo`. `void_`/`boolean` avoid the `void`/`bool` keywords.
 /// `Any` — a type-erased value: a borrowed pointer to the data plus the data's
 /// `typeid`. The wrap (`core::any(x)`) is compiler-driven (it spills `x` and records
-/// `core::type_id(T)`); the rest is ordinary generic K2, so downcasting is safe.
+/// `core::type_id(T)`); the rest is ordinary generic Skarn, so downcasting is safe.
 pub const any_source =
     \\Any :: struct { data: *const u8, id: usize, name: []const u8 }
     \\

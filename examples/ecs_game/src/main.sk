@@ -2,8 +2,8 @@
 //
 // A turret at the centre of the field auto-fires at the nearest asteroid;
 // asteroids drift, bounce off the walls, and split into fragments when destroyed.
-// The world is a struct-of-arrays component store (see world.k2); each tick runs
-// the spawner / fire / movement / collision / lifetime systems (see systems.k2).
+// The world is a struct-of-arrays component store (see world.sk); each tick runs
+// the spawner / fire / movement / collision / lifetime systems (see systems.sk).
 // Every 30 frames it renders an ASCII snapshot, then prints a final report.
 
 #import std.heap.{ Arena, make, new };

@@ -1,5 +1,5 @@
 const std = @import("std");
-const k2 = @import("k2_compiler");
+const skarn = @import("skarn_compiler");
 
 test "diagnostics: return type mismatch shows types" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -8,7 +8,7 @@ test "diagnostics: return type mismatch shows types" {
     const bad =
         \\bad :: fn() -> i32 { return true; }
     ;
-    const result = k2.compile(arena.allocator(), "bad.sk", bad);
+    const result = skarn.compile(arena.allocator(), "bad.sk", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -20,7 +20,7 @@ test "diagnostics: returning a capturing closure is rejected (would dangle)" {
     const bad =
         \\make :: fn(n: i32) -> fn(i32) -> i32 { return fn(x: i32) -> i32 { return x + n; }; }
     ;
-    const result = k2.compile(arena.allocator(), "escape.sk", bad);
+    const result = skarn.compile(arena.allocator(), "escape.sk", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -31,7 +31,7 @@ test "diagnostics: returning a capturing closure held in a local is rejected" {
     const bad =
         \\make :: fn(n: i32) -> fn(i32) -> i32 { f := fn(x: i32) -> i32 { return x + n; }; return f; }
     ;
-    const result = k2.compile(arena.allocator(), "escape2.sk", bad);
+    const result = skarn.compile(arena.allocator(), "escape2.sk", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -43,7 +43,7 @@ test "diagnostics: returning a non-capturing function value is allowed" {
         \\dbl :: fn(x: i32) -> i32 { return x * 2; }
         \\get :: fn() -> fn(i32) -> i32 { return dbl; }
     ;
-    var fe = try k2.compile(arena.allocator(), "ok.sk", ok);
+    var fe = try skarn.compile(arena.allocator(), "ok.sk", ok);
     fe.deinit(arena.allocator());
 }
 
@@ -54,7 +54,7 @@ test "diagnostics: unknown name shows identifier" {
     const bad =
         \\bad :: fn() -> i32 { return foo; }
     ;
-    const result = k2.compile(arena.allocator(), "bad.sk", bad);
+    const result = skarn.compile(arena.allocator(), "bad.sk", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -66,7 +66,7 @@ test "diagnostics: wrong arg count shows expected vs actual" {
         \\add :: fn(a: i32, b: i32) -> i32 { return a + b; }
         \\bad :: fn() -> i32 { return add(1); }
     ;
-    const result = k2.compile(arena.allocator(), "bad.sk", bad);
+    const result = skarn.compile(arena.allocator(), "bad.sk", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -78,7 +78,7 @@ test "diagnostics: arg type mismatch shows types" {
         \\add :: fn(a: i32, b: i32) -> i32 { return a + b; }
         \\bad :: fn() -> i32 { return add(1, true); }
     ;
-    const result = k2.compile(arena.allocator(), "bad.sk", bad);
+    const result = skarn.compile(arena.allocator(), "bad.sk", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -90,7 +90,7 @@ test "diagnostics: sema errors are stored in TypeEnv" {
     const src =
         \\add :: fn(a: i32, b: i32) -> i32 { return a + b; }
     ;
-    var fe = try k2.compile(arena.allocator(), "ok.sk", src);
+    var fe = try skarn.compile(arena.allocator(), "ok.sk", src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectEqual(@as(usize, 0), fe.types.diagnostics.items.len);
 }
@@ -104,7 +104,7 @@ test "diagnostics: fail outside error function is caught" {
         \\bad :: fn() -> i32 { fail .timeout; return 0; }
     ;
     try std.testing.expectError(error.SemanticFailed,
-        k2.compile(arena.allocator(), "bad.sk", bad));
+        skarn.compile(arena.allocator(), "bad.sk", bad));
 }
 
 test "diagnostics: renderDiagnostic produces correct format" {
@@ -119,14 +119,14 @@ test "diagnostics: renderDiagnostic produces correct format" {
     ;
     // Just verify compile fails — rendering is tested via existence
     try std.testing.expectError(error.SemanticFailed,
-        k2.compile(arena.allocator(), "test.sk", bad));
+        skarn.compile(arena.allocator(), "test.sk", bad));
 
     // Verify Diagnostic.err constructor works
-    const d = k2.Diagnostic.err("test message",
-        k2.Span.new(0, 3), "test.sk");
-    try std.testing.expectEqual(k2.DiagKind.err, d.kind);
+    const d = skarn.Diagnostic.err("test message",
+        skarn.Span.new(0, 3), "test.sk");
+    try std.testing.expectEqual(skarn.DiagKind.err, d.kind);
 
-    const rendered = try k2.renderDiagnostic(arena.allocator(), "test.sk", src, d);
+    const rendered = try skarn.renderDiagnostic(arena.allocator(), "test.sk", src, d);
     // Should contain file:line:col: error: message
     try std.testing.expect(std.mem.indexOf(u8, rendered, "test.sk") != null);
     try std.testing.expect(std.mem.indexOf(u8, rendered, "error:") != null);
@@ -138,9 +138,9 @@ test "diagnostics: renderDiagnostic produces correct format" {
 /// tolerant mode so the diagnostics survive even though checking fails. Lets the
 /// tests below assert the *text* of an error, not just that one occurred.
 fn firstError(arena: std.mem.Allocator, src: []const u8) !?[]const u8 {
-    const mod = try k2.parseSource(arena, "t.sk", src);
-    var syms = try k2.sema_mod.collectSymbols(arena, mod);
-    const env = try k2.sema_mod.checkTypesTolerant(arena, mod, &syms, src, "t.sk");
+    const mod = try skarn.parseSource(arena, "t.sk", src);
+    var syms = try skarn.sema_mod.collectSymbols(arena, mod);
+    const env = try skarn.sema_mod.checkTypesTolerant(arena, mod, &syms, src, "t.sk");
     for (env.diagnostics.items) |d| {
         if (d.kind == .err) return d.message;
     }

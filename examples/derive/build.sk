@@ -1,7 +1,7 @@
 #import std.build.{ Build, executable, release, run_step, default };
 
 build :: fn(b: Build) {
-    app := b.executable("derive", "main.k2");
+    app := b.executable("derive", "main.sk");
     app.release();
     b.run_step("run", app);
     b.default(app);

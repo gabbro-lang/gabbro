@@ -5,17 +5,17 @@
 #import std.process;
 
 main :: fn() -> i32 {
-    if !process::set_env("K2_T", "hello42") { return 1; }
+    if !process::set_env("SKARN_T", "hello42") { return 1; }
     b1: [64]u8 = .{};
-    if process::get_env("K2_T", b1[:]) |v| { if v.len != 7usize { return 2; } } else { return 3; }
+    if process::get_env("SKARN_T", b1[:]) |v| { if v.len != 7usize { return 2; } } else { return 3; }
 
-    ig := process::set_env("K2_T", "world");        // overwrite
+    ig := process::set_env("SKARN_T", "world");        // overwrite
     b2: [64]u8 = .{};
-    if process::get_env("K2_T", b2[:]) |v| { if v.len != 5usize { return 4; } } else { return 5; }
+    if process::get_env("SKARN_T", b2[:]) |v| { if v.len != 5usize { return 4; } } else { return 5; }
 
-    ig2 := process::unset_env("K2_T");              // remove
+    ig2 := process::unset_env("SKARN_T");              // remove
     b3: [64]u8 = .{};
-    if process::get_env("K2_T", b3[:]) |v| { return 6; } else {}
+    if process::get_env("SKARN_T", b3[:]) |v| { return 6; } else {}
 
     p: [4096]u8 = .{};                               // inherited env still readable
     if process::get_env("PATH", p[:]) |v| { if v.len == 0usize { return 7; } } else { return 8; }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// std.net — TCP/UDP networking over Winsock2.
+// std.net — TCP/UDP networking over Winsocskarn.
 //
 // This file is a thin convenience facade. The library is layered across a
 // subdirectory module so each piece stays small and focused:

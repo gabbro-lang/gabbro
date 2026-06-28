@@ -1,5 +1,5 @@
 // diskscan (CLI) — scan a directory tree and print the biggest items, sorted,
-// with scan throughput. The GUI (gui.k2) shares the same scanner.
+// with scan throughput. The GUI (gui.sk) shares the same scanner.
 //
 //   diskscan [dir]      default: current directory
 

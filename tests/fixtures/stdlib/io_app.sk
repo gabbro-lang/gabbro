@@ -23,7 +23,7 @@ rule :: fn() -> i32 {
 
 run :: fn() -> i32 {
     // ── Section 1: Basic string output ───────────────────────────────────────
-    println("K2 std.io showcase") catch err { return 1; };
+    println("Skarn std.io showcase") catch err { return 1; };
 
     r := rule();
     if r != 0 { return r; }

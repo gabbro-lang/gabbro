@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // std.c — C ABI primitive types, for clearer `#extern` FFI declarations.
 //
-// These are transparent aliases (interchangeable with the underlying K2 type),
+// These are transparent aliases (interchangeable with the underlying Skarn type),
 // sized for the C ABI on 64-bit Windows (LLP64: `long` is 32-bit, `size_t` is
 // 64-bit). Using them documents intent and eases future cross-platform sizing.
 //
@@ -33,7 +33,7 @@ pub c_size_t    :: usize;    // `size_t`
 pub c_ssize_t   :: isize;    // `ssize_t` / `ptrdiff_t`
 pub c_intptr    :: isize;    // `intptr_t`
 pub c_uintptr   :: usize;    // `uintptr_t`
-pub c_voidptr   :: usize;    // `void*` as a raw address (K2 has no void pointer)
+pub c_voidptr   :: usize;    // `void*` as a raw address (Skarn has no void pointer)
 
 // ── floating point ──────────────────────────────────────────────────────────
 

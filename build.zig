@@ -25,17 +25,17 @@ pub fn build(b: *std.Build) void {
     const stdlib_root = b.option(
         []const u8,
         "stdlib-root",
-        "Path to the K2 modules directory containing std/",
+        "Path to the Skarn modules directory containing std/",
     ) orelse b.pathFromRoot("lib");
 
-    // Statically link the self-hosted linker (k2lnk) into k2.exe for a
-    // single-binary release (no separate k2lnk.dll). Two-stage: the base k2.exe
-    // compiles linker/k2lnk.k2 to a freestanding object, which the final k2.exe
+    // Statically link the self-hosted linker (skarnld) into skarn.exe for a
+    // single-binary release (no separate skarnld.dll). Two-stage: the base skarn.exe
+    // compiles linker/skarnld.sk to a freestanding object, which the final skarn.exe
     // links in and exports. Dev builds leave this off and ship the dll.
-    const embed_linker = b.option(bool, "embed-linker", "Bake k2lnk into k2.exe (single-binary release)") orelse false;
+    const embed_linker = b.option(bool, "embed-linker", "Bake skarnld into skarn.exe (single-binary release)") orelse false;
 
     // ── Compiler library module ───────────────────────────────────────────
-    const compiler_mod = b.addModule("k2_compiler", .{
+    const compiler_mod = b.addModule("skarn_compiler", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
@@ -61,8 +61,8 @@ pub fn build(b: *std.Build) void {
     // `std.heap.Arena`) works in every compile path — including the inline
     // `compile(source)` path that never touches disk. `@embedFile` resolves
     // these import names; the files remain the single source of truth in lib/.
-    compiler_mod.addAnonymousImport("std_heap_k2", .{ .root_source_file = b.path("lib/std/heap.sk") });
-    compiler_mod.addAnonymousImport("std_ptr_k2", .{ .root_source_file = b.path("lib/std/ptr.sk") });
+    compiler_mod.addAnonymousImport("std_heap_skarn", .{ .root_source_file = b.path("lib/std/heap.sk") });
+    compiler_mod.addAnonymousImport("std_ptr_skarn", .{ .root_source_file = b.path("lib/std/ptr.sk") });
 
     // Wire LLVM into the compiler library when a path is provided.
     if (llvm_path) |lp| {
@@ -73,39 +73,39 @@ pub fn build(b: *std.Build) void {
         //   Windows prebuilt (llvm.org): LLVM-C
         //   Linux/macOS:                 LLVM-17 / LLVM
         compiler_mod.linkSystemLibrary("LLVM-C", .{});
-        // libclang (the C binding generator, `k2 bindgen`) is deliberately NOT
+        // libclang (the C binding generator, `skarn bindgen`) is deliberately NOT
         // linked: the include path above gives `@cImport` its types, but the
         // functions are loaded at runtime via std.DynLib (see clang_c.zig). So
-        // k2.exe carries no dependency on the 81 MB libclang.dll — it ships as
-        // an optional component, loaded only when `k2 bindgen` actually runs.
+        // skarn.exe carries no dependency on the 81 MB libclang.dll — it ships as
+        // an optional component, loaded only when `skarn bindgen` actually runs.
     }
 
-    // ── Optional in-process LLD (k2lld.dll) ───────────────────────────────
+    // ── Optional in-process LLD (skarnlld.dll) ───────────────────────────────
     // `-Din-process-lld` bundles the LLD COFF driver + its LLVM static deps
-    // into a DLL exposing `k2_lld_link_coff`, so `k2 build` links in-process
+    // into a DLL exposing `skarn_lld_link_coff`, so `skarn build` links in-process
     // instead of spawning a 69 MB lld-link.exe. Off by default; the spawn path
     // is the fallback. Requires the LLVM/LLD static libs in <llvm-path>/lib.
-    const in_process_lld = b.option(bool, "in-process-lld", "Build k2lld.dll for in-process linking") orelse false;
+    const in_process_lld = b.option(bool, "in-process-lld", "Build skarnlld.dll for in-process linking") orelse false;
     opts.addOption(bool, "in_process_lld", in_process_lld and llvm_path != null);
     if (in_process_lld) {
         if (llvm_path) |lp| {
             // The SDK's LLVM static libs are MSVC-ABI (/MT). Build the shim DLL
             // against the MSVC toolchain so the CRT/STL match.
             const msvc_target = b.resolveTargetQuery(.{ .cpu_arch = .x86_64, .os_tag = .windows, .abi = .msvc });
-            // Always ReleaseFast + stripped: the DLL is loaded on every `k2
+            // Always ReleaseFast + stripped: the DLL is loaded on every `skarn
             // build`, so its size drives link latency. Debug info would bloat it
             // to ~77 MB and dominate the load.
-            const k2lld = b.addLibrary(.{
-                .name = "k2lld",
+            const skarnlld = b.addLibrary(.{
+                .name = "skarnlld",
                 .linkage = .dynamic,
                 .root_module = b.createModule(.{ .target = msvc_target, .optimize = .ReleaseFast, .strip = true, .link_libc = true }),
             });
-            k2lld.root_module.addCSourceFile(.{
+            skarnlld.root_module.addCSourceFile(.{
                 .file = b.path("src/backend/llvm/lld_shim.cpp"),
                 .flags = &.{ "-std=c++17", "-fno-rtti" },
             });
-            k2lld.root_module.addIncludePath(.{ .cwd_relative = b.fmt("{s}/include", .{lp}) });
-            k2lld.root_module.addLibraryPath(.{ .cwd_relative = b.fmt("{s}/lib", .{lp}) });
+            skarnlld.root_module.addIncludePath(.{ .cwd_relative = b.fmt("{s}/include", .{lp}) });
+            skarnlld.root_module.addLibraryPath(.{ .cwd_relative = b.fmt("{s}/lib", .{lp}) });
             // LLD + the FULL LLVM static set (all targets — LLD's LTO path
             // references every target initializer), in `llvm-config --libnames
             // all` order, then the Windows system libs LLVM needs.
@@ -182,8 +182,8 @@ pub fn build(b: *std.Build) void {
                 "xml2s",  "psapi",  "shell32", "ole32",
                 "uuid",   "advapi32", "ws2_32", "ntdll",
             };
-            for (lld_llvm_libs) |name| k2lld.root_module.linkSystemLibrary(name, .{});
-            b.installArtifact(k2lld);
+            for (lld_llvm_libs) |name| skarnlld.root_module.linkSystemLibrary(name, .{});
+            b.installArtifact(skarnlld);
         }
     }
 
@@ -202,38 +202,38 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{ .name = "skarn", .root_module = exe_mod });
-    exe.root_module.addImport("k2_compiler", compiler_mod);
+    exe.root_module.addImport("skarn_compiler", compiler_mod);
     exe.root_module.addLibraryPath(.{ .cwd_relative = basalt_lib_dir });
 
     if (embed_linker and llvm_path != null) {
-        // Stage 1: the base k2.exe compiles the linker to a freestanding object
+        // Stage 1: the base skarn.exe compiles the linker to a freestanding object
         // (no entry / _fltused). It only does codegen, so it needs LLVM-C.dll on
         // PATH but no linker.
         const lp = llvm_path.?;
         const gen = b.addRunArtifact(exe);
         gen.addArg("object");
-        gen.addFileArg(b.path("linker/k2lnk.sk"));
+        gen.addFileArg(b.path("linker/skarnld.sk"));
         gen.addArgs(&.{ "--no-entry", "-O2", "-o" });
-        const k2lnk_obj = gen.addOutputFileArg("k2lnk.obj");
+        const skarnld_obj = gen.addOutputFileArg("skarnld.obj");
         gen.addPathDir(b.fmt("{s}/bin", .{lp})); // so LLVM-C.dll resolves at run time
 
-        // Stage 2: the shipped k2.exe links that object in and exports k2_link_mem
+        // Stage 2: the shipped skarn.exe links that object in and exports skarn_link_mem
         // (link.zig finds it via GetProcAddress on its own module). One binary.
         // A SEPARATE module so the object isn't pulled into the base exe above
         // (which would make the generator depend on its own output — a cycle).
-        const final_mod = b.addModule("k2_embed", .{
+        const final_mod = b.addModule("skarn_embed", .{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
         });
-        final_mod.addImport("k2_compiler", compiler_mod);
+        final_mod.addImport("skarn_compiler", compiler_mod);
         final_mod.addLibraryPath(.{ .cwd_relative = basalt_lib_dir });
-        final_mod.addObjectFile(k2lnk_obj);
-        // The embedded object carries the k2 runtime, which references ws2_32
+        final_mod.addObjectFile(skarnld_obj);
+        // The embedded object carries the skarn runtime, which references ws2_32
         // (the net module). kernel32 is already linked; add Winsock.
         final_mod.linkSystemLibrary("ws2_32", .{});
         const final = b.addExecutable(.{ .name = "skarn", .root_module = final_mod });
-        final.win32_module_definition = b.path("linker/k2lnk_embed.def");
+        final.win32_module_definition = b.path("linker/skarnld_embed.def");
         b.installArtifact(final);
     } else {
         b.installArtifact(exe);
@@ -250,7 +250,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/root.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "k2_compiler", .module = compiler_mod }},
+        .imports = &.{.{ .name = "skarn_compiler", .module = compiler_mod }},
     });
 
     const test_filter = b.option([]const u8, "test-filter", "Only run tests whose name contains this substring");

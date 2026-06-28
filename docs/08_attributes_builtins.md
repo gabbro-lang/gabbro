@@ -48,8 +48,6 @@ Attributes modify the behavior or layout of declarations. They are prefixed with
 - `#must_use`: the caller may not discard the function's return value — `f();` as a statement is an error; use `x := f()` or `_ := f()`.
 - `#maybe_unused`: marks a declaration as possibly unused (accepted; suppresses any future unused-declaration warning).
 
----
-
 ## Builtins — the `core::` namespace
 
 Builtins live in the reserved **`core::`** namespace — compiler-provided operations,
@@ -138,8 +136,6 @@ width-dependent ones currently fall back to runtime inside `#run`.
 `core::memcpy(dst, src, n)`, `core::memset(dst, byte, n)`, `core::trap()`,
 `core::unreachable()`, `core::prefetch(ptr)`, `core::cycle_count() -> u64`. These are
 the low-level primitives the standard library wraps.
-
----
 
 ## Compile-Time Directives
 

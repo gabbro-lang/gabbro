@@ -1,8 +1,6 @@
 # Syntax Reference
 
-This document is the complete syntax reference for the Skarn programming language. It covers every lexical element — from comments and identifiers to operators and punctuation — that makes up a valid Skarn program.
-
----
+Every lexical element of Skarn: comments, identifiers, literals, operators, and punctuation.
 
 ## Comments
 
@@ -17,8 +15,6 @@ x := 42; // inline comment
 
 > [!NOTE]
 > Block comments (`/* ... */`) are intentionally omitted from Skarn. Use multiple line comments instead.
-
----
 
 ## Identifiers
 
@@ -38,14 +34,12 @@ Point2D :: struct { x: f64, y: f64 };
 
 ### Escaped Identifiers
 
-Skarn allows you to prefix an identifier with `@` to use a keyword as a regular identifier, or to define special names (like the runtime's `@panic` function) without conflicting with standard user names:
+Prefix an identifier with `@` to use a keyword as a regular identifier, or to define special names (like the runtime's `@panic`) without clashing with user names:
 
 ```skarn
 @if := 42;          // uses the keyword 'if' as a variable name
 @panic("oh no");    // standard library panic function
 ```
-
----
 
 ## Keywords
 
@@ -106,8 +100,6 @@ The following table lists every keyword in Skarn, grouped by category.
 | `true` | Boolean true |
 | `false` | Boolean false |
 
----
-
 ## Primitive Type Keywords
 
 Skarn provides a fixed set of primitive types:
@@ -131,8 +123,6 @@ Skarn provides a fixed set of primitive types:
 
 > [!NOTE]
 > `f32` and `f64` are handled as identifiers (not keywords) at the lexer level, but are recognized as primitive types during semantic analysis.
-
----
 
 ## Literals
 
@@ -237,8 +227,6 @@ The `null` literal is used with optional types:
 ```skarn
 null  // for optionals
 ```
-
----
 
 ## Operators
 
@@ -345,8 +333,6 @@ Operators are listed from **highest** to **lowest** precedence:
 > [!TIP]
 > When in doubt, use parentheses to make precedence explicit. This improves readability and avoids subtle bugs.
 
----
-
 ## Declarations
 
 ### Constants (Compile-Time)
@@ -419,8 +405,6 @@ buffer: [256]u8 = .{};
 > [!TIP]
 > Prefer `:=` with type inference when the type is obvious from context. Use explicit types when the inferred type would be ambiguous or when you need a specific numeric width.
 
----
-
 ## Punctuation Reference
 
 | Symbol | Usage |
@@ -436,8 +420,6 @@ buffer: [256]u8 = .{};
 | `.{ }` | Compound literal (struct, array, or enum initialization) |
 | `#` | Directive prefix (`#import`, `#if`, `#run`, attributes) |
 | `\|x\|` | Payload capture (in `match` arms, `catch` blocks, etc.) |
-
----
 
 ## Quick Example
 

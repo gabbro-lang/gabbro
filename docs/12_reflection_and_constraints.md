@@ -39,7 +39,7 @@
 Jai exposes reflection and metaprogramming through many special-purpose pieces
 that don't compose: `#modify` (a code block bolted onto a signature), the
 `Type_Info` / `Type_Info_Integer` / `Type_Info_Struct` cast hierarchy,
-`get_type_table`, `for_expansion`, `#insert -> string`. Each is powerful; together
+`get_type_table`, `for_expansion`, `#insert -> string`. Each does its job; together
 they're a grab-bag.
 
 Skarn already has a structural advantage Jai lacks: **the comptime VM executes the
@@ -65,8 +65,6 @@ Five orthogonal primitives, each type-safe, each composing with the rest:
 
 Reflection-driven serialization, custom iteration, and code generation all fall
 out of these — no new directives.
-
----
 
 ## 1. `TypeInfo` — reflection as a matchable value
 
@@ -114,8 +112,6 @@ describe :: fn(info: TypeInfo) -> []const u8 {
 > is exhaustive, payload-bound, and impossible to mis-cast. The compiler also
 > checks you handled (or `else`'d) every kind.
 
----
-
 ## 2. `typeid` — cheap runtime identity
 
 > **Implemented today:** `typeid_of(T) -> usize` — a stable runtime id for a type.
@@ -142,8 +138,6 @@ if typeid_of(x) == typeid_of(Vector3) { … }
 > **✦ Beyond Jai.** Jai compares `*Type_Info` pointers and bakes the whole table
 > unconditionally. A `typeid` is cheaper to compare, stable across compilation
 > units, and (with §4's tree-shaking) only costs a table slot when actually used.
-
----
 
 ## 3. `Any` — safe dynamic values
 
@@ -198,8 +192,6 @@ sum_field :: fn(v: Any) -> i32 {
 > name-checked, and you pattern-match `.info()`. You cannot read an `Any` as the
 > wrong type without the compiler handing you a `null` to deal with.
 
----
-
 ## 4. The type table — opt-in, tree-shaken
 
 Runtime reflection needs `TypeInfo` baked into the binary's data segment. Jai
@@ -221,8 +213,6 @@ three structs bakes exactly those three (plus their transitive field types).
 > remember. Reflection you don't use costs nothing — the opposite of Jai's
 > bake-all-then-strip model. A capability (§7) can additionally gate *who* may read
 > the table, so a sandboxed plugin can't enumerate the host's types.
-
----
 
 ## 5. Serialization — one source, two speeds
 
@@ -275,8 +265,6 @@ to_json_of :: fn($T: type, v: T, w: *StringBuilder) {
 > **or** walk `Type_Info` at runtime. They're different code. Skarn's single
 > `match`-on-`TypeInfo` function *is* both — comptime folds it to specialized code,
 > runtime executes it dynamically, guaranteed identical by the shared IR.
-
----
 
 ## 6. `constraint` and `where` — resolve-time generics
 
@@ -430,8 +418,6 @@ heavier `Any`/Phase-4 concern; node ids need zero new VM value machinery.)
 the next candidate on reject). Fallback is moot until Skarn grows same-name
 overloading; rewrite is a small extension of the same `evalWhereType` mechanism.
 
----
-
 ## 7. Where it all pays off (broad feature parity, Skarn-style)
 
 The same five primitives subsume the rest of Jai's metaprogramming toolkit —
@@ -451,8 +437,6 @@ The unifying idea: **reflection is a value, constraints are predicates over it,
 `Any` is reflection plus a pointer, iteration is an interface, and code generation
 is a `#for` over reflected fields.** Five composable pieces instead of a dozen
 special forms — all type-checked, all phase-unified, all sandboxable.
-
----
 
 ## 8. Implementation phasing
 

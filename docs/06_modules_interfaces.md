@@ -39,7 +39,7 @@ them distinct means a local variable named `io` never shadows the `io` namespace
 
 > **Collisions are fine.** Two different modules may each declare the same name
 > (e.g. both define a `greet` or a `parse`); the compiler mangles colliding names
-> per module under the hood, so they link cleanly. You reach each through its
+> per module internally, so they link cleanly. You reach each through its
 > namespace (`a::greet`, `b::greet`) or a selective/glob import. A name is only
 > mangled when it actually collides — unique names keep their bare linkage.
 
@@ -61,8 +61,6 @@ pub User :: struct {
     name: []const u8,
 }
 ```
-
----
 
 ## Interfaces
 
@@ -138,8 +136,6 @@ A type's *own* methods can instead be declared **inside the struct body** (where
 [Methods](02_types.md#methods). Use in-struct declarations for a type's own API and
 free `self`-first functions to extend a type you don't own; an in-struct method
 shadows a free function of the same name when called on that type.
-
----
 
 ## Generics
 

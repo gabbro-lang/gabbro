@@ -29,8 +29,6 @@ process :: fn(data: []const u8) -> void {
 > [!NOTE]
 > Functions without an explicit return type implicitly return `void`. Writing `-> void` is optional but permitted for clarity.
 
----
-
 ## Parameters
 
 ```skarn
@@ -66,8 +64,6 @@ pub doubled :: fn(self: i32) -> i32 {
 | Borrow          | `b: borrow []u8`  | Zone-aware borrowed reference                   |
 | Self            | `self: T`         | Enables dot-call syntax on type `T`             |
 
----
-
 ## Self and Methods
 
 Any top-level function whose first parameter is named `self` can be called using **dot-call syntax**:
@@ -93,8 +89,6 @@ q := origin().translate(1, 2).scaled(3); // chain method calls
 > [!NOTE]
 > A method on a temporary receiver sees a copy, so any mutation it makes is
 > discarded with the temporary — chaining is for transforming/reading.
-
----
 
 ## Generic Functions
 
@@ -124,8 +118,6 @@ print_to :: fn($W: Writer, writer: *W, data: []const u8) -> usize ! IoError {
 
 > [!NOTE]
 > Generics are **monomorphized** — each unique type argument produces a specialized version at compile time. There is no runtime dispatch overhead.
-
----
 
 ## Lambdas (Anonymous Functions)
 
@@ -231,8 +223,6 @@ lambda copies the captured values into a small environment when it is created.
 > a top-level constant initializer isn't supported yet — bind it to a local first
 > (`f := fn(x){ … }; K :: #run g(f);`) or use a named function.
 
----
-
 ## Fallible Functions
 
 Functions that can fail use `!` after the return type to declare an error channel:
@@ -250,8 +240,6 @@ combine :: fn() -> i32 ! { ... }
 
 > [!TIP]
 > See the [Error Handling](05_error_handling.md) chapter for full details on error propagation, `try`, `catch`, and the `?` operator.
-
----
 
 ## External Functions
 
@@ -273,8 +261,6 @@ WriteFile :: fn(
 
 > [!WARNING]
 > External function calls are inherently unsafe. The compiler cannot verify the correctness of the foreign function's signature or behavior.
-
----
 
 ## Function Attributes
 
@@ -308,8 +294,6 @@ exported_fn :: fn() { ... }
 | `#naked`     | Omit the function prologue/epilogue (for raw assembly)        |
 | `#entry`     | Mark as the program entry point                               |
 | `#export`    | Export the symbol for external linkage                         |
-
----
 
 ## Control Flow
 
@@ -370,8 +354,6 @@ branches — so an untyped branch value (`.{ … }`, a bare `.variant`) is typed
 context, exactly like a `match` expression. (Statement-position `if { … }` is
 unchanged; the expression form only applies where a value is required.)
 
----
-
 ### While Loop
 
 ```skarn
@@ -406,8 +388,6 @@ while cur |n| {
 The condition may be any optional; the `|x|` binding is optional itself
 (`while opt { … }` loops while `opt` is non-null without binding the payload).
 
----
-
 ### For Range Loop
 
 ```skarn
@@ -426,8 +406,6 @@ for i in 0..=10 {
 |------------|------------------|-----------------------|
 | `0..10`    | Exclusive end    | 0, 1, 2, …, 9        |
 | `0..=10`   | Inclusive end     | 0, 1, 2, …, 10       |
-
----
 
 ### For Slice Loop
 
@@ -482,8 +460,6 @@ main :: fn() -> i32 {
 The index form `for x, i in it` is available too — `i` counts iterations from
 `0`. Iterating by reference (`for &x in it`) is not allowed: a `next` method
 yields values, not addresses.
-
----
 
 ### Match
 
@@ -573,8 +549,6 @@ return match code { 0 => 200, 1, 2, 3 => 400, else => 500 };
 > String compares are length-gated, so a shorter subject is never read out of
 > bounds.
 
----
-
 ### Break and Continue
 
 `break` exits the innermost loop. `continue` skips to the next iteration:
@@ -586,8 +560,6 @@ while true {
     process();
 }
 ```
-
----
 
 ### Defer
 
@@ -619,8 +591,6 @@ defer { println("second registered, first to run"); }
 //   first registered, last to run
 ```
 
----
-
 ### Unsafe Blocks
 
 `unsafe` blocks disable certain safety checks. They are required for raw pointer operations, inline assembly, and other low-level operations:
@@ -637,8 +607,6 @@ val := unsafe core::unaligned_read(u64, &x);
 
 > [!CAUTION]
 > Unsafe code bypasses the compiler's safety guarantees. Use sparingly and audit carefully. Incorrect unsafe code can cause undefined behavior, memory corruption, or security vulnerabilities.
-
----
 
 ### Compile-time Directives
 
@@ -665,8 +633,6 @@ size := #run compute_size();
 |-----------|----------------------------------------------------------------|
 | `#if`     | Conditional compilation based on compile-time constants        |
 | `#run`    | Execute code or expressions at compile time                    |
-
----
 
 ### Zone Blocks
 

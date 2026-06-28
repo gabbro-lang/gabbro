@@ -19,8 +19,6 @@ exit), giving zero-leak comptime execution. The original tree-walker
 The north star is to match and then exceed Jai's metaprogramming, and to close the
 `build.rs`/Jai **supply-chain hole** with capability-sandboxed comptime.
 
----
-
 ## What's implemented
 
 ### The VM (Phase 1 — done)
@@ -74,8 +72,6 @@ The north star is to match and then exceed Jai's metaprogramming, and to close t
   intrinsics → `BuildPlan` → real exes/DLLs). See
   [10_build_system.md](10_build_system.md).
 
----
-
 ## What's partial or not yet built
 
 | Area | State | Gap |
@@ -88,8 +84,6 @@ The north star is to match and then exceed Jai's metaprogramming, and to close t
 | **Capability sandboxing (Phase 5)** | not started | Comptime FFI/`unsafe` are **unconditionally available** (`ffi.zig`: "for now it is unconditionally available"). A malicious dependency macro can reach the host — the `build.rs` hole is **not** yet closed. |
 | **Host stdlib in the VM** | partial | `build.sk` uses `host_call` intrinsics; general `std.fs`/`std.io` at comptime behind capability interfaces is not generalized. |
 | **`#quote` fidelity for new match patterns** | lossy | range/string/guard/binding patterns reflect as the catch-all `anything`. |
-
----
 
 ## Roadmap — and Skarn-unique innovations
 
@@ -166,7 +160,7 @@ serialization / equality / hashing / debug-printing with no per-type boilerplate
 and no `build.rs` risk.
 
 ### R5. Zone-budgeted comptime
-Leverage the comptime zone model (R-side already done): give each macro/hook a
+Use the comptime zone model (R-side already done): give each macro/hook a
 **memory and step budget** drawn from its zone. A generator that blows its budget
 (runaway recursion, pathological expansion) is killed with a diagnostic instead of
 OOM-ing the compiler. Turns "zero-leak comptime" into "**bounded, fair** comptime"
@@ -183,8 +177,6 @@ time. Distinct from per-decl attributes: these are *cross-cutting* invariants.
 Round-trip the new match patterns (range/string/guard/binding) through `AstPattern`
 so quoted/reflected matches are faithful — needed before R4 derive plugins emit
 matches.
-
----
 
 ## Critical files
 - VM: `src/vm/{value,zones,engine,instructions,compiler,ffi}.zig`.

@@ -16,8 +16,6 @@ Skarn has two complementary ways to generate code at compile time:
    first-class value, and splice it. Best when the code's *structure* depends on
    logic (loops over fields, conditionals on types). Covered last.
 
----
-
 ## 1. Quote and insert
 
 `#quote { ... }` captures a block of code as a typed AST value rather than
@@ -38,8 +36,6 @@ A bare `#insert #quote { ... }` is **not** hygienic — the locals it introduces
 
 `#quote(expr)` is the expression form: it captures a single expression as an
 `AstExpr` value.
-
----
 
 ## 2. Macros
 
@@ -121,8 +117,6 @@ build :: macro(out: Expr, ty: Expr, sel: Expr, lo: Expr, hi: Expr) {
 }
 ```
 
----
-
 ## 3. `#for` — compile-time unrolling
 
 `#for i in a..b { ... }` inside a template is **unrolled** at expansion time: the
@@ -144,8 +138,6 @@ Note the distinction:
 - A **comptime** `#for i in 0..4 { ... $(i) ... }` is unrolled; `i` is a comptime
   literal, spliced with `$(i)`. The bounds must be integer literals (or macro
   parameters bound to literals).
-
----
 
 ## 4. Hygiene
 
@@ -176,8 +168,6 @@ To deliberately produce a binding the caller can name, write to a variable the
 caller passes in (an `Expr` parameter, like `$out` above), or use a bare
 `#insert #quote { ... }`, whose locals are *not* hygienic.
 
----
-
 ## 5. `#parse` — the string escape hatch
 
 `#parse(string_expr)` evaluates a string at compile time, parses it as code, and
@@ -191,8 +181,6 @@ quotations — useful when the code is assembled as text:
 Prefer typed `#quote`/macros where possible; reach for `#parse` only when you
 genuinely have code as a string.
 
----
-
 ## 6. Errors and gotchas
 
 - A `$name` splice **only** means something inside a macro template's
@@ -203,8 +191,6 @@ genuinely have code as a string.
   programmatic path below.
 - A `Block` argument cannot be spliced in expression position (`$b` where an
   expression is expected) — splice it as a statement (`$b;`) instead.
-
----
 
 ## 7. Programmatic generation (when templates aren't enough)
 

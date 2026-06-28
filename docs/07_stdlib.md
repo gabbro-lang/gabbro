@@ -1,7 +1,6 @@
 # Standard Library
 
-The Skarn standard library (`std`) provides core functionality. It is designed to
-be minimalistic and allocation-free wherever possible. 
+Skarn's standard library (`std`): minimal, and allocation-free where it can be. 
 
 Here are the primary modules:
 
@@ -24,16 +23,12 @@ Synchronous, allocation-free I/O interfaces and utilities.
 **Free functions for console:**
 - `print(data)`, `println(data)`, `print_u64(val)`, `eprintln(data)`
 
----
-
 ## `std.fmt`
 Formatting utilities built on top of `std.io.Writer`.
 
 - `write_padded_left`, `write_padded_right`, `write_padded_center`
 - `write_u64_padded`, `write_hex_u64_padded`
 - `join_bytes(w: *Writer, items: []const []const u8, sep: []const u8)`
-
----
 
 ## `std.mem`
 Safe typed-memory generic helpers.
@@ -46,8 +41,6 @@ Safe typed-memory generic helpers.
 
 Byte-specialized aliases are provided: `eql_bytes`, `copy_bytes`, `zero`.
 
----
-
 ## `std.fs`
 Minimal synchronous file I/O (Windows-only currently).
 
@@ -58,8 +51,6 @@ Minimal synchronous file I/O (Windows-only currently).
 - `exists(path)`: Check file existence
 - Returns a `File` struct which implements both `Reader` and `Writer`.
 
----
-
 ## `std.process`
 Process management (Windows-only currently).
 
@@ -68,8 +59,6 @@ Process management (Windows-only currently).
 - `current_pid()`
 - `get_env`, `set_env`, `unset_env`
 - `command_line`
-
----
 
 ## `std.ptr`
 Pointer manipulation and conversions (requires `unsafe` in some contexts).
@@ -80,8 +69,6 @@ Pointer manipulation and conversions (requires `unsafe` in some contexts).
 - `is_aligned`, `align_down`, `align_up`
 - `is_null`
 
----
-
 ## `std.bits`
 Bit-twiddling utilities.
 
@@ -90,8 +77,6 @@ Bit-twiddling utilities.
 - `rotate_left_u32`, `rotate_right_u64`, etc.
 - `is_power_of_two_u32`
 - `bit_u32`, `set_bit_u32`, `clear_bit_u32`, `toggle_bit_u32`
-
----
 
 ## `std.atomics`
 Atomic operations over shared memory — the foundation for lock-free code and

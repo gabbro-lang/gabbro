@@ -4,8 +4,6 @@ Skarn does not have a Garbage Collector (GC), nor does it rely on hidden allocat
 Instead, it uses a concept called **Zones** for safe, lexically-scoped memory
 management, and **Borrowing** to pass memory around without violating ownership rules.
 
----
-
 ## Zone Blocks
 
 A zone block defines a lexical scope and creates an allocation arena tied to that scope.
@@ -62,8 +60,6 @@ zone z: Arena {
 `free` is a compile-time-checked no-op: a bump arena reclaims everything at once
 on zone exit, so freeing a single allocation only verifies ownership.
 
----
-
 ## Ownership and Escape Analysis
 
 When you allocate memory in a zone, the resulting pointer (or slice) is "owned"
@@ -86,8 +82,6 @@ escape_example :: fn() -> []u8 {
 2. **No Escape**: Zone-owned values cannot escape to outer scopes or be returned from functions.
 3. **Restricted Passing**: Zone-owned values can only be passed as arguments to function parameters explicitly marked with `borrow`.
 4. **Valid Freeing**: You can only `free` a value using the zone handle that owns it.
-
----
 
 ## Borrow Parameters
 
@@ -118,8 +112,6 @@ main :: fn() {
 4. Borrowed values **cannot be stored** into aggregates (structs/arrays) or through pointers.
 5. Borrowed values cannot be explicitly freed.
 6. A borrowed value is transparent to type-checking inside the function — you interact with it just like a normal pointer or slice.
-
----
 
 ## Example: Building a Temporary String
 

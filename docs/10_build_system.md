@@ -15,8 +15,6 @@
 This document is the design. See [09_comptime_vm_roadmap.md](09_comptime_vm_roadmap.md)
 for the VM/metaprogramming foundation it sits on.
 
----
-
 ## 1. The file and the execution model
 
 A project has a **`build.sk`** at its root. It defines a `build` procedure:
@@ -47,8 +45,6 @@ This is Jai's model (`#run build()`), minus the boilerplate. For Jai familiarity
 | **1 — declarative builder** | 90% of projects | `Build`/`Artifact`/`Step` + methods. Pure data. |
 | **2 — workspaces & options** | power users | Jai-parity `Workspace`, full `Options` struct, `add_file`/`add_source`/`add_quote`. |
 | **3 — compiler intercept** | tooling, codegen | the message loop: `wait_message`, typed `Message`, `set_status`. |
-
----
 
 ## 2. Layer 1 — the declarative builder
 
@@ -126,8 +122,6 @@ pub Artifact :: struct {
 | `b.default(artifact)` | the default target |
 | `b.option(key, default) -> []const u8` | read a `-Dkey=value` CLI override |
 
----
-
 ## 3. Layer 2 — workspaces & build options (Jai parity)
 
 A **workspace** is an isolated compilation environment, exactly as in Jai. Layer 1
@@ -196,8 +190,6 @@ pub DeadCode :: enum { none, used, all }
 `set_optimization(o, .release_fast)` is sugar that flips the whole safety/codegen
 block at once, like Jai's `set_optimization`.
 
----
-
 ## 4. Layer 3 — the compiler intercept (message loop)
 
 This is the Jai message loop, built on Skarn's `#compiler` hook + `compiler_decls()`
@@ -248,8 +240,6 @@ pub Message :: struct {
 Today `compiler_decls()` already gives a hook the program's declarations (name +
 kind) at compile time; Layer 3 generalizes that into the streamed message form
 and adds the typed-AST/type-info handles.
-
----
 
 ## 5. Beyond Jai
 
@@ -321,8 +311,6 @@ A `b.codegen` step can read C/C++ headers (or, natively, introspect Skarn via
 `compiler_decls()`/`type_info`) and emit **typed AST** bindings into a workspace —
 the safer, faster cousin of Jai's `generate_bindings`.
 
----
-
 ## 6. CLI surface
 
 ```text
@@ -342,8 +330,6 @@ skarn build <file.sk>        direct single-file build (back-compat, today's beha
 Like Jai (`-- meta Build`) and the Default_Metaprogram, the no-`build.sk` path is
 the built-in default metaprogram: it just turns flags into `Options`.
 
----
-
 ## 7. Location directives (Jai parity)
 
 For asserts, logging, and codegen:
@@ -357,8 +343,6 @@ For asserts, logging, and codegen:
 | `#caller_location` | default-arg form: caller's `(file, line)` |
 
 Paths always use `/`, even on Windows.
-
----
 
 ## 8. Jai → Skarn mapping (and the extensions)
 
@@ -377,8 +361,6 @@ Paths always use `/`, even on Windows.
 | Default_Metaprogram | `skarn build` with no `build.sk` |
 | `generate_bindings` | `b.codegen` step emitting typed AST |
 | — | **capabilities/sandbox, content-hashed parallel graph, `--watch`, target matrix, hermetic/`--frozen`** |
-
----
 
 ## 9. Implementation plan
 
@@ -412,8 +394,6 @@ id; all state lives in the driver.
 
 **Build order from here:** `test_dir` execution → dependency/build graph +
 incremental → capabilities → Layers 2–3 surface → cross-compile.
-
----
 
 ## 10. Minimal end-to-end (the target for v1)
 

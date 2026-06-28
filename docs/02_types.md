@@ -1,8 +1,6 @@
 # Type System
 
-Skarn is statically typed with full type inference. Every value has a known type at compile time, and the compiler will reject programs where types do not align. Skarn's type system is designed to be explicit where it matters — preventing subtle bugs through distinct types, optional types, and strict casting rules — while staying lightweight through inference and compound literals.
-
----
+Skarn is statically typed with full inference. It's strict where that catches bugs — distinct types, optionals, no implicit narrowing — and stays out of your way otherwise, through inference and compound literals.
 
 ## Primitive Types
 
@@ -90,8 +88,6 @@ StatusBits :: struct {
 > [!NOTE]
 > Sub-byte types are only valid as fields inside `#packed` structs. They cannot appear in function signatures, local variables, or non-packed struct fields.
 
----
-
 ### Float Types
 
 | Type  | Size   | Precision        |
@@ -107,8 +103,6 @@ half := 0.5f32;
 result := pi * 2.0;
 ```
 
----
-
 ### Boolean
 
 `bool` holds one of two values: `true` or `false`.
@@ -119,8 +113,6 @@ done: bool = false;
 ```
 
 Booleans are used in conditions, logical expressions, and as flags. Skarn does not implicitly convert integers or pointers to `bool`.
-
----
 
 ### Void
 
@@ -133,8 +125,6 @@ log :: fn(msg: []const u8) -> void {
 ```
 
 You never construct a `void` value directly. A function with a `void` return simply ends without a return expression, or uses a bare `return;`.
-
----
 
 ## Composite Types
 
@@ -195,8 +185,6 @@ p.y = 30;
 > [!TIP]
 > Use `.{}` zero initialization to ensure all fields start at known values. This is especially useful for large structs where you only need to override a few fields afterward.
 
----
-
 ### Packed Structs
 
 The `#packed` attribute creates a struct with no padding between fields. This is essential for hardware registers, binary protocols, and memory-mapped I/O:
@@ -224,8 +212,6 @@ PixelFormat :: struct {
 > [!IMPORTANT]
 > Taking the address of a packed struct field is not allowed, because the field may not be byte-aligned. Access packed fields by value only.
 
----
-
 ### Generic Structs
 
 Structs can be parameterized by types (and compile-time values) using `$`-prefixed parameters:
@@ -250,8 +236,6 @@ ArrayList :: struct($T: type) {
 
 list: ArrayList(u8) = .{};
 ```
-
----
 
 ### Methods
 
@@ -305,8 +289,6 @@ extension.
 > inherited, so they cost nothing the existing generic/UFCS machinery doesn't
 > already pay. To constrain an inherited type parameter (e.g. "integers only"),
 > give the method a `where { … }` clause.
-
----
 
 ### Enums
 
@@ -369,8 +351,6 @@ Enums with payloads are Skarn's approach to tagged unions. Construction and matc
 both work at compile time too, so comptime code can build and inspect them — the
 basis for constructing `ast.*` values programmatically in metaprogramming.
 
----
-
 ### Error Types
 
 Error types are declared with the `errors` keyword. They look similar to enums but are specifically designed for use with Skarn's fallible function system:
@@ -399,8 +379,6 @@ read_file :: fn(path: []const u8) -> []u8 ! IoError {
 > [!NOTE]
 > See the [Error Handling](05_error_handling.md) chapter for full details on `try`, `catch`, and error propagation.
 
----
-
 ## Pointer Types
 
 Skarn provides several pointer kinds for different use cases.
@@ -425,8 +403,6 @@ val := *ptr;           // dereference: read the value (42)
 - `*const T` prevents modification through the pointer. The underlying data may still be mutable through another path.
 - `*volatile T` ensures every read and write goes to memory, preventing the compiler from optimizing accesses away. Use this for memory-mapped hardware registers.
 
----
-
 ### Many Pointers
 
 A many-pointer points to an array of values whose length is not tracked:
@@ -444,8 +420,6 @@ buffer[3] = 0xFF;
 
 > [!WARNING]
 > Many pointers perform **no bounds checking**. Indexing past the actual allocation is undefined behavior. Prefer slices (`[]T`) whenever you know the length.
-
----
 
 ## Slice Types
 
@@ -499,8 +473,6 @@ in `#run` constants and `#compiler` hooks, e.g. `if d.derives == "Sum"`).
 > [!TIP]
 > Slices are the preferred way to pass sequences of data. They are lightweight (just two machine words) and safe (bounds-checked at runtime).
 
----
-
 ## Array Types
 
 Arrays are fixed-size, stack-allocated sequences:
@@ -523,8 +495,6 @@ process :: fn(items: []const u8) -> void { /* ... */ }
 buf: [16]u8 = .{};
 process(buf[:]);    // convert array to slice
 ```
-
----
 
 ## Optional Types
 
@@ -568,8 +538,6 @@ if maybe != null {
 > [!CAUTION]
 > Avoid `!!` in production code paths unless you are certain the value cannot be `null`. Prefer `??` or explicit null checks to handle the `null` case gracefully.
 
----
-
 ## Function Types
 
 Function types describe a function's signature as a first-class type:
@@ -591,8 +559,6 @@ double :: fn(n: i32) -> i32 { return n * 2; }
 
 result := apply(double, 21);    // 42
 ```
-
----
 
 ## Distinct Types
 
@@ -623,8 +589,6 @@ raw := id as u64;              // back to plain u64
 > [!TIP]
 > Distinct types are zero-cost. At runtime, `UserId` and `u64` have identical representation. The distinction exists only at compile time for type safety.
 
----
-
 ## Type Aliases
 
 A type alias gives an existing type a second name. Unlike `distinct`, an alias is
@@ -653,8 +617,6 @@ The standard library uses aliases for C ABI types — see [`std.c`](07_stdlib.md
 strlen :: fn(s: [*]const c_char) -> c_size_t;
 ```
 
----
-
 ## Opaque Types
 
 Opaque types declare a type with no visible definition. They can only be used behind a pointer:
@@ -672,8 +634,6 @@ use_handle :: fn(h: *Foo) -> void { /* ... */ }
 Opaque types are useful for:
 - **FFI boundaries** — wrapping C `void*` handles with a named type.
 - **Abstraction** — exposing a handle to callers without revealing the implementation.
-
----
 
 ## Atomic Types
 
@@ -695,8 +655,6 @@ atomic_store(&c.value, current + 1);
 
 > [!NOTE]
 > The `atomic` qualifier is only valid on struct fields. See the [Builtins](08_builtins.md) chapter for the full set of atomic operations available.
-
----
 
 ## Borrow Types
 
@@ -726,8 +684,6 @@ print_name :: fn(name: borrow []const u8) -> void {
 > [!IMPORTANT]
 > Borrowed references are a compile-time safety mechanism. They guarantee that zone-owned data is not accidentally captured beyond its intended scope. See the [Memory Management](06_memory.md) chapter for details on zones and ownership.
 
----
-
 ## Type Casting
 
 The `as` operator performs explicit type conversions:
@@ -754,8 +710,6 @@ All casts in Skarn are explicit and visible in the source code. The compiler wil
 | Float | Integer | Truncation toward zero |
 | Distinct type | Underlying type | Identity (no-op at runtime) |
 | Underlying type | Distinct type | Identity (no-op at runtime) |
-
----
 
 ## Type Coercion Rules
 

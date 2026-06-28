@@ -4,8 +4,6 @@ Skarn uses an explicit error-handling model inspired by Zig and Rust. Functions
 that can fail declare it in their signature, and callers must always handle
 the possibility of failure — there are no hidden exceptions.
 
----
-
 ## Error Types
 
 Error types are declared with the `errors` keyword. Each variant is a named
@@ -26,8 +24,6 @@ ParseError :: errors {
 ```
 
 Error variants are referenced with a dot prefix: `.not_found`, `.overflow`, etc.
-
----
 
 ## Fallible Functions
 
@@ -56,8 +52,6 @@ combine :: fn() -> i32 ! {
 The return type of a fallible function is internally a *fallible type*
 `T ! E` — a tagged union of the success value (`T`) and the error (`E`).
 
----
-
 ## The `fail` Statement
 
 Use `fail` to return an error from a fallible function:
@@ -77,8 +71,6 @@ validate :: fn(input: []const u8) -> bool ! ParseError {
 `fail .variant` is only allowed inside functions with a `!` error return type.
 The variant must exist in the function's declared error type, and any payload
 must match the variant's declared payload type.
-
----
 
 ## Error Propagation with `?`
 
@@ -137,8 +129,6 @@ build :: fn(into: *heap::Arena, n: usize) -> []u8 ! heap::MemError {
 }
 ```
 
----
-
 ## Catching Errors with `catch`
 
 Use `catch` to handle an error locally instead of propagating it:
@@ -168,8 +158,6 @@ result := parse_json_string(input, output) catch err {
 };
 ```
 
----
-
 ## Force Unwrap with `!!`
 
 The `!!` operator unwraps a fallible (or optional) value, panicking at runtime
@@ -186,8 +174,6 @@ ptr := maybe_ptr!!;
 Use `!!` sparingly — it is a convenience for cases where failure is truly
 unexpected and should abort the program.
 
----
-
 ## Nil Coalesce with `??`
 
 The `??` operator provides a default value when the left side is an error or
@@ -200,8 +186,6 @@ value := parse("?") ?? 0;
 // Returns a default for optionals too
 name := get_name() ?? "unknown";
 ```
-
----
 
 ## Defer Modes
 
@@ -236,8 +220,6 @@ process :: fn() -> void ! IoError {
 
 Multiple defers execute in reverse order (LIFO), just like Go and Zig.
 
----
-
 ## Pattern: Fallible Function with Cleanup
 
 A common pattern in Skarn combines `defer`, `fail`, and `?`:
@@ -264,8 +246,6 @@ main :: fn() -> i32 {
 }
 ```
 
----
-
 ## Fallible Entry Points
 
 `main` can itself be a fallible function:
@@ -279,8 +259,6 @@ main :: fn() -> i32 ! IoError {
 
 The runtime handles top-level error propagation by aborting with the error
 message.
-
----
 
 ## Summary Table
 

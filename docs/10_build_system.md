@@ -1,19 +1,16 @@
 # The Skarn Build System (`build.sk`)
 
-> **Thesis.** Your build *is* a Skarn program that runs inside the compiler. No
-> Makefiles, no CMake, no second language. Skarn already has the two pieces Jai's
-> build system is made of — a **comptime VM** that executes the compiler's own IR
-> and a **`#compiler` message loop** that can inspect and generate the program —
-> so the build system is the ergonomic surface on top of them.
->
-> Where Jai stops, Skarn keeps going: **capability-sandboxed dependency builds**
-> (the structural fix for the `build.rs` supply-chain problem), a **content-
-> hashed parallel build graph**, **typed-AST codegen** instead of string
-> splicing, **targets as values** for cross-compile matrices, and **`--watch`**
-> backed by the fast `skarnld` linker.
+Your build is a Skarn program that runs inside the compiler. No Makefiles, no CMake,
+no second language. The two pieces are already there: the comptime VM that executes
+the compiler's IR, and the `#compiler` message loop that inspects and generates the
+program. The build system sits on top.
 
-This document is the design. See [09_comptime.md](09_comptime.md)
-for the VM/metaprogramming foundation it sits on.
+Planned on the same base: capability-sandboxed dependency builds (the structural fix
+for the `build.rs` problem), a content-hashed parallel build graph, typed-AST codegen,
+targets as values, and `--watch` on the `skarnld` linker.
+
+This is the design. The VM/metaprogramming foundation is in
+[09_comptime.md](09_comptime.md).
 
 ## 1. The file and the execution model
 
@@ -37,7 +34,7 @@ populated `Build` value back out of VM memory and executes the plan.
 This is Jai's model (`#run build()`), minus the boilerplate. For Jai familiarity
 `#run build();` is also accepted, but bare `skarn build` is the idiom.
 
-**Three layers, increasing power:**
+**Three layers:**
 
 | Layer | Audience | Surface |
 | --- | --- | --- |
@@ -48,15 +45,15 @@ This is Jai's model (`#run build()`), minus the boilerplate. For Jai familiarity
 
 ## 2. Layer 1 — the declarative builder
 
-The everyday API. Everything is a method on `*Build` or `*Artifact` (UFCS), so it
-reads as a fluent pipeline. Methods only *populate data* — the compiler performs
-the effects — which keeps the build deterministic and sandboxable.
+The everyday API. Methods on `*Build` and `*Artifact` (UFCS), which only populate
+data — the compiler performs the effects. The build is deterministic and sandboxable
+because of that split.
 
 ```skarn
 #import std.build;
 
 build :: fn(b: *Build) {
-    // ── the game ──────────────────────────────────────────────
+    // the game
     game := b.executable("game", "src/main.sk");
     game.release();                      // or .optimize(.release_fast)
     game.link("raylib");                 // raylib.lib
@@ -65,16 +62,16 @@ build :: fn(b: *Build) {
     game.output("bin/game.exe");
     game.define("MAX_ENTITIES", "4096"); // comptime const injected into this build
 
-    // ── a build-time dependency, sandboxed by default ─────────
+    // a build-time dependency, sandboxed by default
     rl := b.require_path("raylib", "vendor/raylib");
     game.depend(rl);
 
-    // ── a codegen step that feeds a second artifact ───────────
+    // a codegen step that feeds a second artifact
     bind := b.codegen("bindings", gen_raylib_bindings);  // fn(*Gen)
     tool := b.executable("packer", "tools/packer.sk");
     tool.needs(bind);                    // ordering + declared inputs
 
-    // ── run / test steps ──────────────────────────────────────
+    // run / test steps
     b.run_step("run", game);             // `skarn build run [-- args]`
     b.test_dir("test", "tests/");        // `skarn build test`
 
@@ -124,8 +121,8 @@ pub Artifact :: struct {
 
 ## 3. Layer 2 — workspaces & build options (Jai parity)
 
-A **workspace** is an isolated compilation environment, exactly as in Jai. Layer 1
-creates one per artifact for you; Layer 2 lets you drive them directly.
+A workspace is an isolated compilation environment, as in Jai. Layer 1 makes one
+per artifact; in Layer 2 you drive them directly.
 
 ```skarn
 build :: fn(b: *Build) {
@@ -241,9 +238,7 @@ Today `compiler_decls()` already gives a hook the program's declarations (name +
 kind) at compile time; Layer 3 generalizes that into the streamed message form
 and adds the typed-AST/type-info handles.
 
-## 5. Beyond Jai
-
-The parts that make this *exceed* Jai rather than merely match it.
+## 5. The distinctive parts
 
 ### 5.1 Capability-sandboxed dependency builds — the supply-chain fix
 Jai's build is arbitrary code with full host access; so is `build.rs`. **Skarn hands

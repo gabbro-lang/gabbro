@@ -25,7 +25,7 @@ Attributes modify the behavior or layout of declarations. They are prefixed with
 - `#export("name")`: exports the symbol with external linkage. If no string is provided, exports it using its Skarn name.
 - `#extern("library_name", "symbol_name")`: declares an external function binding (FFI).
   The second argument is the **real link symbol** — the Skarn declaration name is free to
-  differ from the C symbol, so you can give a binding an idiomatic Skarn name:
+  differ from the C symbol — a binding can take an idiomatic Skarn name:
   ```skarn
   #extern("kernel32", "WriteFile")
   WriteFile :: fn(...) -> bool;          // Skarn name == C symbol

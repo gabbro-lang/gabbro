@@ -23,7 +23,7 @@ main :: fn() -> i32 {
 ```
 
 A bare `#insert #quote { ... }` is **not** hygienic — the locals it introduces
-(`x` above) leak into the surrounding scope on purpose, so you can use them. (A
+(`x` above) leak into the surrounding scope on purpose — they're yours to use. (A
 *macro*'s locals do not leak; see [Hygiene](#4-hygiene).)
 
 `#quote(expr)` is the expression form: it captures a single expression as an

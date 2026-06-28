@@ -314,8 +314,7 @@ allocator-injected ones.
 
 ### `std.vec` — `Vec(T)`
 
-A growable array with in-struct methods (UFCS), the ergonomic successor to
-`std.list`:
+A growable array with in-struct methods (UFCS), the successor to `std.list`:
 
 ```skarn
 #import std.heap as heap;

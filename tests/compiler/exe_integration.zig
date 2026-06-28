@@ -766,34 +766,37 @@ test "exe: generated match + cast compiles and runs" {
     try std.testing.expectEqual(@as(u32, 30), code);
 }
 
-test "exe: comptime FFI calls kernel32 at build time" {
+test "exe: comptime FFI from a pure #run is rejected (capability)" {
     if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    // `mul_div` resolves to kernel32!MulDiv and is CALLED on the comptime VM:
-    // MulDiv(10, 6, 1) = 60 is computed during compilation and baked in.
-    const code = try compileAndRun(arena.allocator(),
+    // A bare `#run` carries no `ffi` capability, so reaching kernel32!MulDiv at
+    // compile time must be denied — this is the build.rs surface, closed. (Only
+    // `build.sk` is granted FFI.)
+    if (compileAndRun(arena.allocator(),
         \\#extern("kernel32", "MulDiv")
         \\mul_div :: fn(a: i32, b: i32, c: i32) -> i32;
         \\RESULT :: #run mul_div(10, 6, 1);
         \\main :: fn() -> i32 { return RESULT; }
-    , "exe_ffi_muldiv");
-    try std.testing.expectEqual(@as(u32, 60), code);
+    , "exe_ffi_denied")) |_| {
+        return error.TestUnexpectedResult; // it compiled — the capability gate didn't fire
+    } else |_| {}
 }
 
-test "exe: comptime FFI marshals a string argument" {
+test "exe: comptime FFI with a string arg is rejected from #run too" {
     if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    const code = try compileAndRun(arena.allocator(),
+    if (compileAndRun(arena.allocator(),
         \\#extern("kernel32", "lstrlenA")
         \\str_len :: fn(s: []const u8) -> i32;
         \\LEN :: #run str_len("hello, world");
         \\main :: fn() -> i32 { return LEN; }
-    , "exe_ffi_strlen");
-    try std.testing.expectEqual(@as(u32, 12), code);
+    , "exe_ffi_str_denied")) |_| {
+        return error.TestUnexpectedResult;
+    } else |_| {}
 }
 
 test "exe: main returning 42 propagates exit code" {

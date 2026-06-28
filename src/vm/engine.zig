@@ -45,6 +45,16 @@ pub const BuildHost = struct {
     call: *const fn (ctx: *anyopaque, op: u32, args: []const Value) Value,
 };
 
+/// What a comptime run is allowed to do. A bare `#run` gets none of these — it is
+/// pure — and the build driver grants `ffi` to `build.sk`. Capabilities only narrow
+/// as the call stack descends; they can't be forged or widened. This is the
+/// structural fix for the `build.rs` surface: a dependency's compile-time code
+/// can't reach the host unless it was handed the capability to.
+pub const Caps = struct {
+    /// May call arbitrary host (DLL / C) functions while compiling.
+    ffi: bool = false,
+};
+
 pub const Vm = struct {
     allocator: std.mem.Allocator,
     /// Function table for resolving `call`. Optional: a standalone function with
@@ -53,6 +63,9 @@ pub const Vm = struct {
     zone_stack: zones.ZoneStack,
     /// Optional host bridge for `host_call` (the build driver). Null → trap.
     host: ?BuildHost = null,
+    /// What this run may do. Default: nothing privileged (a pure `#run`). The build
+    /// driver sets `caps.ffi = true` for `build.sk`. See `Caps`.
+    caps: Caps = .{},
     call_depth: usize = 0,
     max_call_depth: usize = 512,
     /// Guard against runaway comptime loops (mirrors the tree-walker's cap).
@@ -80,6 +93,29 @@ pub const Vm = struct {
             .module = module,
             .zone_stack = zones.ZoneStack.init(allocator),
         };
+    }
+
+    /// FFI to these benign memory primitives is always allowed: the comptime heap
+    /// (`std.heap`) reserves and frees pages through them, so gating them would
+    /// break allocation inside a pure `#run`. They do nothing beyond memory.
+    fn ffiAlwaysAllowed(ec: ffi.ExternCall) bool {
+        return std.mem.eql(u8, ec.symbol, "VirtualAlloc") or
+            std.mem.eql(u8, ec.symbol, "VirtualFree");
+    }
+
+    /// Call a host function, gated by the `ffi` capability. A pure `#run` may only
+    /// reach the benign memory primitives above; anything else halts the build with
+    /// a diagnostic. `build.sk` runs with `ffi` granted, so it reaches everything.
+    fn callExtern(self: *Vm, ec: ffi.ExternCall, args: []const Value) error{Trap}!Value {
+        if (!self.caps.ffi and !ffiAlwaysAllowed(ec)) {
+            self.compiler_error_msg = std.fmt.allocPrint(
+                self.allocator,
+                "comptime FFI to `{s}` (in `{s}`) is not allowed here: this ran as a pure `#run`, which has no `ffi` capability. Only `build.sk` is granted FFI.",
+                .{ ec.symbol, ec.lib },
+            ) catch "comptime FFI requires the `ffi` capability (only `build.sk` has it)";
+            return error.Trap;
+        }
+        return ffi.call(self.allocator, ec, args) catch error.Trap;
     }
 
     pub fn deinit(self: *Vm) void {
@@ -328,7 +364,7 @@ pub const Vm = struct {
                     defer if (argc > buf.len) self.allocator.free(arg_slice);
                     for (0..argc) |i| arg_slice[i] = frame.regs[base + i];
                     frame.regs[inst.a] = if (callee.extern_call) |ec|
-                        ffi.call(self.allocator, ec, arg_slice) catch return error.Trap
+                        try self.callExtern(ec, arg_slice)
                     else
                         try self.run(callee, arg_slice);
                 },
@@ -366,7 +402,7 @@ pub const Vm = struct {
                     } else 0;
                     for (0..argc) |i| arg_slice[off + i] = frame.regs[base + i];
                     frame.regs[inst.a] = if (callee.extern_call) |ec|
-                        ffi.call(self.allocator, ec, arg_slice) catch return error.Trap
+                        try self.callExtern(ec, arg_slice)
                     else
                         try self.run(callee, arg_slice);
                 },

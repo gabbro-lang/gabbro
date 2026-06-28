@@ -246,7 +246,7 @@ fn linkWithLld(allocator: std.mem.Allocator, io: std.Io, opts: WindowsLinkOption
     }
 }
 
-// ── Linux / ELF linking ─────────────────────────────────────────────────────────
+// Linux / ELF linking
 
 pub const LinuxLinkOptions = struct {
     /// Directory containing `ld.lld[.exe]` (e.g. <llvm>/bin). Empty = use PATH.

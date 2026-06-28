@@ -74,7 +74,7 @@ pub mark_deleted :: fn(node: *Node) {
     while p |pp| { pp.size = pp.size - sz; p = pp.parent; }
 }
 
-// ── heapsort by .size descending (no recursion, O(n log n)) ──────────────────
+// heapsort by .size descending (no recursion, O(n log n))
 swap :: fn(a: []*Node, i: usize, j: usize) { t := a[i]; a[i] = a[j]; a[j] = t; }
 
 sift_down :: fn(a: []*Node, start: usize, end: usize) {

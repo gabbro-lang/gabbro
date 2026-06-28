@@ -40,7 +40,7 @@
 //   null_writer()        — create a new null sink
 //   null_reset           — reset the byte counter
 
-// ─── Error set ────────────────────────────────────────────────────────────────
+// Error set
 
 pub IoError :: errors {
     write_failed,   // The underlying write call returned zero bytes
@@ -50,7 +50,7 @@ pub IoError :: errors {
     buffer_full,    // A FixedBuf ran out of space mid-write
 }
 
-// ─── Interfaces ───────────────────────────────────────────────────────────────
+// Interfaces
 
 // Writer is the core output interface. Any type that can receive bytes
 // implements Writer. The dynamic version (*Writer) enables generic output
@@ -66,7 +66,7 @@ pub Reader :: interface {
     read :: fn(self: *Self, buf: []u8) -> usize ! IoError;
 }
 
-// ─── Standard streams ─────────────────────────────────────────────────────────
+// Standard streams
 
 pub Stdout :: struct { marker: u8, }
 pub Stderr :: struct { marker: u8, }
@@ -103,7 +103,7 @@ pub stderr :: fn() -> Stderr {
     return .{ 0u8 };
 }
 
-// ─── FixedBuf ─────────────────────────────────────────────────────────────────
+// FixedBuf
 //
 // A 256-byte stack-allocated write buffer. Use it to format numbers and
 // strings without heap allocation, then flush to any *Writer or directly
@@ -187,7 +187,7 @@ pub buf_flush :: fn(self: *FixedBuf, sink: *Writer) -> usize ! IoError {
     return sink.write_all(pending)?;
 }
 
-// ─── NullWriter ───────────────────────────────────────────────────────────────
+// NullWriter
 //
 // NullWriter discards all output but accumulates a count of bytes written.
 // Use it to measure formatted output size before allocating or sending.
@@ -223,7 +223,7 @@ pub null_reset :: fn(self: *NullWriter) {
     self.count = 0usize;
 }
 
-// ─── Writer extension methods ──────────────────────────────────────────────────
+// Writer extension methods
 
 // Write the entire slice or fail. Turns a short write into an error.
 pub write_all :: fn(self: *Writer, data: []const u8) -> usize ! IoError {
@@ -267,7 +267,7 @@ pub write_bool :: fn(self: *Writer, value: bool) -> usize ! IoError {
     return self.write_all("false")?;
 }
 
-// ─── Decimal output ───────────────────────────────────────────────────────────
+// Decimal output
 
 // Internal: write a single decimal digit 0..9 as its ASCII character.
 write_decimal_digit :: fn(self: *Writer, digit: u64) -> usize ! IoError {
@@ -301,7 +301,7 @@ pub write_i64 :: fn(self: *Writer, value: i64) -> usize ! IoError {
     return a + b;
 }
 
-// ─── Hexadecimal output ───────────────────────────────────────────────────────
+// Hexadecimal output
 
 // Internal: ASCII character for a hex nibble in the range 0..15.
 hex_char :: fn(n: u8) -> u8 {
@@ -355,7 +355,7 @@ pub write_hex_u64_full :: fn(self: *Writer, value: u64) -> usize ! IoError {
     return a + b + c + d + e + f + g + h;
 }
 
-// ─── Stdout convenience ───────────────────────────────────────────────────────
+// Stdout convenience
 
 pub print :: fn(data: []const u8) -> usize ! IoError {
     out := stdout();
@@ -387,7 +387,7 @@ pub print_bool :: fn(value: bool) -> usize ! IoError {
     return (&out).write_bool(value)?;
 }
 
-// ─── Stderr convenience ───────────────────────────────────────────────────────
+// Stderr convenience
 
 pub eprint :: fn(data: []const u8) -> usize ! IoError {
     out := stderr();

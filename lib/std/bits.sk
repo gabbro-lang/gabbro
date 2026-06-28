@@ -7,7 +7,7 @@
 // on integers; this module names the idioms built on top of them: counting
 // bits, rotating, testing power-of-two-ness, and poking individual bits.
 
-// ─── Population count ─────────────────────────────────────────────────────────
+// Population count
 
 // Number of set bits (Brian Kernighan's algorithm: clears the lowest set bit
 // each iteration, so it loops once per 1-bit rather than once per bit width).
@@ -31,7 +31,7 @@ pub count_ones_u64 :: fn(value: u64) -> u32 {
     return count;
 }
 
-// ─── Leading / trailing zero counts ───────────────────────────────────────────
+// Leading / trailing zero counts
 
 pub leading_zeros_u32 :: fn(value: u32) -> u32 {
     if value == 0u32 { return 32u32; }
@@ -77,7 +77,7 @@ pub trailing_zeros_u64 :: fn(value: u64) -> u32 {
     return n;
 }
 
-// ─── Rotation ─────────────────────────────────────────────────────────────────
+// Rotation
 
 pub rotate_left_u32 :: fn(value: u32, amount: u32) -> u32 {
     n := amount & 31u32;
@@ -103,7 +103,7 @@ pub rotate_right_u64 :: fn(value: u64, amount: u32) -> u64 {
     return (value >> n) | (value << (64u64 - n));
 }
 
-// ─── Power of two ─────────────────────────────────────────────────────────────
+// Power of two
 
 pub is_power_of_two_u32 :: fn(value: u32) -> bool {
     if value == 0u32 { return false; }
@@ -115,7 +115,7 @@ pub is_power_of_two_u64 :: fn(value: u64) -> bool {
     return (value & (value - 1u64)) == 0u64;
 }
 
-// ─── Single-bit access ────────────────────────────────────────────────────────
+// Single-bit access
 //
 // `index` is taken modulo the bit width, so it always names a real bit.
 

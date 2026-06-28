@@ -24,7 +24,7 @@ fn enableUtf8Console() void {
     if (builtin.os.tag == .windows) _ = win.SetConsoleOutputCP(65001);
 }
 
-// ── Live status line ───────────────────────────────────────────────────────────
+// Live status line
 // A "changing command line" — the current phase, with a spinner that advances at
 // each phase boundary. Uses a bare carriage return + padding (no ANSI), so it is
 // harmless when output is redirected.
@@ -53,7 +53,7 @@ fn progressStep(ctx: ?*anyopaque, phase: skarn.Phase) void {
     p.step(phase);
 }
 
-// ── Entry ───────────────────────────────────────────────────────────────────────
+// Entry
 
 const Options = struct {
     out_path: ?[]const u8 = null,
@@ -233,7 +233,7 @@ pub fn main(init: std.process.Init) u8 {
         opts.extra_libs.append(allocator, "vcruntime") catch return 1;
     }
 
-    // ── Relocatable runtime: find the stdlib + the LLVM/linker dir wherever skarn is
+    // Relocatable runtime: find the stdlib + the LLVM/linker dir wherever skarn is
     // installed, so the binary isn't tied to its build machine. Resolved paths
     // live on the process arena (cleaned at exit).
     {
@@ -281,7 +281,7 @@ pub fn main(init: std.process.Init) u8 {
     return 1;
 }
 
-// ── Commands ──────────────────────────────────────────────────────────────────
+// Commands
 
 /// `skarn bindgen <header.h> [--lib <name>] [-o <out.sk>] [-I... -D...] [-- <clang args>]`
 fn cmdBindgen(allocator: std.mem.Allocator, io: std.Io, env: anytype, args: []const []const u8) u8 {
@@ -491,7 +491,7 @@ fn cmdBuild(allocator: std.mem.Allocator, io: std.Io, path: []const u8, source: 
     return 0;
 }
 
-// ── Build system (`skarn build` with a build.sk) ──────────────────────────────────
+// Build system (`skarn build` with a build.sk)
 
 fn cmdBuildDir(allocator: std.mem.Allocator, io: std.Io, rest: []const []const u8) u8 {
     if (!skarn.llvm_enabled) return noLlvm();
@@ -584,7 +584,7 @@ fn fileExists(io: std.Io, path: []const u8) bool {
     return true;
 }
 
-// ── Relocatable-runtime path resolution ──────────────────────────────────────
+// Relocatable-runtime path resolution
 
 /// True if `dir/<rel>` exists (probe via the page allocator, freed immediately).
 fn dirHasFile(io: std.Io, dir: []const u8, rel: []const u8) bool {
@@ -632,7 +632,7 @@ fn resolveLlvmBin(ra: std.mem.Allocator, io: std.Io, env: anytype, exe_dir: ?[]c
     return null;
 }
 
-// ── Stats ───────────────────────────────────────────────────────────────────────
+// Stats
 
 fn ms(ns: u64) f64 {
     return @as(f64, @floatFromInt(ns)) / 1_000_000.0;
@@ -658,7 +658,7 @@ fn printRow(name: []const u8, ns: u64) void {
     std.debug.print("  {s: <14}{d: >8.2} ms\n", .{ name, ms(ns) });
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 
 fn eqAny(s: []const u8, options: []const []const u8) bool {
     for (options) |o| if (std.mem.eql(u8, s, o)) return true;

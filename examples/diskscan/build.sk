@@ -15,7 +15,7 @@ VERSION :: "0.1.0";
 build :: fn(b: Build) {
     dev: bool = b.option("debug");
 
-    // ── CLI: console subsystem ───────────────────────────────────────────────
+    // CLI: console subsystem
     cli := b.executable("diskscan", "src/cli.sk");
     cli.description("Fast multithreaded disk-usage analyzer (CLI)");
     cli.version(VERSION);
@@ -24,7 +24,7 @@ build :: fn(b: Build) {
     if dev { cli.debug(); } else { cli.release(); }
     cli.install();
 
-    // ── GUI: windowed subsystem (no console window) ──────────────────────────
+    // GUI: windowed subsystem (no console window)
     gui := b.executable("diskscan-gui", "src/gui.sk");
     gui.description("Disk-usage analyzer with a native browser GUI");
     gui.version(VERSION);
@@ -33,7 +33,7 @@ build :: fn(b: Build) {
     if dev { gui.debug(); } else { gui.release(); }
     gui.install();
 
-    // ── steps ────────────────────────────────────────────────────────────────
+    // steps
     // No `default` is set, so a bare `skarn build` builds *both* artifacts; the
     // named steps build-and-run one of them.
     b.run_step("run", cli);     // skarn build run   → CLI on the current dir

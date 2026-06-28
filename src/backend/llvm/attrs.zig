@@ -57,7 +57,7 @@ pub fn applyFunctionAttrs(cg: *ModuleCg, func: ir.IrFunction, lv: llvm.LLVMValue
     if (func.link_name) |ln| if (ln.len > 0) llvm.LLVMSetValueName2(lv, ln.ptr, ln.len);
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// Helpers
 
 /// Attach a real LLVM *enum* attribute (e.g. `cold`) so the optimizer acts on it,
 /// unlike a string attribute which is opaque to LLVM.

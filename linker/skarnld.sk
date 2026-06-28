@@ -25,7 +25,7 @@
 #import std.heap.{ Arena, make, alloc, alloc_bytes, deinit };
 #import std.io.{ print, println, print_u64, print_hex_u64 };
 
-// ── Win32 file I/O ──────────────────────────────────────────────────────────
+// Win32 file I/O
 // CreateFileA / ReadFile / WriteFile / CloseHandle / GetCommandLineA are already
 // declared by the auto-imported Skarn runtime (windows.sk) on this flat global
 // symbol table, so we reuse them — redeclaring is a duplicate-symbol error. Only
@@ -39,7 +39,7 @@ FILE_SHARE_READ :: 0x00000001u32;
 OPEN_EXISTING   :: 3u32;
 INVALID_HANDLE  :: 18446744073709551615usize;   // (HANDLE)-1
 
-// ── Little-endian readers ───────────────────────────────────────────────────
+// Little-endian readers
 // All return widened (u32) so callers never juggle sub-word shift types.
 
 rd_u8 :: fn(b: []const u8, o: usize) -> u32 {
@@ -109,7 +109,7 @@ read_file :: fn(a: *Arena, path: []const u8) -> []u8 {
     return buf;
 }
 
-// ── COFF structures ─────────────────────────────────────────────────────────
+// COFF structures
 
 IMAGE_FILE_MACHINE_AMD64 :: 0x8664u32;
 
@@ -238,7 +238,7 @@ get_reloc :: fn(obj: *CoffObj, reloc_ptr: u32, i: u32) -> Reloc {
     };
 }
 
-// ── Image building ──────────────────────────────────────────────────────────
+// Image building
 //
 // Single-object linker: Skarn emits the whole program (and its runtime) into one
 // COFF object, so every defined symbol is local — only kernel32 functions are
@@ -366,7 +366,7 @@ write_file :: fn(a: *Arena, path: []const u8, data: []const u8) -> bool {
     return ok;
 }
 
-// ── CLI helpers ─────────────────────────────────────────────────────────────
+// CLI helpers
 
 p :: fn(s: []const u8) {
     print(s) catch e {};
@@ -541,7 +541,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
     obj := coff_open(data);
     if !obj.ok { return 1; }
 
-    // ── Classify input sections into output classes + size each ──
+    // Classify input sections into output classes + size each
     ns := obj.num_sections;
     nslot := (ns + 1u32) as usize;
     cls := alloc(u32, a, nslot);      // class per 1-based section index
@@ -586,7 +586,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
     bss_in := crun[5usize];
     if text_in == 0usize { p("skarnld: no .text section\n"); return 1; }
 
-    // ── Collect imports (undefined externals) + group them by DLL via the map ──
+    // Collect imports (undefined externals) + group them by DLL via the map
     map := skimp_bytes(&obj);
     nimp := 0u32;
     i := 0u32;
@@ -628,7 +628,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
         i += 1u32 + sy.aux_count;
     }
 
-    // ── Import-table layout: appended to the .rdata class, after input rdata ──
+    // Import-table layout: appended to the .rdata class, after input rdata
     dir_off := au(rdata_in, 8usize);            // import directory
     dir_sz  := ((ndll as usize) + 1usize) * 20usize;  // one descriptor per DLL + null
     // Per-DLL ILTs then per-DLL IATs — contiguous so the IAT data-dir spans them.
@@ -656,7 +656,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
         d += 1u32;
     }
 
-    // ── Export table layout (DLL only), after the import tables in .rdata ──
+    // Export table layout (DLL only), after the import tables in .rdata
     map_exp := skexp_bytes(&obj);
     nexp := 0u32;
     ei := 0usize;
@@ -716,7 +716,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
     }
     rdata_total := cur;                          // whole .rdata class (input + imports + exports)
 
-    // ── Class file offsets + RVAs (empty classes collapse) ──
+    // Class file offsets + RVAs (empty classes collapse)
     np := 2u32;                                   // .text + .rdata always present
     if data_in > 0usize { np += 1u32; }
     if pdata_in > 0usize { np += 1u32; }
@@ -768,7 +768,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
     if ename.len == 0usize { if !opts.is_dll { ename = "mainCRTStartup"; } }
     if ename.len > 0usize { entry_rva = sym_rva(&obj, secrva, ename); }
 
-    // ── Build the image ──
+    // Build the image
     img := alloc_bytes(a, file_size);          // zero-filled (fresh arena pages)
 
     img[0usize] = 0x4du8; img[1usize] = 0x5au8;     // "MZ"
@@ -816,7 +816,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
     wr_u32(img, dd + 96usize, iat_first_rva as u32);        // [12] IAT RVA
     wr_u32(img, dd + 100usize, iat_total as u32);           // [12] IAT size
 
-    // ── Section headers (only present classes, in order) ──
+    // Section headers (only present classes, in order)
     sh := opt + 240usize;
     write_shdr(img, sh,           ".text",  text_total,  text_rva,  text_off,  0x60000020u32);
     write_shdr(img, sh + 40usize, ".rdata", rdata_total, rdata_rva, rdata_off, 0x40000040u32);
@@ -837,7 +837,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
         wr_u32(img, ho + 36usize, 0xc0000080u32);    // UNINIT_DATA | READ | WRITE
     }
 
-    // ── Section raw data: blit every kept input section to its file offset ──
+    // Section raw data: blit every kept input section to its file offset
     s = 0u32;
     while s < ns {
         idx := (s + 1u32) as usize;
@@ -903,7 +903,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
         d += 1u32;
     }
 
-    // ── Export directory (.edata) for a DLL ──
+    // Export directory (.edata) for a DLL
     if opts.is_dll {
         ed := rdata_off + exp_dir_off;
         wr_u32(img, ed + 12usize, (rdata_rva + expdll_off) as u32);   // Name → "<out>.dll"
@@ -925,7 +925,7 @@ link_bytes :: fn(a: *Arena, data: []const u8, out_path: []const u8, opts: *LinkO
         blit(img, rdata_off + expdll_off, out_dll, 0usize, out_dll.len);
     }
 
-    // ── Apply relocations for every kept section ──
+    // Apply relocations for every kept section
     s = 0u32;
     while s < ns {
         idx := (s + 1u32) as usize;
@@ -986,7 +986,7 @@ write_shdr :: fn(img: []u8, o: usize, name: []const u8, vsize: usize, rva: usize
     wr_u32(img, o + 36usize, flags);             // Characteristics
 }
 
-// ── Command line ────────────────────────────────────────────────────────────
+// Command line
 
 // GetCommandLineA is provided by the runtime (returns [*]const u8).
 

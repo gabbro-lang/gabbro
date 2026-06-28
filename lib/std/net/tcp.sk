@@ -16,7 +16,7 @@
 #import std.net.addr as addr;
 #import std.net.socket as socket;
 
-// ── TcpStream — a connected TCP socket ───────────────────────────────────────
+// TcpStream — a connected TCP socket
 pub TcpStream :: struct {
     sock: socket::Socket
 
@@ -81,7 +81,7 @@ pub TcpStream :: struct {
     pub close :: fn(self: *Self) { self.sock.close(); }
 }
 
-// ── TcpListener — a bound, listening TCP socket ──────────────────────────────
+// TcpListener — a bound, listening TCP socket
 
 // The result of `accept`: the new stream and who connected.
 pub Accepted :: struct { stream: TcpStream, peer: addr::SocketAddr }
@@ -110,7 +110,7 @@ pub TcpListener :: struct {
     pub close :: fn(self: *Self) { self.sock.close(); }
 }
 
-// ── Free constructors ────────────────────────────────────────────────────────
+// Free constructors
 
 // Connect to `sa` and return a ready stream (client side).
 pub connect :: fn(sa: addr::SocketAddr) -> TcpStream ! NetError {

@@ -47,7 +47,7 @@ pub diff_bytes :: fn($T: type, a: *T, b: *T) -> isize {
     return -((addr_b - addr_a) as isize);
 }
 
-// ─── Alignment ────────────────────────────────────────────────────────────────
+// Alignment
 //
 // `alignment` must be a power of two — the standard precondition for the
 // mask-based tricks below (use `bits.is_power_of_two_u64` to check one).

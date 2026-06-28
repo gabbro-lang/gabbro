@@ -16,7 +16,7 @@ pub with_alpha :: fn(c: Color, a: u8) -> Color { o: Color = .{ c.r, c.g, c.b, a 
 // A solid gray of the given intensity.
 pub gray :: fn(v: u8) -> Color { c: Color = .{ v, v, v, 255u8 }; return c; }
 
-// ── Named colors ─────────────────────────────────────────────────────────────
+// Named colors
 pub white   :: fn() -> Color { return rgb(255u8, 255u8, 255u8); }
 pub black   :: fn() -> Color { return rgb(0u8, 0u8, 0u8); }
 pub red     :: fn() -> Color { return rgb(230u8, 41u8, 55u8); }
@@ -27,7 +27,7 @@ pub orange  :: fn() -> Color { return rgb(255u8, 161u8, 0u8); }
 pub purple  :: fn() -> Color { return rgb(200u8, 122u8, 255u8); }
 pub clear   :: fn() -> Color { return rgba(0u8, 0u8, 0u8, 0u8); }
 
-// ── Blending & packing ───────────────────────────────────────────────────────
+// Blending & packing
 
 lerp_u8 :: fn(a: u8, b: u8, t: f32) -> u8 {
     af: f32 = a as f32;

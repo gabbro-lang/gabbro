@@ -22,7 +22,7 @@ const Span = @import("lexer/span.zig").Span;
 
 const json = std.json;
 
-// ── Per-document analysis ────────────────────────────────────────────────────
+// Per-document analysis
 
 const Doc = struct {
     arena: std.heap.ArenaAllocator,
@@ -107,7 +107,7 @@ const Server = struct {
     }
 };
 
-// ── Position mapping (byte offset ↔ LSP UTF-16 position) ─────────────────────
+// Position mapping (byte offset ↔ LSP UTF-16 position)
 
 const Pos = struct { line: u32, char: u32 };
 
@@ -180,7 +180,7 @@ fn identAt(text: []const u8, offset: usize) []const u8 {
     return text[start..end];
 }
 
-// ── JSON output helpers ──────────────────────────────────────────────────────
+// JSON output helpers
 
 fn escapeInto(list: *std.ArrayList(u8), gpa: std.mem.Allocator, s: []const u8) void {
     for (s) |c| switch (c) {
@@ -225,7 +225,7 @@ fn sendResult(self: *Server, id: ?json.Value, result_json: []const u8) void {
     send(self, b.items);
 }
 
-// ── JSON input helpers ───────────────────────────────────────────────────────
+// JSON input helpers
 
 fn objGet(v: json.Value, key: []const u8) ?json.Value {
     return switch (v) {
@@ -248,7 +248,7 @@ fn getInt(v: json.Value, key: []const u8) ?i64 {
     };
 }
 
-// ── Kind mappings ────────────────────────────────────────────────────────────
+// Kind mappings
 
 fn completionKind(k: sema.SymbolKind) u8 {
     return switch (k) {
@@ -281,7 +281,7 @@ const keywords = [_][]const u8{
     "void", "byte",
 };
 
-// ── Request handlers ─────────────────────────────────────────────────────────
+// Request handlers
 
 fn handleInitialize(self: *Server, id: ?json.Value) void {
     sendResult(self, id,
@@ -491,7 +491,7 @@ fn dispatch(self: *Server, root: json.Value) void {
     }
 }
 
-// ── The stdio loop ───────────────────────────────────────────────────────────
+// The stdio loop
 
 pub fn run(gpa: std.mem.Allocator, io: std.Io) u8 {
     var in_buf: [1 << 16]u8 = undefined;
@@ -537,7 +537,7 @@ pub fn run(gpa: std.mem.Allocator, io: std.Io) u8 {
     return 0;
 }
 
-// ── Tests ────────────────────────────────────────────────────────────────────
+// Tests
 
 test "lsp: byte offset ↔ UTF-16 position round-trips, incl. multibyte" {
     const t = std.testing;

@@ -44,7 +44,7 @@
 FS_INVALID :: -1i64;       // a closed/invalid handle (matches the seam's failure value)
 MAX_PATH_BYTES :: 260usize;
 
-// ── Errors ────────────────────────────────────────────────────────────────
+// Errors
 
 pub FsError :: errors {
     not_found,       // open of an existing file failed — the path doesn't exist (or access denied)
@@ -56,7 +56,7 @@ pub FsError :: errors {
     path_too_long,   // path (plus NUL terminator) doesn't fit in the internal buffer
 }
 
-// ── Path helpers ──────────────────────────────────────────────────────────
+// Path helpers
 
 // Copy `path` into `buf`, append a NUL terminator, and return a pointer to the
 // start of `buf` suitable for the OS `*A`/syscall APIs.
@@ -71,7 +71,7 @@ fs_to_cstr :: fn(path: []const u8, buf: []u8) -> *const u8 ! FsError {
     return buf.ptr;
 }
 
-// ── File ──────────────────────────────────────────────────────────────────
+// File
 
 // An open OS file handle. Implements both `Reader` and `Writer`, so it works
 // anywhere a `*Reader`/`*Writer` is expected — pipelines, formatters, loggers.
@@ -184,7 +184,7 @@ pub read_all :: fn(path: []const u8, a: *Arena) -> []u8 ! FsError {
     return buf[0usize..total];
 }
 
-// ── Directory iteration ────────────────────────────────────────────────────
+// Directory iteration
 // `open_dir` takes a directory PATH (each platform adds its own glob/listing
 // mechanism). `dir_next` yields each entry name (including "." and ".."), valid
 // only until the following `dir_next` call.

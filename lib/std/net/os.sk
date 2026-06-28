@@ -14,7 +14,7 @@
 
 #import std.net.addr as addr;
 
-// ── OS socket layer ──────────────────────────────────────────────────────────
+// OS socket layer
 // Thin wrappers over the platform runtime's socket seam (windows.sk → Winsocskarn;
 // linux.sk → socket syscalls, translating these Windows option constants). The
 // `sys_` names are kept so the wrappers above are unchanged.
@@ -39,7 +39,7 @@ pub sys_shutdown     :: fn(s: usize, how: i32) -> i32 { return os_net_shutdown(s
 pub sys_htons        :: fn(x: u16) -> u16 { return (x << 8u16) | (x >> 8u16); }
 pub sys_ntohs        :: fn(x: u16) -> u16 { return (x << 8u16) | (x >> 8u16); }
 
-// ── Protocol constants ───────────────────────────────────────────────────────
+// Protocol constants
 pub AF_INET        :: 2;
 pub SOCK_STREAM    :: 1;        // TCP
 pub SOCK_DGRAM     :: 2;        // UDP
@@ -68,7 +68,7 @@ pub SHUT_BOTH      :: 2;        // SD_BOTH
 // WSAGetLastError codes we care about
 pub WSAEWOULDBLOCK :: 10035;
 
-// ── Shared error type ────────────────────────────────────────────────────────
+// Shared error type
 // Every layer of std.net fails with this. Where a specific syscall failed is in
 // the variant name; the numeric Winsock code is available via `last_error()`.
 pub NetError :: errors {
@@ -86,7 +86,7 @@ pub NetError :: errors {
     closed,           // peer closed the connection
 }
 
-// ── The wire address: `sockaddr_in` (16 bytes) ───────────────────────────────
+// The wire address: `sockaddr_in` (16 bytes)
 // family(2) port(2, network order) addr(4, network order) zero(8).
 pub RawSockaddr :: struct { family: u16, port: u16, addr: u32, zero: u64 }
 
@@ -100,7 +100,7 @@ pub addr_from_raw :: fn(r: RawSockaddr) -> addr::SocketAddr {
     return .{ addr::from_net(r.addr), sys_ntohs(r.port) };
 }
 
-// ── Library lifecycle ────────────────────────────────────────────────────────
+// Library lifecycle
 // Initialise Winsock — must be called once before any socket call in a process.
 pub init :: fn() -> void ! NetError {
     data: [512]u8 = .{};                 // WSADATA

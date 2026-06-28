@@ -3,7 +3,7 @@
 /// Provides: @panic, assert, write_stdout, write_stderr
 /// No libc. Uses direct Linux syscalls.
 
-// ── Linux syscalls via inline asm ─────────────────────────────────────────
+// Linux syscalls via inline asm
 
 /// Write bytes to a file descriptor. Returns bytes written.
 sys_write :: fn(fd: i32, data: []const u8) -> isize {
@@ -30,7 +30,7 @@ sys_exit :: fn(code: i32) {
 // linux_start_none.sk (freestanding: call main + exit syscall) or
 // linux_start_gnu.sk (glibc: hand off to __libc_start_main).
 
-// ── Low-level I/O ─────────────────────────────────────────────────────────
+// Low-level I/O
 
 write_stdout :: fn(data: []const u8) -> usize {
     written := sys_write(1, data);
@@ -44,7 +44,7 @@ write_stderr :: fn(data: []const u8) -> usize {
     return written as usize;
 }
 
-// ── OS page memory (backs std.heap) ─────────────────────────────────────────
+// OS page memory (backs std.heap)
 // mmap=9, mprotect=10, munmap=11. The Linux syscall ABI passes the 4th argument
 // in r10 (the `syscall` insn clobbers rcx), so mmap's flags go in r10.
 
@@ -99,7 +99,7 @@ os_release :: fn(addr: usize, size: usize) {
     ignored := sys_munmap(addr, size);
 }
 
-// ── OS time (backs std.time) ─────────────────────────────────────────────────
+// OS time (backs std.time)
 // clock_gettime=228, nanosleep=35. struct timespec = { i64 tv_sec; i64 tv_nsec }.
 
 TimeSpec :: struct { sec: i64, nsec: i64 }
@@ -136,7 +136,7 @@ os_sleep_nanos :: fn(ns: i64) {
     ignored := sys_nanosleep(&req, &rem);
 }
 
-// ── OS file system (backs std.fs) ────────────────────────────────────────────
+// OS file system (backs std.fs)
 // openat=257, read=0, write=1, close=3, lseek=8, newfstatat=262, unlink=87,
 // getdents64=217. Paths are NUL-terminated C strings; AT_FDCWD = -100. A handle
 // is the raw fd (>= 0); -1 means failure (matches the file seam's contract).
@@ -318,7 +318,7 @@ os_dir_close :: fn(h: i64) {
     os_release(h as usize, 4160usize);
 }
 
-// ── OS process (backs std.process) ───────────────────────────────────────────
+// OS process (backs std.process)
 // getpid=39, fork=57, execve=59, wait4=61, kill=62. Process info (cmdline, env)
 // is read from /proc; spawn runs `/bin/sh -c <cmd>`, so the shell does arg
 // splitting + PATH lookup. A child token is just its pid.
@@ -388,7 +388,7 @@ cstrlen :: fn(s: *const u8) -> usize {
     return n;
 }
 
-// ── Environment overlay (set_env / unset_env) ────────────────────────────────
+// Environment overlay (set_env / unset_env)
 // Linux has no syscall to mutate the process environ; libc keeps a `char**` it
 // edits. Freestanding, we keep our own overlay table (lazily heap-allocated,
 // anchored by a mutable global) that get_env consults first and spawn merges in.
@@ -639,7 +639,7 @@ os_wait :: fn(token: i64, block: bool) -> i64 {
 os_kill :: fn(token: i64) -> bool { return sys_kill(token, 9) == 0i64; }  // SIGKILL
 os_proc_release :: fn(token: i64) { ignored := token; }                  // no handles to free
 
-// ── OS sockets (backs std.net) ───────────────────────────────────────────────
+// OS sockets (backs std.net)
 // socket=41 connect=42 accept=43 sendto=44 recvfrom=45 shutdown=48 bind=49
 // listen=50 getsockname=51 setsockopt=54 fcntl=72. AF_INET/SOCK_*/IPPROTO_* match
 // Windows; only the SOL_SOCKET option *constants* differ, translated below.
@@ -770,7 +770,7 @@ os_net_ioctlsocket :: fn(s: usize, cmd: u32, argp: *u32) -> i32 {
     return ll_fcntl(s, 4, nf) as i32;        // F_SETFL
 }
 
-// ── OS threads (backs std.thread) ────────────────────────────────────────────
+// OS threads (backs std.thread)
 // clone=56, gettid=186, sched_yield=24, sched_getaffinity=204. A thread is a
 // clone() that shares VM/FS/FILES and exits with SIGCHLD so the parent can
 // wait4() it for join. We allocate the child stack, then in asm: clone; the
@@ -859,7 +859,7 @@ os_cpu_count :: fn() -> u32 {
     return count;
 }
 
-// ── Core runtime functions ─────────────────────────────────────────────────
+// Core runtime functions
 
 /// Exit with an application-defined status.
 #noreturn

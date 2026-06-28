@@ -19,7 +19,7 @@
 #import std.heap.{ Arena, alloc_bytes };
 #import std.io.{ Writer, IoError };
 
-// ── The builder ────────────────────────────────────────────────────────────
+// The builder
 
 pub StringBuilder :: struct {
     arena:        *Arena,
@@ -51,7 +51,7 @@ pub from :: fn(a: *Arena, s: []const u8) -> StringBuilder {
     return sb;
 }
 
-// ── Growth ─────────────────────────────────────────────────────────────────
+// Growth
 
 // Ensure room for `extra` more bytes, growing (×2, min `extra`) if needed.
 pub sb_grow :: fn(self: *StringBuilder, extra: usize) {
@@ -69,7 +69,7 @@ pub sb_grow :: fn(self: *StringBuilder, extra: usize) {
     self.buf = nbuf;
 }
 
-// ── Core appends ───────────────────────────────────────────────────────────
+// Core appends
 
 pub append :: fn(self: *StringBuilder, s: []const u8) {
     sb_grow(self, s.len);
@@ -121,7 +121,7 @@ pub append_rune :: fn(self: *StringBuilder, cp: u32) {
     append_byte(self, 0x80u8 | ((cp & 0x3Fu32) as u8));
 }
 
-// ── Numeric formatting ─────────────────────────────────────────────────────
+// Numeric formatting
 
 digit_char :: fn(d: u8) -> u8 {
     if d < 10u8 { return 48u8 + d; }        // '0'..'9'
@@ -201,7 +201,7 @@ pub append_bool :: fn(self: *StringBuilder, b: bool) {
     if b { append(self, "true"); } else { append(self, "false"); }
 }
 
-// ── Queries ────────────────────────────────────────────────────────────────
+// Queries
 
 // The built bytes (a view into the arena storage; valid until the next grow).
 pub str :: fn(self: *StringBuilder) -> []const u8 {
@@ -224,7 +224,7 @@ pub byte_at :: fn(self: *StringBuilder, i: usize) -> u8 {
     return self.buf[i];
 }
 
-// ── Mutation ───────────────────────────────────────────────────────────────
+// Mutation
 
 // Reset length to zero, keeping the allocated capacity for reuse.
 pub clear :: fn(self: *StringBuilder) {
@@ -248,7 +248,7 @@ pub set_byte :: fn(self: *StringBuilder, i: usize, c: u8) {
     self.buf[i] = c;
 }
 
-// ── Writer integration ─────────────────────────────────────────────────────
+// Writer integration
 // Implementing Writer lets every std.io helper format into the builder:
 //   w: *Writer = &sb;  w.write_hex_u64(0xDEADu64) catch e {};
 
@@ -385,7 +385,7 @@ pub str_count_byte :: fn(s: []const u8, c: u8) -> usize {
     return total;
 }
 
-// ── ASCII character classification (on a byte) ──────────────────────────────
+// ASCII character classification (on a byte)
 
 pub is_digit :: fn(c: u8) -> bool { return c >= 48u8 && c <= 57u8; }
 pub is_upper :: fn(c: u8) -> bool { return c >= 65u8 && c <= 90u8; }
@@ -397,7 +397,7 @@ pub is_space :: fn(c: u8) -> bool { return c == 32u8 || c == 9u8 || c == 10u8 ||
 pub to_upper_byte :: fn(c: u8) -> u8 { if is_lower(c) { return c - 32u8; } return c; }
 pub to_lower_byte :: fn(c: u8) -> u8 { if is_upper(c) { return c + 32u8; } return c; }
 
-// ── Trimming (returns subslices; no allocation) ─────────────────────────────
+// Trimming (returns subslices; no allocation)
 
 pub str_trim_left :: fn(s: []const u8) -> []const u8 {
     i: usize = 0usize;
@@ -431,7 +431,7 @@ pub str_eq_ignore_case :: fn(a: []const u8, b: []const u8) -> bool {
     return true;
 }
 
-// ── Allocating transforms (into an arena) ───────────────────────────────────
+// Allocating transforms (into an arena)
 
 pub str_dup :: fn(a: *Arena, s: []const u8) -> []const u8 {
     sb: StringBuilder = from(a, s);

@@ -32,12 +32,12 @@
 // Handles (`Build`, `Artifact`) are tiny value structs carrying an id; all build
 // state lives in the compiler. See docs/10_build_system.md for the full design.
 
-// ── Handles ─────────────────────────────────────────────────────────────────
+// Handles
 
 pub Build    :: struct { id: i32 }
 pub Artifact :: struct { id: i32 }
 
-// ── Enums (public API) ──────────────────────────────────────────────────────
+// Enums (public API)
 
 pub Optimize  :: enum { debug, release_safe, release_fast, release_small }
 pub Subsystem :: enum { console, windows }
@@ -45,7 +45,7 @@ pub Subsystem :: enum { console, windows }
 // Artifact-kind codes passed to __build_artifact:
 //   0 executable · 1 shared_library (.dll) · 2 static_library (.lib) · 3 object
 
-// ── Artifact declarations ─────────────────────────────────────────────────────
+// Artifact declarations
 
 // Declare an executable with entry source `root`.
 pub executable :: fn(self: Build, name: []const u8, root: []const u8) -> Artifact {
@@ -67,7 +67,7 @@ pub object :: fn(self: Build, name: []const u8, root: []const u8) -> Artifact {
     return .{ __build_artifact(name, root, 3) };
 }
 
-// ── Optimization ──────────────────────────────────────────────────────────────
+// Optimization
 
 pub optimize :: fn(self: Artifact, level: Optimize) {
     match level {
@@ -85,7 +85,7 @@ pub release_fast  :: fn(self: Artifact) { __build_opt(self.id, 2); }
 pub release       :: fn(self: Artifact) { __build_opt(self.id, 2); } // alias for release_fast
 pub release_small :: fn(self: Artifact) { __build_opt(self.id, 3); }
 
-// ── Linking ───────────────────────────────────────────────────────────────────
+// Linking
 
 // Link a system / import library by name (no extension): "raylib", "user32".
 // Call it once per library.
@@ -155,7 +155,7 @@ pub no_default_libs :: fn(self: Artifact) {
     __build_nodefaultlibs(self.id);
 }
 
-// ── Executable settings ─────────────────────────────────────────────────────────
+// Executable settings
 
 // Choose the PE subsystem (console window or not).
 pub subsystem :: fn(self: Artifact, sub: Subsystem) {
@@ -181,7 +181,7 @@ pub stack_size :: fn(self: Artifact, bytes: u64) {
     __build_stack(self.id, bytes as i64);
 }
 
-// ── Output ────────────────────────────────────────────────────────────────────
+// Output
 
 // Set the output path explicitly (default: derived from the name).
 pub output :: fn(self: Artifact, path: []const u8) {
@@ -193,7 +193,7 @@ pub out_dir :: fn(self: Artifact, dir: []const u8) {
     __build_outdir(self.id, dir);
 }
 
-// ── Metadata ────────────────────────────────────────────────────────────────────
+// Metadata
 
 // Record a semantic version (shown in the build summary).
 pub version :: fn(self: Artifact, v: []const u8) {
@@ -215,7 +215,7 @@ pub define :: fn(self: Artifact, key: []const u8, val: []const u8) {
     __build_define(self.id, key, val);
 }
 
-// ── Dependencies ──────────────────────────────────────────────────────────────
+// Dependencies
 
 // A dependency resolved from a local directory (its own build.sk runs sandboxed).
 pub require_path :: fn(self: Build, name: []const u8, dir: []const u8) -> i32 {
@@ -232,7 +232,7 @@ pub depend :: fn(self: Artifact, dep: i32) {
     __build_depend(self.id, dep);
 }
 
-// ── Workspace ───────────────────────────────────────────────────────────────────
+// Workspace
 
 // Name the workspace (shown in the build summary).
 pub workspace :: fn(self: Build, name: []const u8) {
@@ -249,7 +249,7 @@ pub summary :: fn(self: Build) {
     __build_summary(1);
 }
 
-// ── Build options (`skarn build -Dname` / `-Dname=value`) ───────────────────────────
+// Build options (`skarn build -Dname` / `-Dname=value`)
 
 // True if `-Dname` was passed on the command line.
 pub option :: fn(self: Build, name: []const u8) -> bool {
@@ -261,7 +261,7 @@ pub option_str :: fn(self: Build, name: []const u8, default: []const u8) -> []co
     return __build_optionstr(name, default);
 }
 
-// ── Steps & default ───────────────────────────────────────────────────────────
+// Steps & default
 
 // A run step: `skarn build <name>` builds `target`, then runs it.
 pub run_step :: fn(self: Build, name: []const u8, target: Artifact) {

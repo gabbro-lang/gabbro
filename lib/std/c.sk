@@ -13,7 +13,7 @@
 //   #extern("msvcrt", "abs")
 //   abs :: fn(x: c_int) -> c_int;
 
-// ── integer types ───────────────────────────────────────────────────────────
+// integer types
 
 pub c_char      :: i8;       // `char` (treated as signed here)
 pub c_schar     :: i8;       // `signed char`
@@ -27,7 +27,7 @@ pub c_ulong     :: u32;      // `unsigned long`
 pub c_longlong  :: i64;      // `long long`
 pub c_ulonglong :: u64;      // `unsigned long long`
 
-// ── sizes & pointers ────────────────────────────────────────────────────────
+// sizes & pointers
 
 pub c_size_t    :: usize;    // `size_t`
 pub c_ssize_t   :: isize;    // `ssize_t` / `ptrdiff_t`
@@ -35,12 +35,12 @@ pub c_intptr    :: isize;    // `intptr_t`
 pub c_uintptr   :: usize;    // `uintptr_t`
 pub c_voidptr   :: usize;    // `void*` as a raw address (Skarn has no void pointer)
 
-// ── floating point ──────────────────────────────────────────────────────────
+// floating point
 
 pub c_float     :: f32;      // `float`
 pub c_double    :: f64;      // `double`
 
-// ── other ───────────────────────────────────────────────────────────────────
+// other
 
 pub c_bool      :: bool;     // C99 `_Bool`
 pub c_string    :: [*]const u8;  // `const char*` (NUL-terminated)

@@ -16,7 +16,7 @@
 #import scan.{ Stats, scan };
 #import node.{ Node, make_node, finalize, live_children, mark_deleted };
 
-// ── Win32 bindings ───────────────────────────────────────────────────────────
+// Win32 bindings
 #extern("kernel32", "GetModuleHandleA") GetModuleHandleA :: fn(name: ?*const u8) -> usize;
 #extern("user32", "LoadCursorA")        LoadCursorA :: fn(inst: usize, name: usize) -> usize;
 #extern("user32", "RegisterClassExA")   RegisterClassExA :: fn(wc: *WNDCLASSEXA) -> u16;
@@ -122,7 +122,7 @@ scale_rgb :: fn(c: u32, f: f64) -> u32 {
     return (r as u32) | ((g as u32) << 8u32) | ((b as u32) << 16u32);
 }
 
-// ── colour by file type ──────────────────────────────────────────────────────
+// colour by file type
 ext_of :: fn(name: []const u8) -> []const u8 {
     i: usize = name.len;
     while i > 0usize { i = i - 1usize; if name[i] == 46u8 { return name[(i + 1usize)..name.len]; } }
@@ -158,7 +158,7 @@ color_for :: fn(n: *Node) -> u32 {
     return rgb(150u32, 150u32, 155u32);                                        // other (grey)
 }
 
-// ── tiny allocation-free formatting into a stack buffer ──────────────────────
+// tiny allocation-free formatting into a stack buffer
 put :: fn(buf: []u8, pos: usize, s: []const u8) -> usize {
     i: usize = 0usize;
     while i < s.len { if pos + i < buf.len { buf[pos + i] = s[i]; } i = i + 1usize; }
@@ -218,7 +218,7 @@ build_path :: fn(cur: *Node, buf: []u8) -> usize {
     return pos;
 }
 
-// ── squarified treemap ───────────────────────────────────────────────────────
+// squarified treemap
 row_worst :: fn(items: []*Node, lo: usize, hi: usize, scale: f64, side: f64) -> f64 {
     sum: u64 = 0u64; k: usize = lo;
     while k < hi { sum = sum + items[k].size; k = k + 1usize; }
@@ -309,7 +309,7 @@ hit_test :: fn(s: *State, x: i32, y: i32) -> ?*Node {
     return null;
 }
 
-// ── window procedure ─────────────────────────────────────────────────────────
+// window procedure
 wndproc :: fn(hwnd: usize, msg: u32, wp: usize, lp: isize) -> isize {
     sp := GetWindowLongPtrA(hwnd, GWLP_USERDATA);
     if sp == 0isize { return DefWindowProcA(hwnd, msg, wp, lp); }
@@ -475,7 +475,7 @@ do_delete :: fn(s: *State) {
     }
 }
 
-// ── painting ─────────────────────────────────────────────────────────────────
+// painting
 LEGEND_N :: 8;
 legend_name :: fn(i: i32) -> []const u8 {
     if i == 0i32 { return "code"; } if i == 1i32 { return "image"; } if i == 2i32 { return "video"; }

@@ -12,7 +12,7 @@ build :: fn(b: Build) {
     b.workspace("showcase");
     b.out_root("bin");                 // every artifact goes in bin/
 
-    // ── A GUI executable ──────────────────────────────────────────────
+    // A GUI executable
     app := b.executable("app", "src/main.sk");
     app.release_fast();                // optimize for speed
     app.windowed();                    // GUI subsystem: no console window
@@ -30,11 +30,11 @@ build :: fn(b: Build) {
         app.define("TRACE", "1");
     }
 
-    // ── A companion shared library ────────────────────────────────────
+    // A companion shared library
     plugin := b.shared("plugin", "src/plugin.sk");
     plugin.release_small();
 
-    // ── Steps & default ───────────────────────────────────────────────
+    // Steps & default
     b.run_step("run", app);
     b.default(app);
     b.summary();                       // print a summary when done

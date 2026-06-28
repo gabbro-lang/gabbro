@@ -67,7 +67,7 @@ pub const CompileError = error{
 /// lands. Set once at startup; the compiler is single-threaded per build.
 pub var stdlib_root_override: ?[]const u8 = null;
 
-// ── Public entry points ───────────────────────────────────────────────────────
+// Public entry points
 
 /// Compile source text directly (no file I/O).
 /// Does NOT include the runtime — used by tests and library consumers.
@@ -244,7 +244,7 @@ fn compileFileInternal(
     return runPipelineWithSource(fe_allocator, .{ .file_name = path, .items = items }, root_source, path, arena);
 }
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
+// Internal helpers
 
 fn loadFile(
     allocator: std.mem.Allocator,

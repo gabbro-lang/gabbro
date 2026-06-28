@@ -35,7 +35,7 @@ MAX_GROUP :: 64;
 // A thread entry has the shape `fn(*void) -> u32`. Spawn it with
 // `core::fn_ptr(an_entry)`.
 
-// ── Thread ───────────────────────────────────────────────────────────────────
+// Thread
 pub Thread :: struct {
     token: i64
 
@@ -71,7 +71,7 @@ pub spawn :: fn(entry: *void, arg: *void) -> Thread {
     return .{ os_thread_spawn(entry, arg) };
 }
 
-// ── Free helpers ───────────────────────────────────────────────────────────--
+// Free helpers ───────────────────────────────────────────────────────────--
 
 // The calling thread's OS id.
 pub current_id :: fn() -> u32 { return os_thread_id(); }
@@ -85,7 +85,7 @@ pub yield_now :: fn() { os_thread_yield(); }
 // Number of logical processors available — a sensible default thread count.
 pub cpu_count :: fn() -> u32 { return os_cpu_count(); }
 
-// ── ThreadGroup: fan out, then join the whole batch (structured) ─────────────-
+// ThreadGroup: fan out, then join the whole batch (structured) ─────────────-
 // Spawn several threads as a unit and wait for all of them. The group owns its
 // tokens; `join_all` blocks until every thread has finished. The batch cannot
 // outlive the `join_all` call site.

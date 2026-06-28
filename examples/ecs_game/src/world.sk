@@ -5,7 +5,7 @@
 #import components.{ Kind, MAX_ENTITIES };
 
 pub World :: struct {
-    // ── components (parallel arrays, indexed by entity id) ──────────────
+    // components (parallel arrays, indexed by entity id)
     pos:    [MAX_ENTITIES]Vec2,
     vel:    [MAX_ENTITIES]Vec2,
     radius: [MAX_ENTITIES]f32,
@@ -13,7 +13,7 @@ pub World :: struct {
     kind:   [MAX_ENTITIES]Kind,
     alive:  [MAX_ENTITIES]bool,
     count:  usize,                 // high-water mark of used slots
-    // ── running stats ───────────────────────────────────────────────────
+    // running stats
     spawned: u32,
     killed:  u32,
     shots:   u32,

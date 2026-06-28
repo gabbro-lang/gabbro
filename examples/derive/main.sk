@@ -6,7 +6,7 @@
 #import std.heap.{ Arena, make };
 #import std.io.{ print, print_i64, print_u64 };
 
-// ── 1. Compile-time execution ────────────────────────────────────────────────
+// 1. Compile-time execution
 fib :: fn(n: i32) -> i64 {
     if n < 2 { return n as i64; }
     return fib(n - 1) + fib(n - 2);
@@ -17,7 +17,7 @@ FIB30 :: #run fib(30);            // 832040 — computed by the compiler, not at
 tri :: fn(n: i64) -> i64 { return n * (n + 1) / 2; }
 TRI7 :: #run tri(7);              // 28
 
-// ── 2. Runtime reflection ────────────────────────────────────────────────────
+// 2. Runtime reflection
 Point  :: struct { x: i32, y: i32 }
 Person :: struct { name: []const u8, age: u8, height: f64, home: Point, tags: []const u8 }
 

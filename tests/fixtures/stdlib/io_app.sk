@@ -22,13 +22,13 @@ rule :: fn() -> i32 {
 }
 
 run :: fn() -> i32 {
-    // ── Section 1: Basic string output ───────────────────────────────────────
+    // Section 1: Basic string output
     println("Skarn std.io showcase") catch err { return 1; };
 
     r := rule();
     if r != 0 { return r; }
 
-    // ── Section 2: Unsigned integers ─────────────────────────────────────────
+    // Section 2: Unsigned integers
     print("u64 max:    ") catch err { return 2; };
     print_u64(18446744073709551615u64) catch err { return 2; };
     print("\n") catch err { return 2; };
@@ -41,7 +41,7 @@ run :: fn() -> i32 {
     print_u64(1234567890u64) catch err { return 2; };
     print("\n") catch err { return 2; };
 
-    // ── Section 3: Signed integers ───────────────────────────────────────────
+    // Section 3: Signed integers
     print("i64 pos:    ") catch err { return 3; };
     print_i64(9223372036854775807i64) catch err { return 3; };  // i64 max
     print("\n") catch err { return 3; };
@@ -54,14 +54,14 @@ run :: fn() -> i32 {
     print_i64(-1i64) catch err { return 3; };
     print("\n") catch err { return 3; };
 
-    // ── Section 4: Boolean ───────────────────────────────────────────────────
+    // Section 4: Boolean
     print("bools:      ") catch err { return 4; };
     print_bool(true) catch err { return 4; };
     print(" ") catch err { return 4; };
     print_bool(false) catch err { return 4; };
     print("\n") catch err { return 4; };
 
-    // ── Section 5: Hex output ────────────────────────────────────────────────
+    // Section 5: Hex output
     print("hex u64:    ") catch err { return 5; };
     print_hex_u64(3735928559u64) catch err { return 5; };   // 0xDEADBEEF
     print("\n") catch err { return 5; };
@@ -76,7 +76,7 @@ run :: fn() -> i32 {
     fw.write_hex_u64_full(72623859790382856u64) catch err { return 5; }; // 0x0102030405060708
     print("\n") catch err { return 5; };
 
-    // ── Section 6: Hex byte dump ─────────────────────────────────────────────
+    // Section 6: Hex byte dump
     print("hex bytes:  ") catch err { return 6; };
     out2 := stdout();
     dw: *Writer = &out2;
@@ -89,7 +89,7 @@ run :: fn() -> i32 {
     dw.write_hex_byte(0xEFu8) catch err { return 6; };
     dw.write_char(10u8) catch err { return 6; };
 
-    // ── Section 7: FixedBuf formatting ───────────────────────────────────────
+    // Section 7: FixedBuf formatting
     // Format a complex string into a stack buffer, then flush it.
     buf := fixed_buf();
     bw: *Writer = &buf;
@@ -112,7 +112,7 @@ run :: fn() -> i32 {
     bw.write_char(10u8) catch err { return 7; };
     (&buf).buf_flush_stdout() catch err { return 7; };
 
-    // ── Section 8: NullWriter byte counting ──────────────────────────────────
+    // Section 8: NullWriter byte counting
     // Measure how many bytes write_u64 would produce without writing anything.
     sink := null_writer();
     sw: *Writer = &sink;
@@ -130,7 +130,7 @@ run :: fn() -> i32 {
     print_u64(sink.count as u64) catch err { return 8; };
     print(" bytes\n") catch err { return 8; };
 
-    // ── Section 9: Dynamic dispatch pipeline ─────────────────────────────────
+    // Section 9: Dynamic dispatch pipeline
     // Write the same content through a *Writer pointing at different sinks.
     print("repeat:     ") catch err { return 9; };
     out3 := stdout();
@@ -138,7 +138,7 @@ run :: fn() -> i32 {
     rw.write_repeat(42u8, 8usize) catch err { return 9; };  // '*' == 42
     rw.write_char(10u8) catch err { return 9; };
 
-    // ── Section 10: Stderr output ────────────────────────────────────────────
+    // Section 10: Stderr output
     eprintln("[stderr ok]") catch err { return 10; };
 
     r2 := rule();

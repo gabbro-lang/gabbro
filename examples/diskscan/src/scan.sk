@@ -21,7 +21,7 @@ pub Stats :: struct { files: u64, dirs: u64 }
 
 BUFSZ :: 65536usize;          // 64 KB directory-read buffer
 
-// ── raw little-endian loads from the read buffer ─────────────────────────────
+// raw little-endian loads from the read buffer
 ld_u32 :: fn(addr: usize) -> u32 { p := unsafe ((addr) as *const u32); return unsafe (*p); }
 ld_i64 :: fn(addr: usize) -> i64 { p := unsafe ((addr) as *const i64); return unsafe (*p); }
 
@@ -121,7 +121,7 @@ pub scan_into :: fn(a: *Arena, dir: *Node, path: []u8, plen: usize, buf: []u64, 
     dir.size = total;
 }
 
-// ── multithreading: one worker per CPU over the top-level sub-directories ─────
+// multithreading: one worker per CPU over the top-level sub-directories
 ThreadArg :: struct {
     dirs:      []*Node,         // shared: top-level dir nodes (disjoint per thread)
     paths:     [][]const u8,    // shared: full path of each top-level dir

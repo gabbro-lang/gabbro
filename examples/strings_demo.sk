@@ -8,7 +8,7 @@
 main :: fn() -> i32 {
     a := heap::make();
 
-    // ── StringBuilder: append text + formatted numbers (grows on demand) ──
+    // StringBuilder: append text + formatted numbers (grows on demand)
     sb := strings::builder(&a);
     sb.append("count=");
     sb.append_u64(7u64);
@@ -21,7 +21,7 @@ main :: fn() -> i32 {
     sb.append_byte(10u8);
     io::print(sb.str());
 
-    // ── utilities: trim, transform, search ──
+    // utilities: trim, transform, search
     raw := "  Hello, World!  ";
     trimmed := strings::str_trim(raw);
     io::print(strings::str_upper(&a, trimmed));   // HELLO, WORLD!

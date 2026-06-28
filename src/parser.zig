@@ -710,7 +710,7 @@ pub const Parser = struct {
         }
     }
 
-    // ── tiny AST builders for synthesized (derived) code ──────────────────────--
+    // tiny AST builders for synthesized (derived) code ──────────────────────--
     fn ident(self: *Parser, name: []const u8, sp: Span) ParseError!ast.Expr {
         return self.expr(.{ .ident = name }, sp);
     }

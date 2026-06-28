@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // ── Optional LLVM backend ─────────────────────────────────────────────
+    // Optional LLVM backend
     // Pass `-Dllvm-path=C:\LLVM` (or wherever LLVM is installed) to enable.
     // When omitted, the LLVM backend compiles but is a no-op at runtime.
     const llvm_path = b.option(
@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
     // links in and exports. Dev builds leave this off and ship the dll.
     const embed_linker = b.option(bool, "embed-linker", "Bake skarnld into skarn.exe (single-binary release)") orelse false;
 
-    // ── Compiler library module ───────────────────────────────────────────
+    // Compiler library module
     const compiler_mod = b.addModule("skarn_compiler", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -80,7 +80,7 @@ pub fn build(b: *std.Build) void {
         // an optional component, loaded only when `skarn bindgen` actually runs.
     }
 
-    // ── Optional in-process LLD (skarnlld.dll) ───────────────────────────────
+    // Optional in-process LLD (skarnlld.dll)
     // `-Din-process-lld` bundles the LLD COFF driver + its LLVM static deps
     // into a DLL exposing `skarn_lld_link_coff`, so `skarn build` links in-process
     // instead of spawning a 69 MB lld-link.exe. Off by default; the spawn path
@@ -187,14 +187,14 @@ pub fn build(b: *std.Build) void {
         }
     }
 
-    // ── Basalt stub (kept for historical reasons, can be removed) ─────────
+    // Basalt stub (kept for historical reasons, can be removed)
     const basalt_lib_dir = b.option(
         []const u8,
         "basalt-lib-dir",
         "Directory containing libbasalt.a",
     ) orelse "C:\\Users\\chris\\backend\\basalt\\bin";
 
-    // ── CLI executable ────────────────────────────────────────────────────
+    // CLI executable
     const exe_mod = b.addModule("skarn", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -245,7 +245,7 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run skarn");
     run_step.dependOn(&run_cmd.step);
 
-    // ── Tests ─────────────────────────────────────────────────────────────
+    // Tests
     const test_mod = b.createModule(.{
         .root_source_file = b.path("tests/root.zig"),
         .target = target,

@@ -173,7 +173,7 @@ fn addTypeAttr(cg: *ModuleCg, lv: llvm.LLVMValueRef, index: c_uint, name: []cons
     llvm.LLVMAddAttributeAtIndex(lv, index, attr);
 }
 
-// ── Call-site value coercions (round-trip through stack memory) ───────────────
+// Call-site value coercions (round-trip through stack memory)
 // You cannot bitcast an aggregate to/from an integer directly in LLVM, so the
 // small-struct coercions go through an alloca, exactly like Clang.
 //

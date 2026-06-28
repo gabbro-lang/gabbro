@@ -145,7 +145,7 @@ pub fn lower(cg: *ModuleCg, fncg: anytype, instr: ir.Instr) void {
         .closure_env_make => |mk| lowerClosureEnvMake(cg, fncg, mk),
         .closure_env_load => |ld| lowerClosureEnvLoad(cg, fncg, ld),
 
-        // ── Error / fallible ─────────────────────────────────────────────────
+        // Error / fallible
 
         // try_is_ok: extract discriminant field (1) and compare to zero.
         .try_is_ok => |val| blk: {
@@ -186,7 +186,7 @@ pub fn lower(cg: *ModuleCg, fncg: anytype, instr: ir.Instr) void {
     };
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// Helpers
 
 fn resolveVal(cg: *ModuleCg, fncg: anytype, val: ir.Value, ty: ir.IrType) llvm.LLVMValueRef {
     return values.resolveValue(cg, fncg, val, ty);
@@ -402,7 +402,7 @@ fn lowerSliceExpr(cg: *ModuleCg, fncg: anytype, slice: ir.SliceInstr) ?llvm.LLVM
     return result;
 }
 
-// ── Unary ─────────────────────────────────────────────────────────────────
+// Unary
 
 fn lowerUnary(cg: *ModuleCg, fncg: anytype, u: ir.UnaryInstr, ty: ir.IrType, location: ir.SourceLocation) ?llvm.LLVMValueRef {
     const v = resolveVal(cg, fncg, u.value, ty);
@@ -453,7 +453,7 @@ fn lowerRef(cg: *ModuleCg, fncg: anytype, val: ir.Value) ?llvm.LLVMValueRef {
     };
 }
 
-// ── Binary ─────────────────────────────────────────────────────────────────
+// Binary
 
 fn lowerBinary(cg: *ModuleCg, fncg: anytype, b: ir.BinaryInstr, ty: ir.IrType, location: ir.SourceLocation) ?llvm.LLVMValueRef {
     const lhs_hint = fncg.irTypeOf(b.lhs) orelse fncg.irTypeOf(b.rhs) orelse ty;
@@ -641,7 +641,7 @@ fn unaryFloatIntrinsic(name: []const u8) ?[]const u8 {
     return null;
 }
 
-// ── Inline assembly ────────────────────────────────────────────────────────
+// Inline assembly
 
 fn lowerInlineAsm(
     cg: *ModuleCg,
@@ -713,7 +713,7 @@ fn lowerInlineAsm(
     return if (is_void) null else result;
 }
 
-// ── Calls ──────────────────────────────────────────────────────────────────
+// Calls
 
 /// Indirect call through a function pointer.
 /// With opaque pointers we must reconstruct the LLVM function type from
@@ -853,7 +853,7 @@ fn lowerCallAbi(cg: *ModuleCg, fncg: anytype, call: ir.CallInstr, ret_ty: ir.IrT
     };
 }
 
-// ── Field access ────────────────────────────────────────────────────────────
+// Field access
 //
 // Strategy:
 //   - Slice fields (.ptr / .len): extractvalue from the { ptr, usize } struct.
@@ -976,7 +976,7 @@ fn localOrAllocaPtr(cg: *ModuleCg, fncg: anytype, val: ir.Value, lty: llvm.LLVMT
     };
 }
 
-// ── Builtin instructions ────────────────────────────────────────────────────
+// Builtin instructions
 
 fn lowerBuiltin(
     cg: *ModuleCg,
@@ -1049,7 +1049,7 @@ fn lowerBuiltin(
         return ld;
     }
 
-    // ── Atomics ─────────────────────────────────────────────────────────────
+    // Atomics
     // Each takes a trailing integer ordering constant: 0=relaxed, 1=acquire,
     // 2=release, 3=acq_rel, 4=seq_cst. Alignment is the type's natural width.
 
@@ -1207,7 +1207,7 @@ fn lowerBuiltin(
         return result;
     }
 
-    // ── Bit builtins (map to LLVM intrinsics) ────────────────────────────────
+    // Bit builtins (map to LLVM intrinsics)
     if (std.mem.eql(u8, b.name, "count_ones") or std.mem.eql(u8, b.name, "count_zeros")) {
         if (b.args.len < 1) return null;
         var x = resolveVal(cg, fncg, b.args[0], ty);
@@ -1235,7 +1235,7 @@ fn lowerBuiltin(
         return emitIntrinsic(cg, nm, &.{llvm.LLVMTypeOf(x)}, &.{ x, x, n });
     }
 
-    // ── Math builtins ─────────────────────────────────────────────────────────
+    // Math builtins
     if (std.mem.eql(u8, b.name, "min") or std.mem.eql(u8, b.name, "max")) {
         if (b.args.len < 2) return null;
         const x = resolveVal(cg, fncg, b.args[0], ty);
@@ -1277,7 +1277,7 @@ fn lowerBuiltin(
         return emitIntrinsic(cg, "llvm.fma", &.{llvm.LLVMTypeOf(a0)}, &.{ a0, a1, a2 });
     }
 
-    // ── Memory / control builtins ─────────────────────────────────────────────
+    // Memory / control builtins
     if (std.mem.eql(u8, b.name, "memcpy")) {
         if (b.args.len < 3) return null;
         const dst = resolveVal(cg, fncg, b.args[0], .{ .ptr = undefined });
@@ -1315,7 +1315,7 @@ fn lowerBuiltin(
         return null;
     }
 
-    // ── Error builtins ──────────────────────────────────────────────────────
+    // Error builtins
 
     // error.<VariantName> — emit the discriminant (i32) for an error variant.
     // The variant name is resolved against the current function's error type.
@@ -1374,7 +1374,7 @@ fn errorTypeName(err_ty: ir.IrType) []const u8 {
     };
 }
 
-// ── Runtime safety checks ───────────────────────────────────────────────────
+// Runtime safety checks
 
 /// Emit a conditional panic if `cond_fails` is true (i1).
 /// Splits the current BB into panic_bb and cont_bb; builder lands at cont_bb.
@@ -1473,7 +1473,7 @@ fn emitBoundsCheck(cg: *ModuleCg, fncg: anytype, ix: ir.IndexInstr, location: ir
     emitRuntimeCheck(cg, fncg.llvm_fn, out_of_bounds, "index out of bounds", location);
 }
 
-// ── Compound literals ───────────────────────────────────────────────────────
+// Compound literals
 
 fn lowerCompoundLiteral(
     cg: *ModuleCg,
@@ -1542,7 +1542,7 @@ fn lowerCompoundLiteral(
     }
 }
 
-// ── Struct literals (IrInstrKind.struct_lit) ────────────────────────────────
+// Struct literals (IrInstrKind.struct_lit)
 
 fn lowerStructLit(
     cg: *ModuleCg,
@@ -1570,7 +1570,7 @@ fn lowerStructLit(
     return agg;
 }
 
-// ── Atomic helpers ───────────────────────────────────────────────────────────
+// Atomic helpers
 
 /// Map a skarn ordering constant (0=relaxed … 4=seq_cst) to an LLVM atomic ordering.
 fn atomicOrdering(arg: ir.Value) c_uint {

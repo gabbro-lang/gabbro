@@ -26,7 +26,7 @@
 
 #import std.io;
 
-// ─── Byte-slice padding ───────────────────────────────────────────────────────
+// Byte-slice padding
 //
 // If `data` is already at least `width` bytes, it is written as-is — these
 // never truncate.
@@ -63,7 +63,7 @@ pub write_padded_center :: fn(w: *Writer, data: []const u8, width: usize, fill: 
     return a + b + c;
 }
 
-// ─── Width-justified numbers ──────────────────────────────────────────────────
+// Width-justified numbers
 //
 // Right-justify a number within `width`, padding on the left with `fill`
 // (spaces for column alignment, '0' for fixed-width fields like "007").
@@ -106,7 +106,7 @@ pub write_hex_u64_padded :: fn(w: *Writer, value: u64, width: usize, fill: u8) -
     return a + b;
 }
 
-// ─── Joining ──────────────────────────────────────────────────────────────────
+// Joining
 
 // Write each byte slice in `items`, separated by `sep`.
 //   join_bytes(w, .{"a", "b", "c"}[:], ", ")  ->  "a, b, c"

@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const skarn  = @import("skarn_compiler");
 
-// ── Sub-byte integers ─────────────────────────────────────────────────────────
+// Sub-byte integers
 
 test "u1-u7 as struct fields in packed struct" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -78,7 +78,7 @@ test "i1-i7 signed sub-byte integers" {
     try std.testing.expectEqual(skarn.ir_mod.IrType{ .i = 1 }, s.fields[1].ty);
 }
 
-// ── New attributes ────────────────────────────────────────────────────────────
+// New attributes
 
 test "#noreturn: function with noreturn attribute" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -176,7 +176,7 @@ test "#deprecated: calling deprecated function emits warning" {
     try std.testing.expect(std.mem.indexOf(u8, fe.diagnostics()[0].message, "deprecated") != null);
 }
 
-// ── Jai-style #system_library / #foreign ─────────────────────────────────────
+// Jai-style #system_library / #foreign
 
 test "#system_library: standalone declaration is collected into IrModule.extern_libs" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -237,7 +237,7 @@ test "#foreign: alias for #extern binds external functions and contributes to ex
     try std.testing.expect(found_raylib);
 }
 
-// ── Distinct types ────────────────────────────────────────────────────────────
+// Distinct types
 
 test "distinct integer type: lowers to underlying integer type in IR" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -322,7 +322,7 @@ test "distinct type in struct field lowers to underlying type" {
     try std.testing.expectEqual(skarn.ir_mod.IrType.bool, s.fields[1].ty);
 }
 
-// ── Opaque types ──────────────────────────────────────────────────────────────
+// Opaque types
 
 test "opaque type: *Opaque parameter lowers to ptr" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -347,7 +347,7 @@ test "opaque type: *Opaque parameter lowers to ptr" {
     try std.testing.expect(fn_.params[0].ty == .ptr);
 }
 
-// ── Atomic types ──────────────────────────────────────────────────────────────
+// Atomic types
 
 test "atomic field: struct with atomic u32 fields lowers to regular u32" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -395,7 +395,7 @@ test "atomic_load and atomic_store: parse, type-check, and lower to IR" {
     try skarn.ir_mod.validateModule(m);
 }
 
-// ── Win64 C ABI for by-value aggregates (#extern) ─────────────────────────────
+// Win64 C ABI for by-value aggregates (#extern)
 // raylib-style structs cross the C boundary by value. On Win64 a small struct
 // (size 1/2/4/8) is coerced to an integer register; a larger one is passed by
 // pointer (byval arg / sret return). Without this lowering every struct-passing
@@ -484,7 +484,7 @@ test "C ABI: call sites coerce by-value struct arguments and sret returns" {
     }
 }
 
-// ── C binding generator (`skarn bindgen`, libclang) ──────────────────────────────
+// C binding generator (`skarn bindgen`, libclang)
 
 test "bindgen: C header lowers to Skarn structs, enum consts, and #extern fns" {
     if (comptime !skarn.llvm_enabled) return; // libclang ships with the LLVM build
@@ -548,7 +548,7 @@ test "bindgen: C header lowers to Skarn structs, enum consts, and #extern fns" {
     }
 }
 
-// ── Linker: honoring a C library's /DEFAULTLIB directives ───────────────────────
+// Linker: honoring a C library's /DEFAULTLIB directives
 
 fn argsContain(args: []const []const u8, needle: []const u8) bool {
     for (args) |a| if (std.mem.eql(u8, a, needle)) return true;
@@ -595,7 +595,7 @@ test "msvc: discoverLibX64 finds a vcruntime-bearing lib dir (or cleanly returns
     }
 }
 
-// ── `core::` builtin namespace ─────────────────────────────────────────────────
+// `core::` builtin namespace
 
 test "core::: a bare builtin call is rejected (must use core::)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);

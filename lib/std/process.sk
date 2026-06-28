@@ -33,7 +33,7 @@
 PROC_INVALID :: -1i64;
 MAX_NAME_BYTES :: 128usize;
 
-// ── Errors ────────────────────────────────────────────────────────────────
+// Errors
 
 pub ProcessError :: errors {
     spawn_failed,       // the child couldn't be launched
@@ -43,7 +43,7 @@ pub ProcessError :: errors {
     name_too_long,      // env-var name/value doesn't fit in the internal buffer
 }
 
-// ── Internal helpers ──────────────────────────────────────────────────────
+// Internal helpers
 
 // Copy `s` into `buf`, NUL-terminate, and return a pointer to the start.
 proc_to_cstr :: fn(s: []const u8, buf: []u8) -> *const u8 ! ProcessError {
@@ -57,7 +57,7 @@ proc_to_cstr :: fn(s: []const u8, buf: []u8) -> *const u8 ! ProcessError {
     return buf.ptr;
 }
 
-// ── Process info ──────────────────────────────────────────────────────────
+// Process info
 
 // The PID of the calling process.
 pub current_pid :: fn() -> u32 {
@@ -71,7 +71,7 @@ pub command_line :: fn(out: []u8) -> []const u8 {
     return out[0usize..(n as usize)];
 }
 
-// ── Environment variables ─────────────────────────────────────────────────
+// Environment variables
 
 // Look up an environment variable, copying its value into `out`. Returns `null`
 // if the variable isn't set or its value doesn't fit in `out`.
@@ -100,7 +100,7 @@ pub unset_env :: fn(name: []const u8) -> bool {
     return os_unset_env(cname);
 }
 
-// ── Child processes ───────────────────────────────────────────────────────
+// Child processes
 
 // A spawned child process, identified by an opaque OS token. Release it with
 // `release` once you're done (named `release` rather than `close` to avoid

@@ -845,7 +845,7 @@ test "for range and slice loops lower with continue-safe increment blocks" {
     try std.testing.expect(has_index_addr);
 }
 
-// ── Const-correctness tests ────────────────────────────────────────────────
+// Const-correctness tests
 
 test "const: *const T is accepted as a parameter type" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -908,7 +908,7 @@ test "const: field write through *const T is rejected" {
     );
 }
 
-// ── Static constraint tests ────────────────────────────────────────────────
+// Static constraint tests
 
 test "static constraints: $T: Interface accepts conforming type" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);

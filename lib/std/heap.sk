@@ -38,7 +38,7 @@
 
 #import std.ptr.{ align_up };
 
-// ── OS page memory ──────────────────────────────────────────────────────────
+// OS page memory
 // Page reserve/commit/release is provided by the platform runtime (windows.sk
 // → VirtualAlloc/VirtualFree; linux.sk → mmap/mprotect/munmap), so this module
 // stays OS-agnostic:
@@ -49,7 +49,7 @@
 // The platform runtime supplies the definitions; the runtime-free `compile` path
 // injects a host shim (see pipeline.prependHeapPrelude).
 
-// ── Tunables ──────────────────────────────────────────────────────────────
+// Tunables
 
 // Default chunk payload (64 KiB) for a growable arena. Allocations larger than
 // this get their own exact-fit chunk.
@@ -72,7 +72,7 @@ ARENA_FIXED    :: 0u8;       // over a caller buffer; never touches the OS
 ARENA_CHUNKED  :: 1u8;       // grows by reserving fresh 64 KiB chunks
 ARENA_RESERVED :: 2u8;       // one up-front reservation, pages committed lazily
 
-// ── Types ─────────────────────────────────────────────────────────────────
+// Types
 
 pub MemError :: errors {
     out_of_memory,      // backing exhausted (VirtualAlloc failed, or a fixed/reserved cap is full)
@@ -104,7 +104,7 @@ pub Mark :: struct {
     used:  usize,
 }
 
-// ── Constructors ──────────────────────────────────────────────────────────
+// Constructors
 
 // A fresh growable arena. No memory is reserved until the first allocation.
 pub make :: fn() -> Arena {
@@ -145,7 +145,7 @@ pub fixed :: fn(buf: []u8) -> Arena {
     return .{ base, base, ARENA_FIXED };
 }
 
-// ── Core bump ─────────────────────────────────────────────────────────────
+// Core bump
 
 // Commit enough pages so `need_payload` bytes of `c`'s payload are backed.
 // Only ever extends a reserved arena (chunked/fixed chunks are fully committed).
@@ -216,7 +216,7 @@ carve :: fn(self: *Arena, need: usize) -> ?usize {
     return aligned2;
 }
 
-// ── Byte allocation ───────────────────────────────────────────────────────
+// Byte allocation
 
 // Allocate `n` bytes. Aborts on exhaustion.
 pub alloc_bytes :: fn(self: *Arena, n: usize) -> []u8 {
@@ -234,7 +234,7 @@ pub try_alloc_bytes :: fn(self: *Arena, n: usize) -> []u8 ! MemError {
     return unsafe core::slice_raw(u8, p, n);
 }
 
-// ── Typed allocation ──────────────────────────────────────────────────────
+// Typed allocation
 
 // Allocate a `[]T` of `n` elements (16-byte aligned, which covers any T).
 // Aborts on exhaustion. Call as `(&a).alloc(T, n)` or `alloc(T, &a, n)`.
@@ -282,7 +282,7 @@ pub new_slice :: fn($T: type, self: *Arena, n: usize) -> []T {
     return alloc(T, self, n);
 }
 
-// ── Reuse & lifetime ──────────────────────────────────────────────────────
+// Reuse & lifetime
 
 // Rewind the arena to empty, KEEPING its chunks for reuse. Everything allocated
 // before is invalidated; no memory is returned to the OS, so the next round of

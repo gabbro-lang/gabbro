@@ -40,7 +40,7 @@ const Expander = struct {
         return p;
     }
 
-    // ── module walk: collect macros, expand bodies, drop macro decls ──────────
+    // module walk: collect macros, expand bodies, drop macro decls
 
     fn expandModule(self: *Expander, module: ast.Module) ExpandError!ast.Module {
         for (module.items) |item| switch (item) {
@@ -171,7 +171,7 @@ const Expander = struct {
         }
     }
 
-    // ── macro expansion: bind args, build hygiene map, substitute ─────────────
+    // macro expansion: bind args, build hygiene map, substitute
 
     fn expandMacroCall(self: *Expander, macro: ast.FunctionDecl, call: ast.CallExpr) ExpandError!ast.Block {
         if (call.args.len != macro.params.len) {
@@ -279,7 +279,7 @@ const Expander = struct {
         try hyg.put(name, fresh);
     }
 
-    // ── substitution ──────────────────────────────────────────────────────────
+    // substitution
 
     fn substBlock(self: *Expander, block: ast.Block, env: *Env, hyg: *Hyg) ExpandError!ast.Block {
         var out: std.ArrayList(ast.Stmt) = .empty;
@@ -414,7 +414,7 @@ const Expander = struct {
         }
     }
 
-    // ── #for unrolling ────────────────────────────────────────────────────────
+    // #for unrolling
 
     /// Emit `cf.body` once per index in `[start, end)` (or `..=`), binding the
     /// loop variable to that index's literal so `$(i)` splices it.

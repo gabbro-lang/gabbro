@@ -1,7 +1,7 @@
 // win32 — the Win32 bindings the scanner needs: bulk directory reads
 // (GetFileInformationByHandleEx), threading, and a CPU-count query.
 
-// ── Directory handles + bulk enumeration ─────────────────────────────────────
+// Directory handles + bulk enumeration
 pub GENERIC_READ            :: 0x80000000u32;
 pub FILE_SHARE_READ         :: 0x1u32;
 pub FILE_SHARE_WRITE        :: 0x2u32;
@@ -37,7 +37,7 @@ pub WideCharToMultiByte :: fn(cp: u32, flags: u32, wstr: *const u16, wlen: i32, 
 
 pub CP_ACP :: 0u32;
 
-// ── Threading ────────────────────────────────────────────────────────────────
+// Threading
 #extern("kernel32", "CreateThread")
 pub CreateThread :: fn(attrs: ?*void, stack: usize, start: fn(*void) -> u32, param: ?*void, flags: u32, tid: ?*u32) -> usize;
 

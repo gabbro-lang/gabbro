@@ -152,7 +152,7 @@ main :: fn() -> i32 {
 
     ms: i64 = since_millis(t0);
 
-    // ── Biggest top-level items (repeated max-selection) ─────────────────────
+    // Biggest top-level items (repeated max-selection)
     sb := builder(&a);
     append(&sb, "Disk usage for "); append(&sb, root); append(&sb, "\n\n");
 
@@ -182,7 +182,7 @@ main :: fn() -> i32 {
         shown = shown + 1usize;
     }
 
-    // ── Throughput report ────────────────────────────────────────────────────
+    // Throughput report
     append(&sb, "\n");
     append(&sb, "total:    "); fmt_size(&sb, s.bytes); append(&sb, "\n");
     append(&sb, "files:    "); append_u64(&sb, s.files); append(&sb, "\n");

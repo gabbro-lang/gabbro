@@ -7,7 +7,7 @@ const compiler = skarn.vm_compiler;
 const Value = skarn.vm_value.Value;
 const Instr = instructions.Instr;
 
-// ── Engine: hand-assembled bytecode ──────────────────────────────────────
+// Engine: hand-assembled bytecode
 
 test "engine: hand-assembled arithmetic" {
     var vm = engine.Vm.init(std.testing.allocator);
@@ -109,7 +109,7 @@ test "engine: zones unwind on early return" {
     try std.testing.expectEqual(@as(usize, 0), vm.zone_stack.depth());
 }
 
-// ── End-to-end: Skarn source → IR → bytecode → run ──────────────────────────
+// End-to-end: Skarn source → IR → bytecode → run
 
 /// Compile Skarn source, lower to IR, compile the named function's module, and
 /// invoke it with `args`. Caller owns nothing; everything is freed here.

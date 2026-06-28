@@ -1191,7 +1191,7 @@ const Checker = struct {
         if (self.exhaustive_matches_init) self.exhaustive_matches.deinit();
     }
 
-    // ── Diagnostics ──────────────────────────────────────────────────────────
+    // Diagnostics
 
     fn emitWarning(self: *Checker, span: Span, comptime fmt: []const u8, args: anytype) void {
         const msg = std.fmt.allocPrint(self.allocator, fmt, args) catch return;
@@ -3043,7 +3043,7 @@ const Checker = struct {
             return error.SemanticFailed;
         }
 
-        // ── Builtins ────────────────────────────────────────────────────
+        // Builtins
         // `core::panic(msg)` — the no-return panic intrinsic (maps to `@panic` in
         // IR). Other no-return forms (`@panic`, `exit`, `abort`) keep their handling.
         if (is_core and std.mem.eql(u8, name, "panic")) {

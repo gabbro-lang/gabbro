@@ -3,7 +3,7 @@
 /// Provides: @panic, assert, write_stdout, write_stderr
 /// No libc. Uses kernel32.dll only (always available on Windows).
 
-// ── kernel32 imports ──────────────────────────────────────────────────────
+// kernel32 imports
 
 #extern("kernel32", "GetStdHandle")
 GetStdHandle :: fn(id: i32) -> usize;
@@ -34,7 +34,7 @@ VirtualAlloc :: fn(addr: usize, size: usize, alloc_type: u32, protect: u32) -> u
 #extern("kernel32", "VirtualFree")
 VirtualFree :: fn(addr: usize, size: usize, free_type: u32) -> bool;
 
-// ── OS page memory (backs std.heap) ─────────────────────────────────────────
+// OS page memory (backs std.heap)
 // MEM_RESERVE=0x2000, MEM_COMMIT=0x1000, MEM_RELEASE=0x8000, PAGE_READWRITE=0x4.
 
 os_reserve :: fn(size: usize) -> usize {
@@ -50,7 +50,7 @@ os_release :: fn(addr: usize, size: usize) {
     ignored := VirtualFree(addr, 0usize, 0x8000u32); // MEM_RELEASE frees the whole region; size unused
 }
 
-// ── OS time (backs std.time) ─────────────────────────────────────────────────
+// OS time (backs std.time)
 // `Sleep` is a shared runtime primitive (std.thread reuses it, like CloseHandle).
 
 #extern("kernel32", "GetSystemTimePreciseAsFileTime")
@@ -88,7 +88,7 @@ os_sleep_nanos :: fn(ns: i64) {
     Sleep((ns / 1000000i64) as u32);
 }
 
-// ── OS file system (backs std.fs) ────────────────────────────────────────────
+// OS file system (backs std.fs)
 // A handle is the Win32 HANDLE as i64 (INVALID_HANDLE_VALUE → -1, matching the
 // seam contract). Paths arrive NUL-terminated for the `*A` APIs.
 
@@ -236,7 +236,7 @@ os_dir_close :: fn(h: i64) {
     os_release(h as usize, 384usize);
 }
 
-// ── OS process (backs std.process) ───────────────────────────────────────────
+// OS process (backs std.process)
 // A child token is a heap ProcState holding the process + thread handles.
 
 #extern("kernel32", "GetCurrentProcessId")
@@ -344,7 +344,7 @@ os_proc_release :: fn(token: i64) {
     os_release(token as usize, 32usize);
 }
 
-// ── OS sockets (backs std.net) ───────────────────────────────────────────────
+// OS sockets (backs std.net)
 // Winsocskarn passthrough — std.net already passes Windows level/option constants.
 
 #extern("ws2_32", "WSAStartup") ws_startup :: fn(version: u16, data: *u8) -> i32;
@@ -383,7 +383,7 @@ os_net_getsockname :: fn(s: usize, name: *u8, namelen: *i32) -> i32 { return ws_
 os_net_ioctlsocket :: fn(s: usize, cmd: u32, argp: *u32) -> i32 { return ws_ioctlsocket(s, cmd, argp); }
 os_net_shutdown :: fn(s: usize, how: i32) -> i32 { return ws_shutdown(s, how); }
 
-// ── OS threads (backs std.thread) ────────────────────────────────────────────
+// OS threads (backs std.thread)
 // The thread token is the Win32 thread HANDLE; join/running reuse the shared
 // WaitForSingleObject / CloseHandle runtime primitives.
 
@@ -413,13 +413,13 @@ os_thread_id :: fn() -> u32 { return k_thread_id(); }
 os_thread_yield :: fn() { ignored := k_switch(); }
 os_cpu_count :: fn() -> u32 { return k_cpus(0xFFFFu16); }
 
-// ── Handle constants ──────────────────────────────────────────────────────
+// Handle constants
 
 STD_OUTPUT_HANDLE :: -11;
 STD_ERROR_HANDLE  :: -12;
 PANIC_EXIT_CODE   :: 0xDEAD_BEEF;
 
-// ── Low-level I/O ─────────────────────────────────────────────────────────
+// Low-level I/O
 
 write_stdout :: fn(data: []const u8) -> usize {
     if data.len == 0 { return 0; }
@@ -439,7 +439,7 @@ write_stderr :: fn(data: []const u8) -> usize {
     return written as usize;
 }
 
-// ── Core runtime functions ─────────────────────────────────────────────────
+// Core runtime functions
 
 /// Exit with an application-defined status.
 #noreturn

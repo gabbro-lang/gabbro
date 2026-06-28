@@ -27,7 +27,7 @@ streq :: fn(a: []const u8, b: []const u8) -> bool {
 main :: fn() -> i32 {
     a := heap::make();
 
-    // ── Serialize ────────────────────────────────────────────────────────────
+    // Serialize
     p: Point = .{ 3, -4 };
     if !streq(serde::to_json(Point, p, &a), "{\"x\":3,\"y\":-4}") { return 1; }
 
@@ -43,7 +43,7 @@ main :: fn() -> i32 {
     nv: Nums = .{ xs[0..3usize], "xs" };
     if !streq(serde::to_json(Nums, nv, &a), "{\"vals\":[10,20,30],\"tag\":\"xs\"}") { return 4; }
 
-    // ── Deserialize + round-trip (parse → re-serialize must reproduce input) ──
+    // Deserialize + round-trip (parse → re-serialize must reproduce input)
     rt_player: []const u8 = "{\"name\":\"Bowser\",\"pos\":{\"x\":-1,\"y\":2},\"hp\":250,\"alive\":false}";
     if serde::from_json(Player, rt_player, &a) |q| {
         if !streq(serde::to_json(Player, q, &a), rt_player) { return 5; }

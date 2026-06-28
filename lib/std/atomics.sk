@@ -17,14 +17,14 @@
 // of the ordering constants below (the hardware requires a compile-time-known
 // ordering, so it can't be a runtime parameter).
 
-// ── Memory orderings (for the `core::atomic_*` builtins) ─────────────────────
+// Memory orderings (for the `core::atomic_*` builtins)
 pub Relaxed :: 0; // atomicity only, no ordering between threads
 pub Acquire :: 1; // later memory accesses can't move before this load
 pub Release :: 2; // earlier memory accesses can't move after this store
 pub AcqRel  :: 3; // acquire + release (for a read-modify-write)
 pub SeqCst  :: 4; // a single total order across all seq-cst operations
 
-// ── Compile-time type contracts ──────────────────────────────────────────────
+// Compile-time type contracts
 // These run during generic resolution: an unsuitable `T` is rejected at the call
 // site before any code is generated.
 
@@ -66,7 +66,7 @@ pub Boolean :: constraint($T) {
     }
 }
 
-// ── Load / store ─────────────────────────────────────────────────────────────
+// Load / store
 
 // Atomically read the current value.
 pub load :: fn($T: Native, p: *T) -> T { return core::atomic_load(p, 4); }
@@ -84,7 +84,7 @@ pub store_release :: fn($T: Native, p: *T, v: T) { core::atomic_store(p, v, 2); 
 // Atomically replace the value with `v`; returns the previous value.
 pub swap :: fn($T: Native, p: *T, v: T) -> T { return core::atomic_exchange(p, v, 4); }
 
-// ── Compare-exchange ─────────────────────────────────────────────────────────
+// Compare-exchange
 
 // If `*p` equals `expected`, atomically replace it with `desired` and return true;
 // otherwise leave it and return false. The core building block for lock-free
@@ -99,7 +99,7 @@ pub compare_exchange_value :: fn($T: Native, p: *T, expected: T, desired: T) -> 
     return core::atomic_cas(p, expected, desired, 4);
 }
 
-// ── Arithmetic (return the previous value) ───────────────────────────────────
+// Arithmetic (return the previous value)
 
 // Integer add/sub use native instructions; float add/sub use native float atomics.
 pub fetch_add :: fn($T: Numeric, p: *T, v: T) -> T { return core::atomic_add(p, v, 4); }
@@ -123,11 +123,11 @@ pub fetch_div :: fn($T: Numeric, p: *T, v: T) -> T {
     return core::atomic_load(p, 4); // unreachable
 }
 
-// ── Min / max (integers; signed vs unsigned chosen from `T`) ─────────────────
+// Min / max (integers; signed vs unsigned chosen from `T`)
 pub fetch_max :: fn($T: Integer, p: *T, v: T) -> T { return core::atomic_max(p, v, 4); }
 pub fetch_min :: fn($T: Integer, p: *T, v: T) -> T { return core::atomic_min(p, v, 4); }
 
-// ── Bitwise (integers; return the previous value) ────────────────────────────
+// Bitwise (integers; return the previous value)
 pub fetch_and  :: fn($T: Integer, p: *T, v: T) -> T { return core::atomic_and(p, v, 4); }
 pub fetch_or   :: fn($T: Integer, p: *T, v: T) -> T { return core::atomic_or(p, v, 4); }
 pub fetch_xor  :: fn($T: Integer, p: *T, v: T) -> T { return core::atomic_xor(p, v, 4); }
@@ -150,7 +150,7 @@ pub fetch_shr :: fn($T: Integer, p: *T, bits: T) -> T {
     return core::atomic_load(p, 4); // unreachable
 }
 
-// ── Fences ───────────────────────────────────────────────────────────────────
+// Fences
 
 // A sequentially-consistent fence (orders all surrounding atomic accesses).
 pub fence :: fn() { core::atomic_fence(4); }
@@ -161,7 +161,7 @@ pub fence_acquire :: fn() { core::atomic_fence(1); }
 // A release fence — no load/store before it may move after it.
 pub fence_release :: fn() { core::atomic_fence(2); }
 
-// ── 32-bit flag helpers (the common ready/done signal between threads) ──────
+// 32-bit flag helpers (the common ready/done signal between threads)
 // A 0/non-zero `u32` is the simplest cross-thread flag.
 
 // True if the flag currently holds a non-zero value.
@@ -192,7 +192,7 @@ pub spin_lock :: fn(lock: *u32) {
 // Release a spinlock previously taken with `spin_lock`.
 pub spin_unlock :: fn(lock: *u32) { store_release(lock, 0u32); }
 
-// ── Atomic(T): a typed cell you may only touch atomically ────────────────────
+// Atomic(T): a typed cell you may only touch atomically
 // The free functions above act on a raw `*T`; `Atomic(T)` wraps the value so the
 // type itself documents "this is shared, access it atomically", and the methods
 // (declared *inside* the struct) read naturally. The element type is recovered

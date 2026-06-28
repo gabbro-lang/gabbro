@@ -17,7 +17,7 @@
 // The UTC breakdown is pure arithmetic (Howard Hinnant's civil-from-days),
 // exact for any time at or after the epoch.
 
-// ── Wall clock (Unix epoch) ─────────────────────────────────────────────────
+// Wall clock (Unix epoch)
 
 // Nanoseconds since 1970-01-01 00:00:00 UTC.
 pub unix_nanos :: fn() -> i64 { return os_wall_nanos(); }
@@ -28,7 +28,7 @@ pub unix_millis :: fn() -> i64 { return os_wall_nanos() / 1000000i64; }
 // Whole seconds since 1970-01-01 00:00:00 UTC.
 pub unix_seconds :: fn() -> i64 { return os_wall_nanos() / 1000000000i64; }
 
-// ── Monotonic clock ─────────────────────────────────────────────────────────
+// Monotonic clock
 
 // A point on the monotonic clock. Compare via `since_*`; never wall-time.
 pub Instant :: struct { nanos: i64 }
@@ -54,7 +54,7 @@ pub monotonic_millis :: fn() -> u64 { return (os_monotonic_nanos() / 1000000i64)
 // Suspend the current thread for at least `millis` milliseconds.
 pub sleep_ms :: fn(millis: u32) { os_sleep_nanos((millis as i64) * 1000000i64); }
 
-// ── UTC calendar breakdown ──────────────────────────────────────────────────
+// UTC calendar breakdown
 
 // A broken-down UTC date and time. `weekday` is 0=Sunday … 6=Saturday.
 pub DateTime :: struct {

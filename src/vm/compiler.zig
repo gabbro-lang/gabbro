@@ -180,7 +180,7 @@ const FnCompiler = struct {
         };
     }
 
-    // ── Setup passes ─────────────────────────────────────────────────────
+    // Setup passes
 
     /// Parameters take the leading slots; every `store_local` name gets one too.
     fn collectLocals(self: *FnCompiler) CompileError!void {
@@ -303,7 +303,7 @@ const FnCompiler = struct {
         };
     }
 
-    // ── Operand resolution ───────────────────────────────────────────────
+    // Operand resolution
 
     /// Resolve an IR value to a register, emitting loads for immediates and
     /// locals/params as needed.
@@ -387,7 +387,7 @@ const FnCompiler = struct {
         return idx;
     }
 
-    // ── Instruction lowering ─────────────────────────────────────────────
+    // Instruction lowering
 
     fn lowerInstr(self: *FnCompiler, inst: ir.Instr) CompileError!void {
         const target: Reg = if (inst.id) |id| id else 0;
@@ -591,7 +591,7 @@ const FnCompiler = struct {
                 } else return error.Unsupported;
             },
 
-            // ── Aggregates (Tier C: structs) ─────────────────────────────
+            // Aggregates (Tier C: structs)
             .struct_lit => |sl| try self.lowerStructLit(target, sl),
 
             .field => |f| {
@@ -652,7 +652,7 @@ const FnCompiler = struct {
                 try self.emit(Instr.r_r_imm(.field_addr, target, base, idx));
             },
 
-            // ── Arrays & slices ──────────────────────────────────────────
+            // Arrays & slices
             .index => |ix| {
                 // `type_info(T).fields[i]` advances into a field descriptor.
                 if (ix.base == .reg) {
@@ -694,7 +694,7 @@ const FnCompiler = struct {
                 try self.emit(Instr.r_r_imm(.load_cell, target, ptr, 0));
             },
 
-            // ── Variants / enums ─────────────────────────────────────────
+            // Variants / enums
             // A variant value is a 2-cell block: [tag, payload].
             .variant_lit => |vl| {
                 const idx = self.variantIndex(vl.type_name, vl.variant) orelse return error.Unsupported;
@@ -721,7 +721,7 @@ const FnCompiler = struct {
                 try self.emit(Instr.r_r_imm(.load_cell, target, subj, 1));
             },
 
-            // ── Optionals ────────────────────────────────────────────────
+            // Optionals
             // `some(x)` is a 1-cell block [x]; `none` is the bare null value.
             .optional_is_some => |v| {
                 const r = try self.resolveReg(v);
@@ -732,7 +732,7 @@ const FnCompiler = struct {
                 try self.emit(Instr.r_r_imm(.load_cell, target, r, 0));
             },
 
-            // ── Fallible (T ! E) ─────────────────────────────────────────
+            // Fallible (T ! E)
             // A fallible value matches the LLVM layout: a 2-cell block
             // [value(0), discriminant(1)] where disc 0 means ok. The error
             // payload shares the value slot (field 0), like the LLVM backend.
@@ -752,7 +752,7 @@ const FnCompiler = struct {
                 try self.emit(Instr.r_r_imm(.load_cell, target, r, 0)); // value / payload
             },
 
-            // ── Interfaces ───────────────────────────────────────────────
+            // Interfaces
             // A fat interface value is a 2-cell block: [data ptr, vtable index].
             .interface_make => |im| {
                 const data = try self.resolveReg(im.data);
@@ -972,7 +972,7 @@ const FnCompiler = struct {
         }
     }
 
-    // ── Struct layout helpers ────────────────────────────────────────────
+    // Struct layout helpers
 
     fn structDef(self: *FnCompiler, name: []const u8) ?ir.StructDef {
         for (self.module.structs) |s| {

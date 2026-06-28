@@ -112,7 +112,7 @@ pub const BuildPlan = struct {
     }
 };
 
-// ── VM host-call bridge ────────────────────────────────────────────────────────
+// VM host-call bridge
 
 fn argStr(args: []const Value, i: usize) []const u8 {
     if (i >= args.len) return "";
@@ -329,7 +329,7 @@ fn hasFlag(options: []const []const u8, name: []const u8) bool {
     return false;
 }
 
-// ── Options + entry ──────────────────────────────────────────────────────────
+// Options + entry
 
 pub const RunOptions = struct {
     /// A requested target/step name (`skarn build <name>`), or null for the default.
@@ -663,7 +663,7 @@ fn runTestDir(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir: []
     if (failed != 0) return error.RunFailed;
 }
 
-// ── Library inspection (import lib vs static archive) ───────────────────────────
+// Library inspection (import lib vs static archive)
 
 const LibKind = union(enum) {
     /// A static archive (regular COFF object members) — needs the C runtime.
@@ -690,7 +690,7 @@ fn inspectLib(arena: std.mem.Allocator, bytes: []const u8) LibKind {
     return .{ .import_lib = dll };
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// Helpers
 
 fn resolveOutput(plan: *BuildPlan, base_dir: []const u8, art: Artifact) BuildError![]const u8 {
     const a = plan.a();

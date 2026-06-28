@@ -8,13 +8,13 @@
 // Naming: there is no function overloading, so per-type ops are prefixed —
 // `v2_*` for Vec2, `v3_*` for Vec3. All work with UFCS: `a.v2_add(b)`.
 
-// ── Constants ──────────────────────────────────────────────────────────────
+// Constants
 pub PI      :: 3.14159265f32;
 pub TAU     :: 6.28318531f32;     // 2π
 pub DEG2RAD :: 0.01745329f32;     // π/180
 pub RAD2DEG :: 57.2957795f32;     // 180/π
 
-// ── Scalar helpers ───────────────────────────────────────────────────────────
+// Scalar helpers
 
 // Linear interpolation: `a` at t=0, `b` at t=1.
 pub lerp :: fn(a: f32, b: f32, t: f32) -> f32 { return a + (b - a) * t; }
@@ -61,7 +61,7 @@ pub wrapf :: fn(x: f32, lo: f32, hi: f32) -> f32 {
     return lo + t;
 }
 
-// ── Vec2 (2D) ────────────────────────────────────────────────────────────────
+// Vec2 (2D)
 pub Vec2 :: struct { x: f32, y: f32 }
 
 pub v2 :: fn(x: f32, y: f32) -> Vec2 { r: Vec2 = .{ x, y }; return r; }
@@ -113,7 +113,7 @@ pub v2_rotate :: fn(a: Vec2, rad: f32) -> Vec2 {
 // A unit vector at angle `rad` (0 = +x).
 pub v2_from_angle :: fn(rad: f32) -> Vec2 { r: Vec2 = .{ cos(rad), sin(rad) }; return r; }
 
-// ── Vec3 (3D) ────────────────────────────────────────────────────────────────
+// Vec3 (3D)
 pub Vec3 :: struct { x: f32, y: f32, z: f32 }
 
 pub v3 :: fn(x: f32, y: f32, z: f32) -> Vec3 { r: Vec3 = .{ x, y, z }; return r; }
@@ -134,7 +134,7 @@ pub v3_normalize :: fn(a: Vec3) -> Vec3 {
     return r;
 }
 
-// ── Rect (axis-aligned, for sprites / UI / collisions) ───────────────────────
+// Rect (axis-aligned, for sprites / UI / collisions)
 pub Rect :: struct { x: f32, y: f32, w: f32, h: f32 }
 
 pub rect :: fn(x: f32, y: f32, w: f32, h: f32) -> Rect { r: Rect = .{ x, y, w, h }; return r; }

@@ -171,7 +171,7 @@ pub const LlvmBackend = struct {
 /// Convenience wrapper — link step exposed at module level.
 pub const linkWindows = link.windows;
 
-// ── Windows entry point generator ────────────────────────────────────────────
+// Windows entry point generator
 //
 // When the Skarn module has an `entry` function, automatically emit:
 //

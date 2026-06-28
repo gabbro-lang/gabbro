@@ -28,7 +28,7 @@
 #import std.net.tcp as tcp;
 #import std.net.udp as udp;
 
-// ── Library lifecycle ────────────────────────────────────────────────────────
+// Library lifecycle
 
 // Initialise Winsock — call once before any socket call.
 pub init :: fn() -> void ! NetError { os::init()?; return; }
@@ -40,7 +40,7 @@ pub shutdown :: fn() { os::cleanup(); }
 // a `NetError`.
 pub last_error :: fn() -> i32 { return os::last_error(); }
 
-// ── TCP convenience ──────────────────────────────────────────────────────────
+// TCP convenience
 
 // Connect to `sa` and return a ready `tcp::TcpStream` (client side).
 pub connect :: fn(sa: addr::SocketAddr) -> tcp::TcpStream ! NetError {
@@ -52,7 +52,7 @@ pub listen :: fn(sa: addr::SocketAddr) -> tcp::TcpListener ! NetError {
     return tcp::listen(sa)?;
 }
 
-// ── UDP convenience ──────────────────────────────────────────────────────────
+// UDP convenience
 
 // A `udp::UdpSocket` bound to `sa`.
 pub udp_bind :: fn(sa: addr::SocketAddr) -> udp::UdpSocket ! NetError {

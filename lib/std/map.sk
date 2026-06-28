@@ -33,7 +33,7 @@ TOMB  :: 2u8;   // a deleted slot — probing skips past it but doesn't stop
 
 INIT_CAP :: 8usize;   // always a power of two so `hash & (cap-1)` indexes a slot
 
-// ── Raw byte hashing (FNV-1a) ────────────────────────────────────────────────
+// Raw byte hashing (FNV-1a)
 fnv_bytes :: fn(p: *const u8, n: usize) -> u64 {
     h: u64 = 14695981039346656037u64;
     i: usize = 0usize;
@@ -53,7 +53,7 @@ eq_bytes :: fn(a: *const u8, b: *const u8, n: usize) -> bool {
     return true;
 }
 
-// ── AutoHashMap(K, V) — byte-hashed, any value-type key ──────────────────────
+// AutoHashMap(K, V) — byte-hashed, any value-type key
 pub AutoHashMap :: struct($K: type, $V: type) {
     region: *Arena,
     states: []u8,
@@ -193,7 +193,7 @@ pub auto :: fn($K: type, $V: type, a: *Arena) -> AutoHashMap(K, V) {
     return r;
 }
 
-// ── StrMap(V) — string keys, hashed and compared by CONTENT ──────────────────
+// StrMap(V) — string keys, hashed and compared by CONTENT
 pub StrMap :: struct($V: type) {
     region: *Arena,
     states: []u8,

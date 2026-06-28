@@ -8,7 +8,7 @@ const ModuleCg = @import("context.zig").ModuleCg;
 
 pub const EmitError = error{ TargetInitFailed, VerifyFailed, EmitFailed, OutOfMemory };
 
-// ── Target setup ─────────────────────────────────────────────────────────────
+// Target setup
 
 /// One-time global initialisation of the native target.
 /// Safe to call multiple times (LLVM checks internally).
@@ -129,7 +129,7 @@ pub const TargetMachine = struct {
     }
 };
 
-// ── Verification ─────────────────────────────────────────────────────────────
+// Verification
 
 /// Verify the LLVM module.  On failure, prints LLVM's error to stderr and
 /// returns `error.VerifyFailed`.
@@ -144,7 +144,7 @@ pub fn verify(cg: *ModuleCg) EmitError!void {
     }
 }
 
-// ── Object file emission ──────────────────────────────────────────────────────
+// Object file emission
 
 /// Emit a native object file at `path`.
 ///
@@ -198,7 +198,7 @@ pub fn emitObject(cg: *ModuleCg, tm: TargetMachine, path: [*:0]const u8) EmitErr
     }
 }
 
-// ── Debug helpers ─────────────────────────────────────────────────────────────
+// Debug helpers
 
 /// Print the module as LLVM text IR to stderr (useful for debugging codegen).
 pub fn dumpIr(cg: *ModuleCg) void {

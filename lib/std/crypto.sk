@@ -15,7 +15,7 @@
 #import std.heap.{ Arena };
 #import std.strings as strings;
 
-// ── FNV-1a (fast, non-cryptographic — hash maps, content keys) ───────────────
+// FNV-1a (fast, non-cryptographic — hash maps, content keys)
 
 pub fnv1a_64 :: fn(data: []const u8) -> u64 {
     h: u64 = 0xcbf29ce484222325u64;
@@ -37,7 +37,7 @@ pub fnv1a_32 :: fn(data: []const u8) -> u32 {
     return h;
 }
 
-// ── CRC-32 (IEEE 802.3, the zip/png polynomial) ──────────────────────────────
+// CRC-32 (IEEE 802.3, the zip/png polynomial)
 
 // Bitwise (table-free) CRC-32. `crc32("123456789")` == 0xcbf43926.
 pub crc32 :: fn(data: []const u8) -> u32 {
@@ -56,7 +56,7 @@ pub crc32 :: fn(data: []const u8) -> u32 {
     return crc ^ 0xffffffffu32;
 }
 
-// ── SHA-256 (FIPS 180-4) ─────────────────────────────────────────────────────
+// SHA-256 (FIPS 180-4)
 
 // Digest length in bytes — `sha256_into`'s `out` must be at least this long.
 pub SHA256_LEN :: 32usize;

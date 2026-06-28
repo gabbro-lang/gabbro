@@ -202,7 +202,7 @@ pub const Vm = struct {
                 .load_const => frame.regs[inst.a] = consts[@intCast(inst.imm)],
                 .copy => frame.regs[inst.a] = frame.regs[inst.b],
 
-                // ── Integer arithmetic ───────────────────────────────────
+                // Integer arithmetic
                 .add_i, .sub_i, .mul_i, .div_i, .rem_i => {
                     const l = frame.regs[inst.b].asI128() orelse return error.TypeMismatch;
                     const r = frame.regs[inst.c].asI128() orelse return error.TypeMismatch;
@@ -220,7 +220,7 @@ pub const Vm = struct {
                     frame.regs[inst.a] = .{ .int = -%v };
                 },
 
-                // ── Float arithmetic ─────────────────────────────────────
+                // Float arithmetic
                 .add_f, .sub_f, .mul_f, .div_f => {
                     const l = frame.regs[inst.b].asF64() orelse return error.TypeMismatch;
                     const r = frame.regs[inst.c].asF64() orelse return error.TypeMismatch;
@@ -237,7 +237,7 @@ pub const Vm = struct {
                     frame.regs[inst.a] = .{ .float = -v };
                 },
 
-                // ── Bitwise & logic ──────────────────────────────────────
+                // Bitwise & logic
                 .bit_and, .bit_or, .bit_xor, .shl, .shr => {
                     const l = frame.regs[inst.b].asI128() orelse return error.TypeMismatch;
                     const r = frame.regs[inst.c].asI128() orelse return error.TypeMismatch;
@@ -256,7 +256,7 @@ pub const Vm = struct {
                 },
                 .not_b => frame.regs[inst.a] = .{ .bool = !frame.regs[inst.b].truthy() },
 
-                // ── Comparison (int) ─────────────────────────────────────
+                // Comparison (int)
                 .eq_i, .ne_i, .lt_i, .le_i, .gt_i, .ge_i => {
                     const l = frame.regs[inst.b].asI128() orelse return error.TypeMismatch;
                     const r = frame.regs[inst.c].asI128() orelse return error.TypeMismatch;
@@ -271,7 +271,7 @@ pub const Vm = struct {
                     } };
                 },
 
-                // ── Comparison (float) ───────────────────────────────────
+                // Comparison (float)
                 .eq_f, .ne_f, .lt_f, .le_f, .gt_f, .ge_f => {
                     const l = frame.regs[inst.b].asF64() orelse return error.TypeMismatch;
                     const r = frame.regs[inst.c].asF64() orelse return error.TypeMismatch;
@@ -286,7 +286,7 @@ pub const Vm = struct {
                     } };
                 },
 
-                // ── Casts ────────────────────────────────────────────────
+                // Casts
                 .cast_to_float => {
                     const v = frame.regs[inst.b].asF64() orelse return error.TypeMismatch;
                     frame.regs[inst.a] = .{ .float = v };
@@ -301,13 +301,13 @@ pub const Vm = struct {
                     };
                 },
 
-                // ── Locals ───────────────────────────────────────────────
+                // Locals
                 .load_local => frame.regs[inst.a] = frame.locals[@intCast(inst.imm)],
                 .store_local => frame.locals[@intCast(inst.imm)] = frame.regs[inst.b],
 
                 .load_global, .store_global => return error.Unsupported,
 
-                // ── Control flow ─────────────────────────────────────────
+                // Control flow
                 .jmp => pc = @intCast(inst.imm),
                 .br_if => if (frame.regs[inst.a].truthy()) {
                     pc = @intCast(inst.imm);
@@ -381,7 +381,7 @@ pub const Vm = struct {
                     return .void;
                 },
 
-                // ── Zones ────────────────────────────────────────────────
+                // Zones
                 .zone_push => {
                     const name = constName(consts, inst.imm);
                     _ = try self.zone_stack.push(name);
@@ -550,7 +550,7 @@ pub const Vm = struct {
                     } };
                 },
 
-                // ── System ───────────────────────────────────────────────
+                // System
                 .sys_print => printValue(frame.regs[inst.a]),
                 .trap => return error.Trap,
                 .host_call => {

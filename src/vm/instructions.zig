@@ -8,36 +8,36 @@ pub const Reg = u32;
 pub const Opcode = enum(u8) {
     nop,
 
-    // ── Constants & moves ────────────────────────────────────────────────
+    // Constants & moves
     load_imm, // a = dst; imm = small integer literal
     load_const, // a = dst; imm = index into the function constant pool
     copy, // a = dst; b = src
 
-    // ── Integer arithmetic ───────────────────────────────────────────────
+    // Integer arithmetic
     add_i, sub_i, mul_i, div_i, rem_i, neg_i,
 
-    // ── Float arithmetic ─────────────────────────────────────────────────
+    // Float arithmetic
     add_f, sub_f, mul_f, div_f, neg_f,
 
-    // ── Bitwise & logic ──────────────────────────────────────────────────
+    // Bitwise & logic
     bit_and, bit_or, bit_xor, bitnot, shl, shr, not_b,
 
-    // ── Comparison (int) ─────────────────────────────────────────────────
+    // Comparison (int)
     eq_i, ne_i, lt_i, le_i, gt_i, ge_i,
 
-    // ── Comparison (float) ───────────────────────────────────────────────
+    // Comparison (float)
     eq_f, ne_f, lt_f, le_f, gt_f, ge_f,
 
-    // ── Casts ────────────────────────────────────────────────────────────
+    // Casts
     cast_to_float, cast_to_int,
 
-    // ── Locals & globals ─────────────────────────────────────────────────
+    // Locals & globals
     load_local, // a = dst; imm = local slot
     store_local, // b = src; imm = local slot
     load_global, // a = dst; imm = global index
     store_global, // b = src; imm = global index
 
-    // ── Control flow ─────────────────────────────────────────────────────
+    // Control flow
     jmp, // imm = target instruction offset
     br_if, // a = cond; imm = target offset (taken when truthy)
     br_if_not, // a = cond; imm = target offset (taken when falsy)
@@ -45,7 +45,7 @@ pub const Opcode = enum(u8) {
     ret, // a = value reg
     ret_void,
 
-    // ── Zones & aggregates ───────────────────────────────────────────────
+    // Zones & aggregates
     zone_push, // imm = const-pool index of the zone name string
     zone_pop,
     zone_alloc, // a = dst; imm = number of cells (allocated in the top zone)
@@ -61,7 +61,7 @@ pub const Opcode = enum(u8) {
     halt_msg, // a = string reg → record it as a compiler diagnostic and halt (Trap)
     record_remove, // a = string reg → record a top-level decl name to remove (no halt)
     scalar_builtin, // a = dst; b = arg0; c = arg1; imm = op id → a `core::` math/bit fold
-    // ── Host memory (run byte-addressed std.heap at comptime) ────────────
+    // Host memory (run byte-addressed std.heap at comptime)
     host_ptr_make, // a = dst; b = addr reg (uint); imm = byte size of pointee → host_ptr
     host_buf_make, // a = dst; b = addr/host_ptr reg; c = len reg; imm = byte stride → host_buf
     opt_is_some, // a = dst; b = optional value → bool (non-null)
@@ -69,11 +69,11 @@ pub const Opcode = enum(u8) {
     call_indirect, // a = dst; b = callee fn_ref reg; c = arg base reg; imm = arg count
     closure_make, // a = dst; b = env ptr reg; c = takes_env (0/1); imm = fn index → closure
 
-    // ── System / diagnostics ─────────────────────────────────────────────
+    // System / diagnostics
     sys_print, // a = reg to print
     trap, // imm = const-pool index of message string, or -1 for none
 
-    // ── Host call ────────────────────────────────────────────────────────
+    // Host call
     // A side-effecting call into the embedding host (e.g. the build driver).
     // imm = host-op id (see BuildOp); b = arg base reg; c = arg count;
     // a = dst reg for the returned value (e.g. a fresh artifact id).

@@ -1784,7 +1784,7 @@ const FunctionLowerer = struct {
         return self.blocks.toOwnedSlice(self.allocator);
     }
 
-    // ── `zone X: Arena {}` desugar ─────────────────────────────────────────
+    // `zone X: Arena {}` desugar
     // A zone handle is a real `std.heap.Arena`. Entering a zone is `X := make()`;
     // every exit path runs `deinit(&X)`. The body's `X.method(...)` calls already
     // lowered as ordinary UFCS/extension calls (sema resolved them against the
@@ -2314,7 +2314,7 @@ const FunctionLowerer = struct {
         self.startBlock(after_id, "for.iter.after");
     }
 
-    // ── Materialization: quoted AST → ast.* construction IR ──────────────────
+    // Materialization: quoted AST → ast.* construction IR
     // `#quote(expr)` / `#quote { ... }` become real `AstExpr`/`AstBlock` values
     // the VM can build, `match` on, and the reifier can turn back into AST.
 
@@ -2447,7 +2447,7 @@ const FunctionLowerer = struct {
         } });
     }
 
-    // ── Materialization: `type_info(T)` → a `TypeInfo` value ──────────────────
+    // Materialization: `type_info(T)` → a `TypeInfo` value
     // Builds the matchable `TypeInfo` tagged enum from a type's layout, the same
     // way `materializeExpr` builds `ast.*`. Recursive payloads are `*TypeInfo`;
     // cycles (`Node { next: *Node }`) break with the `other` leaf.
@@ -5775,7 +5775,7 @@ pub const ComptimeVm = struct {
     }
 };
 
-// ── Reifier: VM value → front-end AST ────────────────────────────────────────
+// Reifier: VM value → front-end AST
 // The inverse of `materializeBlock`/`materializeExpr`: walks the zone-cell
 // representation of an `AstBlock` value the VM built and reconstructs real
 // `ast.*` nodes. Variant tags index the declaration order in `ast_prelude.zig`;
@@ -6117,7 +6117,7 @@ const Reifier = struct {
         return .{ .id = self.freshId(), .kind = kind, .span = self.span };
     }
 
-    // ── Type references, optionals, match arms ───────────────────────────────
+    // Type references, optionals, match arms
 
     fn boolAt(self: *Reifier, p: vm_value.Value.Ptr, off: u32) Error!bool {
         return switch (try self.cellAt(p, off)) {
@@ -6212,7 +6212,7 @@ const Reifier = struct {
     }
 };
 
-// ── Two-pass `#insert`: evaluate computed operands, splice, re-check ─────────
+// Two-pass `#insert`: evaluate computed operands, splice, re-check
 // `#insert <computed>` (e.g. `#insert #run gen()`) needs the VM (post-sema) to
 // produce the code, but the code must be spliced pre-sema to be type-checked.
 // Pass 1: sema the module, run each computed operand on the VM, reify the
@@ -6341,7 +6341,7 @@ pub fn runBuildHook(allocator: std.mem.Allocator, front_end: pipeline.FrontEnd, 
     _ = vm.call("build", &.{build_arg}) catch return error.SemanticFailed;
 }
 
-// ── Comptime test lane ──────────────────────────────────────────────────────────
+// Comptime test lane
 
 pub const TestFailure = struct {
     name: []const u8,
@@ -6631,7 +6631,7 @@ const InsertExpander = struct {
     }
 };
 
-// ── VM comptime corpus ──────────────────────────────────────────────────────
+// VM comptime corpus
 // Evaluates every top-level `X :: #run <expr>` in a module with the VM. This
 // began life as a differential gate against the old AST tree-walker; now that
 // the VM is the sole engine it is a pure regression test — every case in the
@@ -6941,7 +6941,7 @@ fn assignOpToBinOpName(op: ast.AssignOp) ?[]const u8 {
     };
 }
 
-// ── Comptime-only function detection ─────────────────────────────────────────
+// Comptime-only function detection
 // A function whose signature mentions the ast.* prelude types, or whose body
 // builds quote values, is a metaprogramming helper: it runs only on the VM and
 // is excluded from the final (runtime) module.

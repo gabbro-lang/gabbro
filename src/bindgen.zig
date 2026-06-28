@@ -457,7 +457,7 @@ const Generator = struct {
         }
     }
 
-    // ── C type → Skarn type ────────────────────────────────────────────────────
+    // C type → Skarn type
 
     fn mapType(self: *Generator, ty: c.CXType) BindgenError![]const u8 {
         return switch (ty.kind) {
@@ -544,7 +544,7 @@ const Generator = struct {
     }
 };
 
-// ── macro token helpers ─────────────────────────────────────────────────────
+// macro token helpers
 
 const TokKind = enum { literal, identifier, punct, keyword, other };
 const Tok = struct { kind: TokKind, text: []const u8 };
@@ -581,7 +581,7 @@ fn cleanLiteral(text: []const u8) ?[]const u8 {
     return s;
 }
 
-// ── libclang helpers ────────────────────────────────────────────────────────
+// libclang helpers
 
 /// A cursor's spelling, duped into `arena`.
 fn spelling(arena: std.mem.Allocator, cursor: c.CXCursor) ![]const u8 {

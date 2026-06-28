@@ -2419,7 +2419,7 @@ test "exe: `[]const u8` `==` folds at compile time (`#run` / `#compiler` use)" {
     try std.testing.expectEqual(@as(u32, 1), code);
 }
 
-// ── Comptime test lane (#test) ──────────────────────────────────────────────────
+// Comptime test lane (#test)
 
 test "exe: passing #test compiles and the program runs" {
     if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
@@ -2523,7 +2523,7 @@ test "exe: generic []const u8 == folds in a #run (binding-resolved)" {
     try std.testing.expectEqual(@as(u32, 7), code);
 }
 
-// ── Named struct literals + default field values ────────────────────────────────
+// Named struct literals + default field values
 
 test "exe: named struct literal, fields out of order" {
     if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
@@ -2584,7 +2584,7 @@ test "exe: missing required field (no default) fails the build" {
     , "exe_named_missing"));
 }
 
-// ── Calling interface methods on the implementing / constrained type ────────────
+// Calling interface methods on the implementing / constrained type
 
 test "exe: interface method called directly on the implementing type" {
     if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
@@ -2662,7 +2662,7 @@ test "exe: $T: Iface still rejects a non-conforming type" {
     , "exe_iface_nonconforming"));
 }
 
-// ── Struct equality + interface-through-interface dispatch ──────────────────────
+// Struct equality + interface-through-interface dispatch
 
 test "exe: struct == compares field by field (nested + string fields)" {
     if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
@@ -2791,7 +2791,7 @@ test "exe: comparing enum values with non-scalar payloads is a clean error" {
     , "exe_enum_agg_payload"));
 }
 
-// ── Operator precedence & chaining (locked for 0.1.0) ───────────────────────────
+// Operator precedence & chaining (locked for 0.1.0)
 
 test "exe: operator precedence ladder is stable" {
     if (comptime !skarn.llvm_enabled) return error.SkipZigTest;

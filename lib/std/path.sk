@@ -105,7 +105,7 @@ pub has_extension :: fn(p: []const u8, want: []const u8) -> bool {
     return strings::str_eq(e[1usize..e.len], want);
 }
 
-// ── Builders (need an arena) ─────────────────────────────────────────────────
+// Builders (need an arena)
 
 // Join two path segments with a single `SEP`. Trailing separators on `x` and
 // leading ones on `y` are collapsed. An absolute `y` replaces `x` entirely.

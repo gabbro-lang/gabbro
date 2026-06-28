@@ -14,7 +14,7 @@
 #import std.heap.{ Arena };
 #import std.strings.{ StringBuilder, builder, append, append_byte, append_u64, append_i64, append_f64_min, str };
 
-// ── Raw reads from an Any's data pointer ─────────────────────────────────────
+// Raw reads from an Any's data pointer
 // An `Any` carries `data: *const u8` pointing at the value. We read the scalar
 // bytes directly (width from the `TypeInfo`), which sidesteps `usize`-vs-`u64`
 // id ambiguity and needs no per-type downcast.
@@ -73,7 +73,7 @@ write_string :: fn(v: Any, w: *StringBuilder) {
     }
 }
 
-// ── The recursive walker ─────────────────────────────────────────────────────
+// The recursive walker
 // `v` is the value (type-erased); `ti` is its static shape. Both come from the
 // generic entry point, and the struct case threads each field's `Any` + `TypeInfo`
 // back into this same function.
@@ -276,7 +276,7 @@ p_str :: fn(p: *Parser, a: *Arena) -> []const u8 {
     return str(&sb);
 }
 
-// ── Field writers (cast away const, store the parsed value) ──────────────────
+// Field writers (cast away const, store the parsed value)
 set_int :: fn(d: *const u8, ti: TiInt, val: i64) {
     unsafe {
         if ti.bits == 8u16 { *(d as *u8) = val as u8; }
@@ -366,7 +366,7 @@ find_field :: fn(s: TiStruct, key: []const u8) -> usize {
     return s.fields.len;   // not found
 }
 
-// ── Skipping (for unknown object keys + counting array elements) ─────────────
+// Skipping (for unknown object keys + counting array elements)
 p_skip_scalar :: fn(p: *Parser) {
     cont: bool = true;
     while cont {
@@ -419,7 +419,7 @@ p_skip_arr :: fn(p: *Parser, a: *Arena) {
     p_eat(p, 93u8);
 }
 
-// ── The recursive parser ─────────────────────────────────────────────────────
+// The recursive parser
 parse_value :: fn(p: *Parser, target: Any, ti: TypeInfo, a: *Arena) {
     match ti {
         .int |i| => set_int(target.data, i, p_i64(p));

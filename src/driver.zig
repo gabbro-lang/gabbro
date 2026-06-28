@@ -74,7 +74,7 @@ pub fn compileSource(
     };
 }
 
-// ── LLVM backend path ─────────────────────────────────────────────────────────
+// LLVM backend path
 
 /// A compile phase, reported to a progress hook as it begins.
 pub const Phase = enum {

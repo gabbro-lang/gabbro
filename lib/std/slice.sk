@@ -8,7 +8,7 @@
 //   if slice::find(i32, xs, is_neg) |i| { … }      // instead of a manual loop
 //   n := slice::count_where(u8, bytes, is_space);
 
-// ── higher-order helpers (generic over the element type) ─────────────────────
+// higher-order helpers (generic over the element type)
 
 // Index of the first element matching `pred`, or null.
 pub find :: fn($T: type, s: []T, pred: fn(T) -> bool) -> ?usize {

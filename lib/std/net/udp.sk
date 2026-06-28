@@ -72,7 +72,7 @@ pub UdpSocket :: struct {
     pub close :: fn(self: *Self) { self.sock.close(); }
 }
 
-// ── Free constructors ────────────────────────────────────────────────────────
+// Free constructors
 
 // A UDP socket bound to `sa` (a server, or any socket with a fixed local port).
 // Sets `SO_REUSEADDR` so a quick restart can reclaim the port.

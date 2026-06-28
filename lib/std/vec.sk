@@ -24,7 +24,7 @@ pub Vec :: struct($T: type) {
     data:   []T,       // backing storage; capacity == data.len
     count:  usize      // elements in use
 
-    // ── Size & access ──────────────────────────────────────────────────────
+    // Size & access
     pub len      :: fn(self: *Self) -> usize { return self.count; }
     pub cap      :: fn(self: *Self) -> usize { return self.data.len; }
     pub is_empty :: fn(self: *Self) -> bool  { return self.count == 0usize; }
@@ -41,7 +41,7 @@ pub Vec :: struct($T: type) {
     // The live elements as a slice (valid until the next growth).
     pub items :: fn(self: *Self) -> []T { return self.data[0..self.count]; }
 
-    // ── Growth ─────────────────────────────────────────────────────────────
+    // Growth
     // Ensure capacity for at least `want` elements (×2 growth, never shrinks).
     pub reserve :: fn(self: *Self, want: usize) {
         if want <= self.data.len { return; }
@@ -54,7 +54,7 @@ pub Vec :: struct($T: type) {
         self.data = nbuf;
     }
 
-    // ── Mutation ───────────────────────────────────────────────────────────
+    // Mutation
     pub push :: fn(self: *Self, item: T) {
         self.reserve(self.count + 1usize);
         self.data[self.count] = item;
@@ -117,7 +117,7 @@ pub Vec :: struct($T: type) {
     }
 }
 
-// ── Constructors ────────────────────────────────────────────────────────────
+// Constructors
 
 // A new empty Vec bound to region `a`, with a small initial capacity.
 pub make :: fn($T: type, a: *Arena) -> Vec(T) {
@@ -140,7 +140,7 @@ pub from :: fn($T: type, a: *Arena, src: []const T) -> Vec(T) {
     return r;
 }
 
-// ── VecUnmanaged(T) — the region passed per growing call ─────────────────────
+// VecUnmanaged(T) — the region passed per growing call
 //
 // The *unmanaged* twin holds no region of its own; every operation that may grow
 // takes the `*Arena` explicitly. Use it when the same vector is filled from more

@@ -4,9 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Optional LLVM backend
-    // Pass `-Dllvm-path=C:\LLVM` (or wherever LLVM is installed) to enable.
-    // When omitted, the LLVM backend compiles but is a no-op at runtime.
+    // -Dllvm-path turns on the LLVM backend. Without it, the backend is a no-op.
     const llvm_path = b.option(
         []const u8,
         "llvm-path",
@@ -28,13 +26,11 @@ pub fn build(b: *std.Build) void {
         "Path to the Skarn modules directory containing std/",
     ) orelse b.pathFromRoot("lib");
 
-    // Statically link the self-hosted linker (skarnld) into skarn.exe for a
-    // single-binary release (no separate skarnld.dll). Two-stage: the base skarn.exe
-    // compiles linker/skarnld.sk to a freestanding object, which the final skarn.exe
-    // links in and exports. Dev builds leave this off and ship the dll.
+    // Bake skarnld into skarn.exe for a one-file release. The base exe compiles
+    // skarnld.sk to an object; the final exe links it in. Off = ship the dll instead.
     const embed_linker = b.option(bool, "embed-linker", "Bake skarnld into skarn.exe (single-binary release)") orelse false;
 
-    // Compiler library module
+    // the compiler, as a reusable library
     const compiler_mod = b.addModule("skarn_compiler", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -73,18 +69,14 @@ pub fn build(b: *std.Build) void {
         //   Windows prebuilt (llvm.org): LLVM-C
         //   Linux/macOS:                 LLVM-17 / LLVM
         compiler_mod.linkSystemLibrary("LLVM-C", .{});
-        // libclang (the C binding generator, `skarn bindgen`) is deliberately NOT
-        // linked: the include path above gives `@cImport` its types, but the
-        // functions are loaded at runtime via std.DynLib (see clang_c.zig). So
-        // skarn.exe carries no dependency on the 81 MB libclang.dll — it ships as
-        // an optional component, loaded only when `skarn bindgen` actually runs.
+        // libclang isn't linked. The include path gives @cImport its types, but the
+        // functions load at runtime (clang_c.zig), so skarn.exe doesn't drag in the
+        // 81 MB libclang.dll. It's pulled in only for `skarn bindgen`.
     }
 
-    // Optional in-process LLD (skarnlld.dll)
-    // `-Din-process-lld` bundles the LLD COFF driver + its LLVM static deps
-    // into a DLL exposing `skarn_lld_link_coff`, so `skarn build` links in-process
-    // instead of spawning a 69 MB lld-link.exe. Off by default; the spawn path
-    // is the fallback. Requires the LLVM/LLD static libs in <llvm-path>/lib.
+    // optional in-process LLD (skarnlld.dll)
+    // -Din-process-lld builds a DLL with the LLD COFF driver + its LLVM deps, so
+    // `skarn build` links in-process instead of spawning lld-link.exe. Off by default.
     const in_process_lld = b.option(bool, "in-process-lld", "Build skarnlld.dll for in-process linking") orelse false;
     opts.addOption(bool, "in_process_lld", in_process_lld and llvm_path != null);
     if (in_process_lld) {

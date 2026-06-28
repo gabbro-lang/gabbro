@@ -1,6 +1,6 @@
 # Type System
 
-K2 is statically typed with full type inference. Every value has a known type at compile time, and the compiler will reject programs where types do not align. K2's type system is designed to be explicit where it matters — preventing subtle bugs through distinct types, optional types, and strict casting rules — while staying lightweight through inference and compound literals.
+Skarn is statically typed with full type inference. Every value has a known type at compile time, and the compiler will reject programs where types do not align. Skarn's type system is designed to be explicit where it matters — preventing subtle bugs through distinct types, optional types, and strict casting rules — while staying lightweight through inference and compound literals.
 
 ---
 
@@ -8,7 +8,7 @@ K2 is statically typed with full type inference. Every value has a known type at
 
 ### Integer Types
 
-K2 provides fixed-width signed and unsigned integer types:
+Skarn provides fixed-width signed and unsigned integer types:
 
 | Signed | Unsigned | Size |
 |--------|----------|------|
@@ -24,7 +24,7 @@ K2 provides fixed-width signed and unsigned integer types:
 
 Integer literals can carry a type suffix to specify their type explicitly:
 
-```k2
+```skarn
 a := 42i32;       // i32
 b := 255u8;        // u8
 c := 1000u64;      // u64
@@ -37,17 +37,17 @@ A suffix is authoritative: it fixes the literal's width even through inference. 
 
 Only the widths in the table above are valid suffixes (`i8`/`i16`/`i32`/`i64`/`isize`, their `u` twins, and `byte`). An unsupported or malformed width is a compile error rather than a silently-dropped suffix:
 
-```k2
-x := 0u128;   // error: unsupported integer width `u128`: k2 integers are at most 64-bit — use `u64` or `usize`
+```skarn
+x := 0u128;   // error: unsupported integer width `u128`: skarn integers are at most 64-bit — use `u64` or `usize`
 y := 0u9;     // error: unsupported integer width `u9`: ...
-z := 3.0f16;  // error: unsupported float width `f16`: k2 floats are `f32` or `f64`
+z := 3.0f16;  // error: unsupported float width `f16`: skarn floats are `f32` or `f64`
 ```
 
 A hex literal that legitimately ends in letters (`0xABC`, `0xFF`) is *not* a bad suffix — the suffix is split off only after the radix's digits, so hex digits are never mistaken for a width. Float literals accept only `f32`/`f64`.
 
 #### Overflow policy
 
-K2's policy for plain `+`, `-`, `*` is fixed and never undefined behavior:
+Skarn's policy for plain `+`, `-`, `*` is fixed and never undefined behavior:
 
 | Build | Plain `+` `-` `*` on overflow |
 | --- | --- |
@@ -59,7 +59,7 @@ ship — there is no overflow UB to exploit. When you specifically *want* wrapar
 in every build (hashing, PRNGs, checksums, fixed-width counters), use the explicit
 wrapping operators `+%`, `-%`, `*%`, which never trap:
 
-```k2
+```skarn
 a := 250u8 +% 10u8;   // 4   — wraps at 256, never traps
 h := h *% 16777619u32; // FNV-style hash step
 
@@ -76,9 +76,9 @@ like the above can be evaluated in a `#run` constant and matches its runtime val
 
 #### Sub-Byte Integer Types
 
-Within packed structs, K2 supports sub-byte integer types from `u1` through `u7`. These types cannot be used outside of packed struct fields:
+Within packed structs, Skarn supports sub-byte integer types from `u1` through `u7`. These types cannot be used outside of packed struct fields:
 
-```k2
+```skarn
 #packed
 StatusBits :: struct {
     enabled: u1,
@@ -101,7 +101,7 @@ StatusBits :: struct {
 
 Float arithmetic and comparisons lower to the correct LLVM floating-point instructions.
 
-```k2
+```skarn
 pi := 3.14159f64;
 half := 0.5f32;
 result := pi * 2.0;
@@ -113,12 +113,12 @@ result := pi * 2.0;
 
 `bool` holds one of two values: `true` or `false`.
 
-```k2
+```skarn
 flag := true;
 done: bool = false;
 ```
 
-Booleans are used in conditions, logical expressions, and as flags. K2 does not implicitly convert integers or pointers to `bool`.
+Booleans are used in conditions, logical expressions, and as flags. Skarn does not implicitly convert integers or pointers to `bool`.
 
 ---
 
@@ -126,7 +126,7 @@ Booleans are used in conditions, logical expressions, and as flags. K2 does not 
 
 `void` is the unit type. It carries no data and is used as the return type for functions that produce no value:
 
-```k2
+```skarn
 log :: fn(msg: []const u8) -> void {
     // ...
 }
@@ -142,7 +142,7 @@ You never construct a `void` value directly. A function with a `void` return sim
 
 Structs are the primary way to group related data into a single type:
 
-```k2
+```skarn
 Point :: struct {
     x: i32,
     y: i32,
@@ -151,7 +151,7 @@ Point :: struct {
 
 #### Construction
 
-```k2
+```skarn
 // Named-field literal — order doesn't matter
 p: Point = .{ .x = 10, .y = 20 };
 
@@ -173,7 +173,7 @@ field, or a positional/`.{}` literal that stops short of it, fills it from the
 default. Defaults work like trailing default arguments — put defaulted fields
 last so a positional literal can reach them:
 
-```k2
+```skarn
 Config :: struct {
     name: []const u8,
     retries: i32 = 3,
@@ -187,7 +187,7 @@ c: Config = .{ "deploy", 5 };                   // verbose = false (default)
 
 #### Field Access
 
-```k2
+```skarn
 val := p.x;
 p.y = 30;
 ```
@@ -201,7 +201,7 @@ p.y = 30;
 
 The `#packed` attribute creates a struct with no padding between fields. This is essential for hardware registers, binary protocols, and memory-mapped I/O:
 
-```k2
+```skarn
 #packed
 Flags :: struct {
     readable: bool,
@@ -212,7 +212,7 @@ Flags :: struct {
 
 Packed structs support sub-byte field types (`u1` through `u7`), allowing precise bit-level layout:
 
-```k2
+```skarn
 #packed
 PixelFormat :: struct {
     red: u5,
@@ -230,7 +230,7 @@ PixelFormat :: struct {
 
 Structs can be parameterized by types (and compile-time values) using `$`-prefixed parameters:
 
-```k2
+```skarn
 Pair :: struct($T: type, $U: type) {
     first: T,
     second: U,
@@ -241,7 +241,7 @@ p: Pair(i32, bool) = .{ 42, true };
 
 Generic structs are **monomorphized** — each unique combination of type arguments produces a distinct, specialized type at compile time. `Pair(i32, bool)` and `Pair(f64, f64)` are completely separate types.
 
-```k2
+```skarn
 // A dynamically-growable array parameterized by element type
 ArrayList :: struct($T: type) {
     items: []T,
@@ -259,7 +259,7 @@ Functions can be declared **inside** a struct body. Within the body, `Self` is t
 struct type and the struct's type parameters are in scope, so methods on a generic
 struct never re-spell `$T`:
 
-```k2
+```skarn
 Vec2 :: struct {
     x: i32, y: i32
 
@@ -275,7 +275,7 @@ p := Vec2::new(3, 4);   // associated function: `::`, no receiver
 n := p.len2();          // method: `.`, receiver auto-passed (25)
 ```
 
-```k2
+```skarn
 Box :: struct($T: type) {
     value: T
     make :: fn(v: T) -> Self { return .{ v }; }       // T inferred from the arg
@@ -286,7 +286,7 @@ b := Box::make(10);     // Box(i32)
 v := b.get();           // 10
 ```
 
-Two call forms, matching K2's `::` / `.` split:
+Two call forms, matching Skarn's `::` / `.` split:
 
 - **`Type::name(...)`** for an *associated* function — one with no `self` (a
   constructor, factory, or type-level helper). Mirrors module member access.
@@ -312,7 +312,7 @@ extension.
 
 Enums define a type that holds one of a fixed set of variants:
 
-```k2
+```skarn
 Direction :: enum {
     north,
     south,
@@ -327,7 +327,7 @@ d := Direction.north;
 
 When the expected type is known from context, you can use the dot shorthand:
 
-```k2
+```skarn
 d2: Direction = .north;
 
 move :: fn(dir: Direction) -> void { /* ... */ }
@@ -338,7 +338,7 @@ move(.east);
 
 Enum variants can carry associated data:
 
-```k2
+```skarn
 Shape :: enum {
     circle: f64,             // radius
     rectangle: struct {      // inline struct payload
@@ -355,7 +355,7 @@ Construct a payload-carrying variant by calling the variant as `EnumType.variant
 (payload-less variants are just `EnumType.variant`). Recover the payload by pattern
 matching:
 
-```k2
+```skarn
 area :: fn(s: Shape) -> f64 {
     match s {
         .circle |r|    => return 3.14159 * r * r;
@@ -365,7 +365,7 @@ area :: fn(s: Shape) -> f64 {
 }
 ```
 
-Enums with payloads are K2's approach to tagged unions. Construction and matching
+Enums with payloads are Skarn's approach to tagged unions. Construction and matching
 both work at compile time too, so comptime code can build and inspect them — the
 basis for constructing `ast.*` values programmatically in metaprogramming.
 
@@ -373,9 +373,9 @@ basis for constructing `ast.*` values programmatically in metaprogramming.
 
 ### Error Types
 
-Error types are declared with the `errors` keyword. They look similar to enums but are specifically designed for use with K2's fallible function system:
+Error types are declared with the `errors` keyword. They look similar to enums but are specifically designed for use with Skarn's fallible function system:
 
-```k2
+```skarn
 IoError :: errors {
     not_found,
     permission_denied,
@@ -390,7 +390,7 @@ ParseError :: errors {
 
 Error types integrate with the `!` operator in function return types to indicate fallible operations:
 
-```k2
+```skarn
 read_file :: fn(path: []const u8) -> []u8 ! IoError {
     // ...
 }
@@ -403,7 +403,7 @@ read_file :: fn(path: []const u8) -> []u8 ! IoError {
 
 ## Pointer Types
 
-K2 provides several pointer kinds for different use cases.
+Skarn provides several pointer kinds for different use cases.
 
 ### Single Pointers
 
@@ -415,7 +415,7 @@ A single pointer points to exactly one value:
 | `*const T`      | Immutable (const) pointer to `T`    |
 | `*volatile T`   | Volatile pointer to `T`             |
 
-```k2
+```skarn
 x := 42;
 ptr: *i32 = &x;       // take address of x
 val := *ptr;           // dereference: read the value (42)
@@ -436,7 +436,7 @@ A many-pointer points to an array of values whose length is not tracked:
 | `[*]T`          | Mutable many-pointer to `T`             |
 | `[*]const T`    | Const many-pointer to `T`               |
 
-```k2
+```skarn
 buffer: [*]u8 = get_raw_buffer();
 first := buffer[0];
 buffer[3] = 0xFF;
@@ -456,7 +456,7 @@ Slices are a **pointer + length** pair, providing bounds-checked access to a con
 | `[]T`         | Mutable slice of `T`          |
 | `[]const T`   | Const slice of `T`            |
 
-```k2
+```skarn
 arr: [4]i32 = .{ 1, 2, 3, 4 };
 
 slice := arr[:];          // full slice of the array
@@ -466,9 +466,9 @@ len := slice.len;         // number of elements
 raw := slice.ptr;         // underlying pointer ([*]T)
 ```
 
-String literals in K2 have the type `[]const u8`:
+String literals in Skarn have the type `[]const u8`:
 
-```k2
+```skarn
 greeting: []const u8 = "hello, world";
 ```
 
@@ -478,7 +478,7 @@ greeting: []const u8 = "hello, world";
 identity. The comparison checks the length first, then the bytes, so it never
 reads past either slice:
 
-```k2
+```skarn
 a: []const u8 = "abc";
 b: []const u8 = "abc";
 
@@ -505,11 +505,11 @@ in `#run` constants and `#compiler` hooks, e.g. `if d.derives == "Sum"`).
 
 Arrays are fixed-size, stack-allocated sequences:
 
-```k2
+```skarn
 [N]T    // array of N elements of type T
 ```
 
-```k2
+```skarn
 data: [4]u8 = .{ 1u8, 2u8, 3u8, 4u8 };
 zeros: [256]u8 = .{};                    // zero-initialized
 len := data.len;                          // compile-time known: 4
@@ -517,7 +517,7 @@ len := data.len;                          // compile-time known: 4
 
 Arrays differ from slices in that their length is part of the type. `[4]u8` and `[8]u8` are different types. To pass an array to a function expecting a slice, use the slice operator:
 
-```k2
+```skarn
 process :: fn(items: []const u8) -> void { /* ... */ }
 
 buf: [16]u8 = .{};
@@ -530,11 +530,11 @@ process(buf[:]);    // convert array to slice
 
 An optional wraps a value that may or may not be present:
 
-```k2
+```skarn
 ?T    // either a value of type T, or null
 ```
 
-```k2
+```skarn
 maybe: ?i32 = 42;
 none: ?i32 = null;
 ```
@@ -545,7 +545,7 @@ none: ?i32 = null;
 
 Extracts the value, **panicking at runtime** if the optional is `null`:
 
-```k2
+```skarn
 val := maybe!!;    // 42 — or panic if null
 ```
 
@@ -553,13 +553,13 @@ val := maybe!!;    // 42 — or panic if null
 
 Provides a default value when the optional is `null`:
 
-```k2
+```skarn
 val := maybe ?? 0;    // 42, or 0 if maybe were null
 ```
 
 #### Conditional Checks
 
-```k2
+```skarn
 if maybe != null {
     // maybe is guaranteed non-null in this branch
 }
@@ -574,7 +574,7 @@ if maybe != null {
 
 Function types describe a function's signature as a first-class type:
 
-```k2
+```skarn
 fn(i32, i32) -> i32                        // two i32 params, returns i32
 fn(*Self, []const u8) -> usize ! IoError   // fallible method
 fn() -> void                               // no params, no return value
@@ -582,7 +582,7 @@ fn() -> void                               // no params, no return value
 
 Function types allow storing and passing functions as values:
 
-```k2
+```skarn
 apply :: fn(f: fn(i32) -> i32, x: i32) -> i32 {
     return f(x);
 }
@@ -598,14 +598,14 @@ result := apply(double, 21);    // 42
 
 Distinct types create **newtypes** — types that share the underlying representation but are treated as separate types by the compiler:
 
-```k2
+```skarn
 UserId :: distinct u64;
 Pixels :: distinct i32;
 ```
 
 This prevents accidental mixing of semantically different values:
 
-```k2
+```skarn
 user: UserId = 42u64 as UserId;
 offset: Pixels = 100i32 as Pixels;
 
@@ -615,7 +615,7 @@ offset: Pixels = 100i32 as Pixels;
 
 Convert between a distinct type and its underlying type with `as`:
 
-```k2
+```skarn
 id: UserId = 42u64 as UserId;
 raw := id as u64;              // back to plain u64
 ```
@@ -630,7 +630,7 @@ raw := id as u64;              // back to plain u64
 A type alias gives an existing type a second name. Unlike `distinct`, an alias is
 **transparent** — the alias and its underlying type are fully interchangeable:
 
-```k2
+```skarn
 MyInt :: i32;
 Bytes :: []u8;
 Trio  :: [3]i32;
@@ -647,7 +647,7 @@ supported yet).
 
 The standard library uses aliases for C ABI types — see [`std.c`](07_stdlib.md):
 
-```k2
+```skarn
 #import std.c.{ c_int, c_size_t };
 #extern("msvcrt", "strlen")
 strlen :: fn(s: [*]const c_char) -> c_size_t;
@@ -659,11 +659,11 @@ strlen :: fn(s: [*]const c_char) -> c_size_t;
 
 Opaque types declare a type with no visible definition. They can only be used behind a pointer:
 
-```k2
+```skarn
 Foo :: opaque;
 ```
 
-```k2
+```skarn
 // Only *Foo is usable — you cannot create or inspect a Foo value directly
 get_handle :: fn() -> *Foo { /* ... */ }
 use_handle :: fn(h: *Foo) -> void { /* ... */ }
@@ -679,7 +679,7 @@ Opaque types are useful for:
 
 The `atomic` qualifier is applied to struct fields to enable atomic memory operations:
 
-```k2
+```skarn
 Counter :: struct {
     value: atomic u32,
 }
@@ -687,7 +687,7 @@ Counter :: struct {
 
 Atomic fields must be accessed through the `atomic_load` and `atomic_store` builtins rather than through regular field access:
 
-```k2
+```skarn
 c := Counter { value = 0 };
 current := core::atomic_load(&c.value);
 atomic_store(&c.value, current + 1);
@@ -702,14 +702,14 @@ atomic_store(&c.value, current + 1);
 
 The `borrow` qualifier creates a temporary, non-owning reference to zone-allocated data:
 
-```k2
+```skarn
 borrow *T       // borrowed pointer
 borrow []T      // borrowed slice
 ```
 
 Borrowed references allow you to pass zone-owned values to functions without transferring ownership:
 
-```k2
+```skarn
 print_name :: fn(name: borrow []const u8) -> void {
     // Can read `name` but cannot store it or return it
 }
@@ -732,7 +732,7 @@ print_name :: fn(name: borrow []const u8) -> void {
 
 The `as` operator performs explicit type conversions:
 
-```k2
+```skarn
 x := 42i32;
 y := x as i64;          // integer widening (lossless)
 z := x as u32;          // signed to unsigned
@@ -741,7 +741,7 @@ i := 3.14 as i32;       // float to integer (truncates toward zero)
 d := id as u64;         // distinct type to underlying type
 ```
 
-All casts in K2 are explicit and visible in the source code. The compiler will reject `as` casts that are nonsensical (e.g., casting a struct to an integer).
+All casts in Skarn are explicit and visible in the source code. The compiler will reject `as` casts that are nonsensical (e.g., casting a struct to an integer).
 
 ### Cast Summary
 
@@ -759,7 +759,7 @@ All casts in K2 are explicit and visible in the source code. The compiler will r
 
 ## Type Coercion Rules
 
-K2 performs a small, well-defined set of **implicit coercions**. These are the only cases where a value of one type is silently accepted as another:
+Skarn performs a small, well-defined set of **implicit coercions**. These are the only cases where a value of one type is silently accepted as another:
 
 | Source | Target | Description |
 |--------|--------|-------------|
@@ -768,7 +768,7 @@ K2 performs a small, well-defined set of **implicit coercions**. These are the o
 | Concrete type | `*Interface` pointer | When the type implements the interface (checked at compile time) |
 | Non-null value | Optional (`?T`) | A value of type `T` is accepted where `?T` is expected |
 
-All other conversions require an explicit `as` cast. K2 intentionally keeps implicit coercions to a minimum to prevent subtle type errors.
+All other conversions require an explicit `as` cast. Skarn intentionally keeps implicit coercions to a minimum to prevent subtle type errors.
 
 > [!NOTE]
 > Integer literals are special: the literal `42` can become `u8`, `i64`, `usize`, or any integer type — as long as the value fits. Once bound to a variable with a concrete type, no further implicit conversion occurs.

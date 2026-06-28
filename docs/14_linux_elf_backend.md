@@ -1,6 +1,6 @@
 # Linux / ELF / SysV backend
 
-> Status: **core implemented** — k2 cross-compiles from Windows to a **static,
+> Status: **core implemented** — skarn cross-compiles from Windows to a **static,
 > freestanding Linux x86-64 ELF** (no libc) and runs it. Compute/CLI programs
 > work today: I/O, the heap allocator, `Vec`, strings, and formatting. File
 > system, time, process, net, and threads are not yet ported (they still call
@@ -13,18 +13,18 @@
 Use `--target linux` to cross-compile from a Windows host:
 
 ```
-k2 build hello.k2 -o hello --target linux --llvm-path Y:/SDK/LLVM
+skarn build hello.sk -o hello --target linux --llvm-path Y:/SDK/LLVM
 # → a static, non-PIE ELF; runs under Linux/WSL with no shared-library deps
 
-k2 build app.k2 -o app --target linux --libc --sysroot <dir-with-libc.so.6> --llvm-path Y:/SDK/LLVM
+skarn build app.sk -o app --target linux --libc --sysroot <dir-with-libc.so.6> --llvm-path Y:/SDK/LLVM
 # → a normal dynamically-linked glibc ELF (ldd → libc.so.6); _start hands off to
 #   __libc_start_main, which initializes glibc. `#extern("c", …)` now resolves
-#   against libc.so.6 (verified: getpid, and puts via glibc stdio). The whole k2
+#   against libc.so.6 (verified: getpid, and puts via glibc stdio). The whole skarn
 #   stdlib still works under either ABI (it uses syscalls either way).
 #   `--target linux-gnu` is sugar for `--target linux --libc`.
 ```
 
-`--libc` (or build.k2 `app.link_libc()`) is the **portable "I need libc" switch**:
+`--libc` (or build.sk `app.link_libc()`) is the **portable "I need libc" switch**:
 the Windows CRT on Windows, glibc on Linux. The entire `std` library (io, heap,
 time, fs, process — incl. `set_env`, net, thread) runs on Linux — **full parity
 with Windows**. Both the static (`linux`, default) and glibc (`linux --libc`)
@@ -53,17 +53,17 @@ Key implementation notes / gotchas:
   and let its `_start` call `main`. The implementation instead ships its own
   `#naked _start` and talks to the kernel directly — so the output is a single
   static ELF with **zero** dynamic dependencies (`ldd` → "not a dynamic
-  executable"). This matches k2's no-libc Windows story.
+  executable"). This matches skarn's no-libc Windows story.
 - **`_start` must be a GLOBAL symbol.** `ld.lld -e _start` resolves the entry
   against global symbols; `#keep` (external linkage) was not enough on its own,
   so `_start` uses `#entry` (which also keeps it out of internalization, like
   `main`). A local `_start` links "successfully" with entry `0x0` → segfault.
-- **Inline-asm template quirks.** k2's asm template does not process `\n`
+- **Inline-asm template quirks.** skarn's asm template does not process `\n`
   escapes, so multi-instruction asm uses `;` separators (a valid x86 GAS
   statement separator). A literal `$` in an LLVM asm string is an operand
   reference, so AT&T immediates are escaped as `$$-16` / `$$60`. Integer asm
   args are coerced to `i64` to match the asm function type.
-- **The platform allocator is a runtime seam, not `#if`.** k2 has no conditional
+- **The platform allocator is a runtime seam, not `#if`.** skarn has no conditional
   compilation, so `std.heap` stays OS-agnostic and the *runtime* (selected per
   target) provides `os_*`. The runtime-free `compile` path injects a host shim
   so the prelude still type-checks (`pipeline.prependHeapPrelude`).
@@ -131,7 +131,7 @@ Linux. No aggregates, no FFI, no stdlib OS calls yet.
    `cc out.o -o out -no-pie` (or PIE; see §7). Fall back to `ld.lld` with
    explicit crt objects when no `cc` is present.
 3. **Entry**: drop `/ENTRY:mainCRTStartup`. With `cc`/crt1.o, the program entry
-   is glibc's `_start`, which calls our `main(argc, argv)`. k2's `#entry main`
+   is glibc's `_start`, which calls our `main(argc, argv)`. skarn's `#entry main`
    already lowers to a C-callable `main` returning `i32` — that's exactly what
    `_start` expects, so the exit code flows through.
 4. Gate the `__chkstk` module-asm ([context.zig](../src/backend/llvm/context.zig))
@@ -195,7 +195,7 @@ OS-touching modules each need a Linux backing:
 | `std.process` | `GetCommandLine`, `ExitProcess` | `__libc_start_main` argv, `exit` |
 | `std.fs` | Win32 file API | `open`/`read`/`write`/`close`/`stat` |
 | `std.thread` | `CreateThread` | `pthread_create`/`pthread_join` (`-lpthread`) |
-| `std.net` | Winsock2 (`ws2_32`) | BSD sockets (`socket`/`bind`/…, no `WSAStartup`) |
+| `std.net` | Winsocskarn (`ws2_32`) | BSD sockets (`socket`/`bind`/…, no `WSAStartup`) |
 
 The pattern: split each into a thin **os shim** the way `std.net` already layers
 `std.net.os`. Select the shim per target. Two mechanisms, in preference order:
@@ -208,7 +208,7 @@ The pattern: split each into a thin **os shim** the way `std.net` already layers
    Heavier; defer past first boot.
 
 `std.net` is the nicest payoff: the layered `os/socket/tcp/udp` split means only
-`net/os.k2` changes — `socket.k2`/`tcp.k2`/`udp.k2` are already written against
+`net/os.sk` changes — `socket.sk`/`tcp.sk`/`udp.sk` are already written against
 the shim and need no edits. (BSD sockets even drop `WSAStartup`/`WSACleanup`, so
 `net::init` becomes a no-op on Linux.)
 
@@ -226,8 +226,8 @@ or, shorter-term, conditional injection in the pipeline keyed on `Target`.
   Either build `-no-pie` (simplest; `RelocDefault` already suits it) or switch
   the `TargetMachine` reloc model to `PIC` for Linux and link a PIE. Start with
   `-no-pie`, revisit for hardening.
-- **`k2lnk`**: the self-hosted linker is COFF-only and is purely an optimization
-  (LLD is always the correctness path). An ELF `k2lnk` is a *much* later,
+- **`skarnld`**: the self-hosted linker is COFF-only and is purely an optimization
+  (LLD is always the correctness path). An ELF `skarnld` is a *much* later,
   optional flourish — out of scope here.
 
 ## 8. Suggested order

@@ -1,16 +1,16 @@
 # 11. C interoperability
 
-K2 talks to C libraries directly: declare the functions you need with `#extern`,
+Skarn talks to C libraries directly: declare the functions you need with `#extern`,
 link the import library, and call them. Structs cross the boundary **by value**
 with the correct platform ABI, and an automated generator turns C headers into
-K2 bindings so you don't hand-write hundreds of declarations.
+Skarn bindings so you don't hand-write hundreds of declarations.
 
 ## Declaring C functions
 
 `#extern("<lib>", "<symbol>")` binds an external C function. The body is omitted
 (it lives in the C library), and the `<lib>` is pulled into the link automatically.
 
-```k2
+```skarn
 #extern("raylib", "InitWindow")
 InitWindow :: fn(width: i32, height: i32, title: [*]const u8);
 
@@ -28,10 +28,10 @@ sized for 64-bit Windows (LLP64), so signatures can read like their C originals.
 ## Passing structs by value (the raylib pattern)
 
 C UI/graphics libraries pass small aggregates by value everywhere. Declare the
-struct on the K2 side to match the C layout and pass it directly — the compiler
+struct on the Skarn side to match the C layout and pass it directly — the compiler
 applies the Win64 C ABI at the boundary:
 
-```k2
+```skarn
 Color   :: struct { r: u8, g: u8, b: u8, a: u8 }   // 4 bytes
 Vector2 :: struct { x: f32, y: f32 }               // 8 bytes
 Rect    :: struct { x: f32, y: f32, w: f32, h: f32 } // 16 bytes
@@ -55,16 +55,16 @@ Floating-point *struct members* are not special-cased on Win64 (only naked
 The library named in `#extern`/`#system_library` is resolved at link time. Point
 the linker at it:
 
-- **CLI:** `k2 build app.k2 -o app.exe --lib-path <dir> [--lib <name>]`
-- **build.k2:** `app.link("raylib"); app.lib_path("vendor/raylib/lib");`
+- **CLI:** `skarn build app.sk -o app.exe --lib-path <dir> [--lib <name>]`
+- **build.sk:** `app.link("raylib"); app.lib_path("vendor/raylib/lib");`
 
 Linking a non-system import library currently routes through LLD (the self-hosted
-`k2lnk` doesn't read `.lib` archives yet); `k2` configures `lld-link` for you.
+`skarnld` doesn't read `.lib` archives yet); `skarn` configures `lld-link` for you.
 
 ### Linking the C runtime (`link_libc`)
 
-K2 links with `/NODEFAULTLIB` and its own tiny runtime — it does **not** pull in
-the C runtime. That's fine for pure K2, but a C library brings its *code* and not
+Skarn links with `/NODEFAULTLIB` and its own tiny runtime — it does **not** pull in
+the C runtime. That's fine for pure Skarn, but a C library brings its *code* and not
 the CRT it depends on. A **static** library (e.g. a `raylib.lib` built against the
 CRT) calls `malloc`/`free`/`calloc`/`realloc` and the compiler's stack/security
 helpers (`__chkstk`, `__report_rangecheckfailure`), so linking it without the CRT
@@ -72,28 +72,28 @@ fails with `undefined symbol: malloc` and friends.
 
 Link the C runtime to fix it:
 
-- **CLI:** `k2 build app.k2 --libc` (or `-lc`)
-- **build.k2:** `app.link_libc();`
+- **CLI:** `skarn build app.sk --libc` (or `-lc`)
+- **build.sk:** `app.link_libc();`
 
 `link_libc` pulls in the UCRT (`ucrt.lib` — malloc/free/…) and the VC runtime
 (`vcruntime.lib` — `__chkstk`, security checks). Both search paths are found for
 you: the UCRT path is derived from the configured Windows SDK path, and the MSVC
-`lib/x64` directory (where `vcruntime.lib` lives) is **auto-discovered** — `k2`
+`lib/x64` directory (where `vcruntime.lib` lives) is **auto-discovered** — `skarn`
 scans the standard `…/Microsoft Visual Studio/<year>/<edition>/VC/Tools/MSVC/<ver>/lib/x64`
 locations and uses the newest toolset it finds. So you normally don't configure
 anything. If your toolchain is on a non-default drive, override the discovery by
-building `k2` with `-Dmsvc-lib-path=<…/VC/Tools/MSVC/<ver>/lib/x64>`, or pass
+building `skarn` with `-Dmsvc-lib-path=<…/VC/Tools/MSVC/<ver>/lib/x64>`, or pass
 `--lib-path <that dir>` on the command line.
 
-K2's own functions are **module-private** (internal linkage — the whole program is
+Skarn's own functions are **module-private** (internal linkage — the whole program is
 one object), so they never clash with the CRT's `exit`/`abort`/etc. when you link
 libc. A complete static-raylib build is just:
 
 ```sh
-k2 build game.k2 --libc --lib-path <raylib-lib-dir>
+skarn build game.sk --libc --lib-path <raylib-lib-dir>
 ```
 
-(or `app.link_libc()` in a build.k2 — the MSVC path is discovered automatically).
+(or `app.link_libc()` in a build.sk — the MSVC path is discovered automatically).
 
 > A static library also needs *its own* system dependencies. Static raylib, for
 > example, also wants `gdi32`, `user32`, `winmm`, `shell32`, and `opengl32` —
@@ -106,7 +106,7 @@ k2 build game.k2 --libc --lib-path <raylib-lib-dir>
 You don't rename or swap library files to switch link mode, and in the common case
 you don't even say which mode you want. **The build peeks inside each `.lib` you
 link** (in the artifact's own `lib_path`s *and* the directory containing
-`build.k2`, so a `raylib.lib` sitting next to your build script is detected even
+`build.sk`, so a `raylib.lib` sitting next to your build script is detected even
 with no `lib_path` call) and reacts to what it finds:
 
 - an **import library** (it carries an `__IMPORT_DESCRIPTOR_<dll>` symbol) → the
@@ -115,9 +115,9 @@ with no `lib_path` call) and reacts to what it finds:
 
 So this is usually all you write:
 
-```k2
+```skarn
 build :: fn(b: Build) {
-    game := b.executable("game", "src/main.k2");
+    game := b.executable("game", "src/main.sk");
     game.link("raylib");
     game.lib_path("vendor/raylib/lib");   // whichever raylib.lib is here decides the mode
     b.default(game);
@@ -144,22 +144,22 @@ can always be explicit:
 
 A static C library also needs *its own* system deps (static raylib wants
 `opengl32`/`gdi32`/…). You normally **don't list them** — when a static C library
-is linked, K2 honors that library's own embedded `/DEFAULTLIB` directives, exactly
+is linked, Skarn honors that library's own embedded `/DEFAULTLIB` directives, exactly
 like a C compiler does, so its system dependencies flow in automatically:
 
-```k2
+```skarn
 build :: fn(b: Build) {
-    game := b.executable("game", "src/main.k2");
+    game := b.executable("game", "src/main.sk");
     game.link("raylib");
     game.lib_path("vendor/raylib/lib-static");   // raylib.lib (static archive)
     b.default(game);                              // opengl32/gdi32/winmm pulled in for you
 }
 ```
 
-K2 stays minimal-runtime by default: it links `/NODEFAULTLIB` and provides its own
-tiny runtime, so a plain K2 program pulls in nothing. The honoring kicks in **only**
-when a static C library is involved — and even then K2 suppresses just the CRT-startup
-*umbrella* libs (`libcmt`/`msvcrt`/…), whose `mainCRTStartup` would clash with K2's
+Skarn stays minimal-runtime by default: it links `/NODEFAULTLIB` and provides its own
+tiny runtime, so a plain Skarn program pulls in nothing. The honoring kicks in **only**
+when a static C library is involved — and even then Skarn suppresses just the CRT-startup
+*umbrella* libs (`libcmt`/`msvcrt`/…), whose `mainCRTStartup` would clash with Skarn's
 entry, while letting the real system deps (`opengl32`, `gdi32`, …) through. The C
 runtime itself (`malloc`, `__chkstk`, …) comes from `ucrt`+`vcruntime`, which the
 static auto-detection already links.
@@ -170,8 +170,8 @@ static auto-detection already links.
 > prebuilt **static raylib** is the classic case: it embeds `winmm` but not the
 > GUI/GL libraries glfw uses, so a complete static-raylib build is:
 >
-> ```k2
-> app := b.executable("app", "main.k2");
+> ```skarn
+> app := b.executable("app", "main.sk");
 > app.link("raylib");                 // raylib.lib detected → CRT auto-linked
 > app.link("opengl32"); app.link("gdi32"); app.link("user32");
 > app.link("shell32"); app.link("winmm");   // raylib's GUI deps it doesn't declare
@@ -186,7 +186,7 @@ static auto-detection already links.
 linking and control every dependency yourself, call `no_default_libs()`; then the
 library's `/DEFAULTLIB` directives are ignored and you list system deps explicitly:
 
-```k2
+```skarn
 game.lib_path("vendor/raylib/lib-static");
 game.no_default_libs();
 game.link("opengl32"); game.link("gdi32"); game.link("user32");
@@ -195,7 +195,7 @@ game.link("winmm"); game.link("shell32");
 
 A static/dynamic toggle then needs nothing extra in the default path:
 
-```k2
+```skarn
 if b.option("static") {
     game.lib_path("vendor/raylib/lib-static");   // static archive → CRT + its deps auto
 } else {
@@ -222,10 +222,10 @@ be DYNAMIC`) instead of silently shipping a dynamic build.
 
 ### Cross-platform (roadmap)
 
-That API is deliberately platform-agnostic, so the same `build.k2` will work
-unchanged once K2 grows other targets. The intended mapping:
+That API is deliberately platform-agnostic, so the same `build.sk` will work
+unchanged once Skarn grows other targets. The intended mapping:
 
-| build.k2 | Windows (today) | Linux (planned) | macOS (planned) |
+| build.sk | Windows (today) | Linux (planned) | macOS (planned) |
 |---|---|---|---|
 | `link("raylib")` | `raylib.lib` | `-lraylib` → `libraylib.so`/`.a` | `-lraylib` → `libraylib.dylib`/`.a` |
 | `link_mode(.dynamic)` | import lib + ship `.dll` | `.so` + rpath | `.dylib` + rpath |
@@ -233,7 +233,7 @@ unchanged once K2 grows other targets. The intended mapping:
 | `runtime_file(x)` | copy next to exe | (rpath usually suffices) | (rpath) |
 | `link_libc()` | ucrt + vcruntime | the system libc/crt | libSystem |
 
-**K2 only emits and links Windows today** (COFF objects, `lld-link`, a Win64-only
+**Skarn only emits and links Windows today** (COFF objects, `lld-link`, a Win64-only
 ABI in `backend/llvm/abi.zig`, PE output). Reaching Linux/macOS needs, in order:
 
 1. **Target selection** (`-target x86_64-linux-gnu`, …) — LLVM emits ELF/Mach-O
@@ -242,17 +242,17 @@ ABI in `backend/llvm/abi.zig`, PE output). Reaching Linux/macOS needs, in order:
 3. **The SysV / AArch64 aggregate ABI** — the largest piece; SysV's by-value
    struct classification (eightbyte SSE/INTEGER) is more involved than Win64's
    size-based rule, so it's a second ABI backend alongside `abi.zig`.
-4. Per-platform runtime + entry conventions (`runtime/linux.k2` exists already).
+4. Per-platform runtime + entry conventions (`runtime/linux.sk` exists already).
 
-None of that requires changing a `build.k2` — the link-mode/`runtime_file`/named-
+None of that requires changing a `build.sk` — the link-mode/`runtime_file`/named-
 library design above absorbs it.
 
 ## Generating bindings from a C header
 
-`k2 bindgen` parses an arbitrary C header with libclang and emits a K2 module:
+`skarn bindgen` parses an arbitrary C header with libclang and emits a Skarn module:
 
 ```sh
-k2 bindgen raylib.h --lib raylib -o raylib.k2
+skarn bindgen raylib.h --lib raylib -o raylib.sk
 ```
 
 It maps:
@@ -265,11 +265,11 @@ It maps:
 
 Then use it like any module:
 
-```k2
+```skarn
 #import raylib.*;
 
 main :: fn() -> i32 {
-    InitWindow(800, 450, "k2 + raylib".ptr);
+    InitWindow(800, 450, "skarn + raylib".ptr);
     // ...
     return 0;
 }
@@ -278,7 +278,7 @@ main :: fn() -> i32 {
 Options: `--lib <name>` sets the import-library name (default: the header stem),
 `-o <file>` sets the output path, `-I<dir>` / `-D<sym>` are forwarded to clang,
 and anything after `--` is passed to clang verbatim (e.g. extra `-isystem` paths
-for libraries that include system headers). `k2 bindgen` requires an
+for libraries that include system headers). `skarn bindgen` requires an
 LLVM-enabled build (libclang ships in the same SDK).
 
 It also maps **object-like `#define` constants**: a plain numeric/string macro
@@ -286,7 +286,7 @@ becomes `pub NAME :: <value>;`, and a compound-literal macro (e.g. raylib's
 `#define RAYWHITE CLITERAL(Color){ 245,245,245,255 }`) becomes a comptime-folded
 typed constant, so colors and flags Just Work:
 
-```k2
+```skarn
 __lit_RAYWHITE :: fn() -> Color { return .{ 245, 245, 245, 255 }; }
 pub RAYWHITE :: #run __lit_RAYWHITE();
 ```
@@ -295,10 +295,10 @@ pub RAYWHITE :: #run __lit_RAYWHITE();
 
 bindgen handles the awkward parts of real headers too:
 
-- **Function pointers / callbacks** become a real K2 function type, expanded
-  inline at the use site (K2 has no `Name :: fn(...)` type-alias form):
+- **Function pointers / callbacks** become a real Skarn function type, expanded
+  inline at the use site (Skarn has no `Name :: fn(...)` type-alias form):
   `void set_logger(LogCallback)` → `pub set_logger :: fn(cb: fn(i32, [*]const u8) -> void);`.
-  You can pass a K2 function as the callback and C will call back into it.
+  You can pass a Skarn function as the callback and C will call back into it.
 - **Unions** and **bitfield structs** become a size- and alignment-correct opaque
   blob (`#align(A) struct { _bytes: [N]u8 }`) so by-value passing stays ABI-correct
   (you read the contents via casts).

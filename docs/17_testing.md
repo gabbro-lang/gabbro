@@ -5,7 +5,7 @@
 > The runtime lane, property testing, snapshots, and reflection-driven diffs are
 > designed here as the next iterations (§5).
 
-k2's testing story is built on two facilities the compiler already has, which let
+skarn's testing story is built on two facilities the compiler already has, which let
 it do something most languages can't:
 
 - **The comptime VM models real host memory.** A pure test can run while the
@@ -19,7 +19,7 @@ it do something most languages can't:
 
 A test is a function marked `#test` that takes a test context `t: *Test`:
 
-```k2
+```skarn
 #test
 add_associates :: fn(t: *Test) {
     t.eq(2 + 2, 4);
@@ -39,14 +39,14 @@ affect the next. When an assertion fails it calls `core::compiler_error(...)`,
 the VM halts that run, and the driver turns it into a real diagnostic:
 
 ```
-$ k2 build app.k2 -o app.exe
+$ skarn build app.sk -o app.exe
 comptime test 'arithmetic_is_broken' failed: t.eq: values are not equal
 
 1 passed, 1 failed (comptime)
-k2: CompileFailed
+skarn: CompileFailed
 ```
 
-No executable is produced and `k2` exits non-zero. A program whose tests all pass
+No executable is produced and `skarn` exits non-zero. A program whose tests all pass
 builds normally; the test functions are **pruned before code generation**, so
 they add nothing to the binary. A program with no `#test` declarations pays
 nothing — the lane is skipped entirely.
@@ -118,12 +118,12 @@ parse → preludes → sema (Test injected if a #test exists)
 ## 5. Roadmap
 
 The comptime lane is the spine. The remaining pieces (designed in
-[docs/15 §4](15_tooling.md)) build on it and on k2's reflection:
+[docs/15 §4](15_tooling.md)) build on it and on skarn's reflection:
 
 - **Runtime lane** — `#test` functions that touch the OS run as a built
   executable, each in its own `zone`/arena with leak accounting. This also lifts
   the scalar-only restriction on `t.eq` (the LLVM backend runs the real
-  string/struct comparison). `k2 test` discovers, builds, and reports (pretty
+  string/struct comparison). `skarn test` discovers, builds, and reports (pretty
   TTY + TAP/JSON for CI).
 - **Reflection-powered assertions** — on a failed `t.eq`, walk `type_info(V)` and
   print a field-by-field structural diff for any struct/enum/slice, no `#derive`
@@ -131,10 +131,10 @@ The comptime lane is the spine. The remaining pieces (designed in
 - **Property testing** — a `#test(prop)` function declares its generated inputs as
   extra typed parameters; the runner derives a generator from `type_info` for
   each, runs N seeded cases, and **shrinks** to a minimal counterexample. (Inputs
-  go through parameters rather than an inline closure because k2 lambdas don't
+  go through parameters rather than an inline closure because skarn lambdas don't
   capture.)
 - **Snapshots** — `t.snapshot(value, "name")` serializes any value through serde
-  and diffs against a stored snapshot; `k2 test --update` rewrites it.
+  and diffs against a stored snapshot; `skarn test --update` rewrites it.
 
 The throughline: discovery is by attribute, assertions and generators come from
 reflection, and the comptime lane makes a failing test a failing build.

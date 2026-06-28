@@ -22,19 +22,19 @@ Attributes modify the behavior or layout of declarations. They are prefixed with
 
 ### FFI & Linkage
 
-- `#export("name")`: exports the symbol with external linkage. If no string is provided, exports it using its K2 name.
+- `#export("name")`: exports the symbol with external linkage. If no string is provided, exports it using its Skarn name.
 - `#extern("library_name", "symbol_name")`: declares an external function binding (FFI).
-  The second argument is the **real link symbol** — the K2 declaration name is free to
-  differ from the C symbol, so you can give a binding an idiomatic K2 name:
-  ```k2
+  The second argument is the **real link symbol** — the Skarn declaration name is free to
+  differ from the C symbol, so you can give a binding an idiomatic Skarn name:
+  ```skarn
   #extern("kernel32", "WriteFile")
-  WriteFile :: fn(...) -> bool;          // K2 name == C symbol
+  WriteFile :: fn(...) -> bool;          // Skarn name == C symbol
 
   #extern("ws2_32", "connect")
-  sys_connect :: fn(...) -> i32;         // K2 name `sys_connect`, links `connect`
+  sys_connect :: fn(...) -> i32;         // Skarn name `sys_connect`, links `connect`
   ```
-  Two externs may bind the same C symbol under different K2 names (the one external
-  declaration is deduplicated at link time). A plain K2 function may even share a name
+  Two externs may bind the same C symbol under different Skarn names (the one external
+  declaration is deduplicated at link time). A plain Skarn function may even share a name
   with a renamed extern's C symbol (e.g. a `connect` wrapper over `sys_connect`); the
   wrapper keeps internal linkage under a module-private symbol so the two don't clash.
 - `#foreign`: Alias for `#extern`.
@@ -56,7 +56,7 @@ Builtins live in the reserved **`core::`** namespace — compiler-provided opera
 always in scope (no import). The `core::` prefix makes a builtin call visually
 distinct from an ordinary function call:
 
-```k2
+```skarn
 n   := core::sizeof(Point);          // a builtin — you can see the compiler is involved
 name := core::type_name(Point);      // "Point"
 buf := unsafe core::slice_from_raw_parts(u8, p, len);
@@ -93,7 +93,7 @@ The trailing `ord` is an integer ordering constant — `0` relaxed, `1` acquire,
 `3` acq_rel, `4` seq_cst — and **must be compile-time known**. Prefer the
 [`std.atomics`](07_stdlib.md#stdatomics) wrappers, which default to seq_cst.
 | `core::ptr_from_int`| `core::ptr_from_int($T: type, addr: usize) -> T` | **Yes** | Integer address → pointer `T`. |
-| `core::fn_ptr`| `core::fn_ptr(f) -> *void` | **Yes** | Raw thin pointer of a top-level function, for a C callback / thread entry (k2's ordinary fn value is a fat closure a C ABI can't call). |
+| `core::fn_ptr`| `core::fn_ptr(f) -> *void` | **Yes** | Raw thin pointer of a top-level function, for a C callback / thread entry (skarn's ordinary fn value is a fat closure a C ABI can't call). |
 | `core::slice_raw`| `core::slice_raw($T, ptr, len) -> []T` | **Yes** | Build a slice from a raw pointer + length. |
 | `core::volatile_store`| `core::volatile_store(ptr: *T, val: T)` | **Yes** | Volatile memory write. |
 | `core::unaligned_read`| `core::unaligned_read($T: type, ptr) -> T` | **Yes** | Read `T` from a possibly-unaligned address. |
@@ -106,14 +106,14 @@ Compile-time constants (no parens) that fold to a literal at the use site:
 | Constant | Type | Value |
 |---|---|---|
 | `core::file` | `[]const u8` | the current source file path |
-| `core::module` | `[]const u8` | the module name (file basename, no `.k2`) |
+| `core::module` | `[]const u8` | the module name (file basename, no `.sk`) |
 | `core::func` | `[]const u8` | the enclosing function's name |
 | `core::line` | `i32` | the line of the `core::line` reference |
 | `core::column` | `i32` | the column |
 | `core::os` | `[]const u8` | target OS (`"windows"`, `"linux"`, …) |
 | `core::arch` | `[]const u8` | target architecture (`"x86_64"`, …) |
 
-```k2
+```skarn
 log :: fn(msg: []const u8) { print(core::file); print(core::line); print(msg); }
 ```
 
@@ -147,7 +147,7 @@ the low-level primitives the standard library wraps.
 
 Evaluates a condition at compile time and includes only the active branch in the IR.
 
-```k2
+```skarn
 #if core::sizeof(usize) == 8 {
     // 64-bit code
 } else {
@@ -157,9 +157,9 @@ Evaluates a condition at compile time and includes only the active branch in the
 
 ### Compile-time Run (`#run`)
 
-Executes K2 code during compilation via the AST interpreter.
+Executes Skarn code during compilation via the AST interpreter.
 
-```k2
+```skarn
 // As a block
 #run {
     compute_lookup_tables();
@@ -178,7 +178,7 @@ The compiler provides compile-time target information via the virtual `TARGET` i
 - `TARGET.arch`: Returns `.x86_64`, `.aarch64`, or `.unknown`.
 - `TARGET.debug`: Returns `true` if compiling in debug mode, `false` otherwise.
 
-```k2
+```skarn
 #if TARGET.os == .windows {
     #extern("kernel32", "ExitProcess")
     ExitProcess :: fn(code: u32);

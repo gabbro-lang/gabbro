@@ -1,26 +1,26 @@
-# install.ps1 — install k2 from an extracted release archive (Windows).
+# install.ps1 — install skarn from an extracted release archive (Windows).
 #
 # Run from inside the extracted archive (this script sits next to bin/ and lib/):
-#   .\install.ps1                      # → %LOCALAPPDATA%\k2, adds bin to PATH
-#   .\install.ps1 -Prefix D:\tools\k2  # custom location
+#   .\install.ps1                      # → %LOCALAPPDATA%\skarn, adds bin to PATH
+#   .\install.ps1 -Prefix D:\tools\skarn  # custom location
 #   .\install.ps1 -NoPath              # copy only, don't touch PATH
 #
-# k2 finds its standard library + linker relative to k2.exe, so the whole install
-# is just `bin/` + `lib/` kept together. We also set K2_HOME as a robust fallback.
+# skarn finds its standard library + linker relative to skarn.exe, so the whole install
+# is just `bin/` + `lib/` kept together. We also set SKARN_HOME as a robust fallback.
 [CmdletBinding()]
 param(
-    [string] $Prefix = (Join-Path $env:LOCALAPPDATA "k2"),
+    [string] $Prefix = (Join-Path $env:LOCALAPPDATA "skarn"),
     [switch] $NoPath
 )
 $ErrorActionPreference = "Stop"
 $src = $PSScriptRoot
 
-if (-not (Test-Path (Join-Path $src "bin/k2.exe"))) {
-    throw "run this from inside the extracted k2 archive (no bin/k2.exe next to install.ps1)"
+if (-not (Test-Path (Join-Path $src "bin/skarn.exe"))) {
+    throw "run this from inside the extracted skarn archive (no bin/skarn.exe next to install.ps1)"
 }
 
 # 1. Copy the layout to $Prefix (replacing any prior install).
-Write-Host "Installing k2 -> $Prefix"
+Write-Host "Installing skarn -> $Prefix"
 foreach ($d in @("bin", "lib")) {
     $dst = Join-Path $Prefix $d
     if (Test-Path $dst) { Remove-Item -Recurse -Force $dst }
@@ -32,7 +32,7 @@ foreach ($m in @("LICENSE-APACHE-2.0.txt", "LICENSE-GPLv3.txt", "NOTICE", "READM
     if (Test-Path (Join-Path $src $m)) { Copy-Item -Force (Join-Path $src $m) $Prefix }
 }
 
-# 2. PATH + K2_HOME (user scope; idempotent).
+# 2. PATH + SKARN_HOME (user scope; idempotent).
 $bin = Join-Path $Prefix "bin"
 if (-not $NoPath) {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -42,9 +42,9 @@ if (-not $NoPath) {
     } else {
         Write-Host "$bin already on PATH."
     }
-    [Environment]::SetEnvironmentVariable("K2_HOME", $Prefix, "User")
+    [Environment]::SetEnvironmentVariable("SKARN_HOME", $Prefix, "User")
 }
 
 $ver = if (Test-Path (Join-Path $Prefix "VERSION.txt")) { (Get-Content (Join-Path $Prefix "VERSION.txt") -First 1) } else { "" }
 Write-Host ""
-Write-Host "k2 $ver installed. Open a NEW terminal, then:  k2 version"
+Write-Host "skarn $ver installed. Open a NEW terminal, then:  skarn version"

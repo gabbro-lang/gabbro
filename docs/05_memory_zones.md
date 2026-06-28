@@ -1,6 +1,6 @@
 # Memory & Zones
 
-K2 does not have a Garbage Collector (GC), nor does it rely on hidden allocations.
+Skarn does not have a Garbage Collector (GC), nor does it rely on hidden allocations.
 Instead, it uses a concept called **Zones** for safe, lexically-scoped memory
 management, and **Borrowing** to pass memory around without violating ownership rules.
 
@@ -10,7 +10,7 @@ management, and **Borrowing** to pass memory around without violating ownership 
 
 A zone block defines a lexical scope and creates an allocation arena tied to that scope.
 
-```k2
+```skarn
 zone scratch: Arena {
     // `scratch` is now a zone handle available in this block
     
@@ -44,7 +44,7 @@ out. You never write `make`/`deinit` yourself, and the module does not need to
 Because the handle is a full `Arena`, the entire library API is available on it,
 not just `new`/`new_slice`:
 
-```k2
+```skarn
 zone z: Arena {
     p   := z.new(i32);              // alias for alloc_one(i32)
     xs  := z.new_slice(u8, 64);     // alias for alloc(u8, 64)
@@ -67,10 +67,10 @@ on zone exit, so freeing a single allocation only verifies ownership.
 ## Ownership and Escape Analysis
 
 When you allocate memory in a zone, the resulting pointer (or slice) is "owned"
-by that zone. K2 performs strict escape analysis at compile time to ensure
+by that zone. Skarn performs strict escape analysis at compile time to ensure
 zone-allocated memory does not outlive its arena.
 
-```k2
+```skarn
 escape_example :: fn() -> []u8 {
     zone local: Arena {
         buf := local.new_slice(u8, 100);
@@ -94,7 +94,7 @@ escape_example :: fn() -> []u8 {
 If you want to pass zone-allocated memory to a function, the function must declare
 that it is borrowing the memory using the `borrow` keyword.
 
-```k2
+```skarn
 // The `borrow` keyword tells the compiler this slice is temporary
 // and will not be stored or escape.
 process_data :: fn(data: borrow []u8) {
@@ -125,7 +125,7 @@ main :: fn() {
 
 Zones are highly effective for temporary processing where you'd normally use a GC or manually manage malloc/free:
 
-```k2
+```skarn
 #import std.io.{ println };
 
 format_and_print :: fn() {

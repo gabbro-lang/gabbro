@@ -2,8 +2,8 @@ name: Release
 
 # Triggered by a version tag. Handles stable releases and pre-releases by the
 # SemVer tag itself:
-#   v0.1.0          → stable release "k2 0.1.0"
-#   v0.1.0-beta.1   → pre-release "k2 0.1.0-beta.1+<sha>" (full SemVer w/ metadata)
+#   v0.1.0          → stable release "skarn 0.1.0"
+#   v0.1.0-beta.1   → pre-release "skarn 0.1.0-beta.1+<sha>" (full SemVer w/ metadata)
 #   v0.2.0-rc.1     → pre-release, etc.
 # A tag containing `-` is published as a GitHub pre-release; the `+<git-sha>`
 # build metadata is added to the reported version (and release name) for
@@ -55,13 +55,13 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          name: "k2 ${{ steps.pkg.outputs.version }}"
+          name: "skarn ${{ steps.pkg.outputs.version }}"
           prerelease: ${{ steps.tag.outputs.prerelease }}
           files: ${{ steps.pkg.outputs.archive }}
           generate_release_notes: true
           body: |
-            **k2 ${{ steps.pkg.outputs.version }}** — x86_64-windows.
+            **skarn ${{ steps.pkg.outputs.version }}** — x86_64-windows.
 
             Download `${{ steps.pkg.outputs.archive_name }}`, extract, and run
-            `bin/k2` — the standard library and linker travel with it (no install
+            `bin/skarn` — the standard library and linker travel with it (no install
             step, no separate LLVM needed to *use* the compiler).

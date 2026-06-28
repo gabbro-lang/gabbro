@@ -1,6 +1,6 @@
 # Error Handling
 
-K2 uses an explicit error-handling model inspired by Zig and Rust. Functions
+Skarn uses an explicit error-handling model inspired by Zig and Rust. Functions
 that can fail declare it in their signature, and callers must always handle
 the possibility of failure — there are no hidden exceptions.
 
@@ -11,7 +11,7 @@ the possibility of failure — there are no hidden exceptions.
 Error types are declared with the `errors` keyword. Each variant is a named
 error condition, optionally carrying a payload:
 
-```k2
+```skarn
 IoError :: errors {
     not_found,
     permission_denied,
@@ -34,7 +34,7 @@ Error variants are referenced with a dot prefix: `.not_found`, `.overflow`, etc.
 A function that can fail annotates its return type with `!` followed by the
 error type:
 
-```k2
+```skarn
 // Named error type
 read_file :: fn(path: []const u8) -> []u8 ! IoError {
     // ...
@@ -62,7 +62,7 @@ The return type of a fallible function is internally a *fallible type*
 
 Use `fail` to return an error from a fallible function:
 
-```k2
+```skarn
 validate :: fn(input: []const u8) -> bool ! ParseError {
     if input.len == 0 {
         fail .invalid_input;
@@ -85,7 +85,7 @@ must match the variant's declared payload type.
 The `?` operator propagates errors upward to the caller, similar to Rust's `?`
 or Zig's `try`:
 
-```k2
+```skarn
 outer :: fn() -> i32 ! IoError {
     data := read_file("config.txt")?;   // on error, immediately returns the error
     return process(data)?;
@@ -98,7 +98,7 @@ the success value.
 
 ### Chaining `?`
 
-```k2
+```skarn
 pub writer_append :: fn(self: *Byte_Writer, values: []const u8) -> usize ! String_Error {
     i := 0usize;
     while i < values.len {
@@ -116,7 +116,7 @@ compatible error type, `return inner();` forwards the entire `{ok, err}` result 
 no `?` needed. On success it returns the ok value; on failure the error flows out
 unchanged:
 
-```k2
+```skarn
 connect :: fn(sa: SocketAddr) -> TcpStream ! NetError {
     return tcp::connect(sa);     // forwards ok or error, both
 }
@@ -130,7 +130,7 @@ the current function), while a tail-`return` *passes the result through*.
 A `!` error type may be qualified with the module it comes from, just like any
 other type:
 
-```k2
+```skarn
 #import std.heap as heap;
 build :: fn(into: *heap::Arena, n: usize) -> []u8 ! heap::MemError {
     return into.try_alloc_bytes(n);
@@ -143,7 +143,7 @@ build :: fn(into: *heap::Arena, n: usize) -> []u8 ! heap::MemError {
 
 Use `catch` to handle an error locally instead of propagating it:
 
-```k2
+```skarn
 result := parse("42") catch err {
     // `err` is bound to the error value
     println("parse failed");
@@ -158,7 +158,7 @@ diverge (e.g., `return`, `fail`, `break`).
 
 ### Inspecting the error variant
 
-```k2
+```skarn
 result := parse_json_string(input, output) catch err {
     if err == .buffer_full { return 30; }
     if err == .unexpected_end { return 31; }
@@ -175,7 +175,7 @@ result := parse_json_string(input, output) catch err {
 The `!!` operator unwraps a fallible (or optional) value, panicking at runtime
 if it contains an error (or null):
 
-```k2
+```skarn
 // Panics with a runtime error if parse() fails
 value := parse("42")!!;
 
@@ -193,7 +193,7 @@ unexpected and should abort the program.
 The `??` operator provides a default value when the left side is an error or
 null:
 
-```k2
+```skarn
 // Returns 0 if parse fails
 value := parse("?") ?? 0;
 
@@ -205,9 +205,9 @@ name := get_name() ?? "unknown";
 
 ## Defer Modes
 
-K2 supports conditional defers that run only on success or failure:
+Skarn supports conditional defers that run only on success or failure:
 
-```k2
+```skarn
 process :: fn() -> void ! IoError {
     handle := open_file("data.txt")?;
 
@@ -240,9 +240,9 @@ Multiple defers execute in reverse order (LIFO), just like Go and Zig.
 
 ## Pattern: Fallible Function with Cleanup
 
-A common pattern in K2 combines `defer`, `fail`, and `?`:
+A common pattern in Skarn combines `defer`, `fail`, and `?`:
 
-```k2
+```skarn
 process_file :: fn(path: []const u8) -> usize ! IoError {
     file := open(path)?;
     defer close(file);
@@ -270,7 +270,7 @@ main :: fn() -> i32 {
 
 `main` can itself be a fallible function:
 
-```k2
+```skarn
 main :: fn() -> i32 ! IoError {
     println("hello")?;
     return 0;

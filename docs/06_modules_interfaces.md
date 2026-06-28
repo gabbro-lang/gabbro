@@ -2,7 +2,7 @@
 
 ## Modules
 
-In K2, a module corresponds exactly to a file. 
+In Skarn, a module corresponds exactly to a file. 
 
 ### Imports
 
@@ -10,7 +10,7 @@ Use the `#import` directive to bring another module's public symbols into scope.
 Paths are dot-separated relative to the current file, or start with `std.` for the
 standard library. There are four forms:
 
-```k2
+```skarn
 // 1. Namespace import — bind the module under its last path segment.
 //    Members are reached with `::`; the module's names are NOT pulled into scope.
 #import std.io;
@@ -28,7 +28,7 @@ standard library. There are four forms:
 #import std.io.*;
 ... println("hi");
 
-// Local modules work the same (sibling file math.k2):
+// Local modules work the same (sibling file math.sk):
 #import math;            math::add(1, 2);
 #import math.{ add };    add(1, 2);
 ```
@@ -48,7 +48,7 @@ them distinct means a local variable named `io` never shadows the `io` namespace
 By default, all declarations (`fn`, `struct`, `const`, etc.) are private to the module.
 Use the `pub` keyword to make them accessible from other modules.
 
-```k2
+```skarn
 // Only usable in this file
 helper :: fn() { ... }
 
@@ -66,12 +66,12 @@ pub User :: struct {
 
 ## Interfaces
 
-Interfaces in K2 define a set of methods that a type must implement. They enable
+Interfaces in Skarn define a set of methods that a type must implement. They enable
 dynamic dispatch via `*InterfaceType` pointers.
 
 ### Declaration
 
-```k2
+```skarn
 #import std.io.{ IoError };
 
 pub Writer :: interface {
@@ -85,7 +85,7 @@ Notice the `*Self` parameter. Every interface method must take `*Self` (or `borr
 
 You implement an interface for a concrete type using the `as` keyword outside of the struct definition:
 
-```k2
+```skarn
 File :: struct { handle: usize }
 
 // Implementing Writer for File
@@ -106,7 +106,7 @@ File as Writer {
 You can implicitly coerce a pointer to a concrete type into an interface pointer.
 Calls through an interface pointer use a vtable for dynamic dispatch.
 
-```k2
+```skarn
 process :: fn(w: *Writer) -> !void {
     w.write("Hello")?;
 }
@@ -124,7 +124,7 @@ main :: fn() {
 Any function whose first parameter is named `self` acts as an extension method
 and can be called using dot-syntax:
 
-```k2
+```skarn
 pub write_all :: fn(self: *Writer, data: []const u8) -> usize ! IoError {
     // ...
 }
@@ -143,14 +143,14 @@ shadows a free function of the same name when called on that type.
 
 ## Generics
 
-K2 provides static polymorphism via monomorphized generics. 
+Skarn provides static polymorphism via monomorphized generics. 
 Each unique combination of type arguments generates a separate, specialized copy of the function or struct.
 
 ### Generic Functions
 
 Generic type parameters are prefixed with `$`:
 
-```k2
+```skarn
 // $T is an unconstrained type parameter
 identity :: fn(value: $T) -> T {
     return value;
@@ -165,7 +165,7 @@ main :: fn() {
 
 You can also pass types explicitly as arguments:
 
-```k2
+```skarn
 max :: fn($T: type, a: T, b: T) -> T {
     if a > b { return a; }
     return b;
@@ -179,7 +179,7 @@ result := max(i32, 10, 20);
 
 You can constrain a type parameter to types that implement a specific interface:
 
-```k2
+```skarn
 // $W must be a type that implements the Writer interface
 print_to :: fn($W: Writer, writer: *W, data: []const u8) -> usize ! IoError {
     // Statically dispatched call! No vtable lookup overhead.
@@ -189,7 +189,7 @@ print_to :: fn($W: Writer, writer: *W, data: []const u8) -> usize ! IoError {
 
 ### Generic Structs
 
-```k2
+```skarn
 Pair :: struct($T: type, $U: type) {
     first: T,
     second: U,

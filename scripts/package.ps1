@@ -1,12 +1,12 @@
-# scripts/package.ps1 - build + bundle a relocatable k2 release archive.
+# scripts/package.ps1 - build + bundle a relocatable skarn release archive.
 #
-# Produces  dist/k2-<version>-x86_64-windows.zip  laid out as:
-#   k2-<version>-x86_64-windows/
-#     bin/   k2.exe, LLVM-C.dll, k2lld.dll (in-process linker)
+# Produces  dist/skarn-<version>-x86_64-windows.zip  laid out as:
+#   skarn-<version>-x86_64-windows/
+#     bin/   skarn.exe, LLVM-C.dll, skarnlld.dll (in-process linker)
 #     lib/   std/...
 #     LICENSE-*.txt, NOTICE, README.md, VERSION.txt
 # which the relocatable runtime (Phase 0) finds with no flags: std via ../lib,
-# the linker beside k2.exe, the DLLs via the OS loader.
+# the linker beside skarn.exe, the DLLs via the OS loader.
 #
 # Usage:  pwsh scripts/package.ps1 -LlvmPath <llvm-dir> [-Version 0.1.0-beta.1] [-Optimize ReleaseSafe]
 [CmdletBinding()]
@@ -23,28 +23,28 @@ $repo = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if (-not [System.IO.Path]::IsPathRooted($OutDir)) { $OutDir = Join-Path $repo $OutDir }
 
 # 1. Build the compiler (release), injecting the version when given.
-# -Din-process-lld builds k2lld.dll (the LLD fallback) so the release never spawns
-# a 69 MB lld-link.exe. -Dembed-linker bakes the self-hosted k2lnk INTO k2.exe, so
-# the common link path needs no separate k2lnk.dll (single-binary linker).
+# -Din-process-lld builds skarnlld.dll (the LLD fallback) so the release never spawns
+# a 69 MB lld-link.exe. -Dembed-linker bakes the self-hosted skarnld INTO skarn.exe, so
+# the common link path needs no separate skarnld.dll (single-binary linker).
 $buildArgs = @("build", "-Dllvm-path=$LlvmPath", "-Doptimize=$Optimize", "-Din-process-lld", "-Dembed-linker")
 if ($Version) { $buildArgs += "-Dversion=$Version" }
 Write-Host "==> zig $($buildArgs -join ' ')"
 Push-Location $repo
 try { & zig @buildArgs; if ($LASTEXITCODE -ne 0) { throw "zig build failed ($LASTEXITCODE)" } }
 finally { Pop-Location }
-# k2lnk is embedded in k2.exe by -Dembed-linker above — no separate k2lnk.dll.
+# skarnld is embedded in skarn.exe by -Dembed-linker above — no separate skarnld.dll.
 
 # 2. The version is whatever the binary reports - the single source of truth.
-# (`k2 version` prints to stderr; route through cmd so PowerShell doesn't treat
+# (`skarn version` prints to stderr; route through cmd so PowerShell doesn't treat
 # native stderr as a terminating error under ErrorActionPreference=Stop.)
-$k2exe = Join-Path $repo "zig-out/bin/k2.exe"
-$reported = (& cmd /c "`"$k2exe`" version 2>&1") | Select-Object -First 1
-$ver = ($reported -replace '^k2\s+', '').Trim()
-if (-not $ver) { throw "could not read version from k2.exe" }
+$skarnexe = Join-Path $repo "zig-out/bin/skarn.exe"
+$reported = (& cmd /c "`"$skarnexe`" version 2>&1") | Select-Object -First 1
+$ver = ($reported -replace '^skarn\s+', '').Trim()
+if (-not $ver) { throw "could not read version from skarn.exe" }
 # The archive filename drops SemVer build metadata (`+sha`) - the tag/version
-# already identifies it, and `+` is awkward in URLs. `k2 version` keeps the sha.
+# already identifies it, and `+` is awkward in URLs. `skarn version` keeps the sha.
 $fileVer = ($ver -replace '\+.*$', '')
-$name = "k2-$fileVer-x86_64-windows"
+$name = "skarn-$fileVer-x86_64-windows"
 Write-Host "==> version: $ver  (archive: $name)"
 
 # 3. Assemble the install layout.
@@ -52,14 +52,14 @@ $stage = Join-Path $OutDir $name
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force (Join-Path $stage "bin") | Out-Null
 
-Copy-Item (Join-Path $repo "zig-out/bin/k2.exe") (Join-Path $stage "bin")
+Copy-Item (Join-Path $repo "zig-out/bin/skarn.exe") (Join-Path $stage "bin")
 
-# In-process linker: k2lld.dll (built above) replaces a spawned 69 MB lld-link.exe.
-# k2 LoadLibrary's it at link time; no standalone linker exe in the core.
-$k2lld = Join-Path $repo "zig-out/bin/k2lld.dll"
-if (-not (Test-Path $k2lld)) { throw "k2lld.dll missing - build must use -Din-process-lld" }
-Copy-Item $k2lld (Join-Path $stage "bin")
-# (k2lnk is baked into k2.exe via -Dembed-linker — nothing to copy.)
+# In-process linker: skarnlld.dll (built above) replaces a spawned 69 MB lld-link.exe.
+# skarn LoadLibrary's it at link time; no standalone linker exe in the core.
+$skarnlld = Join-Path $repo "zig-out/bin/skarnlld.dll"
+if (-not (Test-Path $skarnlld)) { throw "skarnlld.dll missing - build must use -Din-process-lld" }
+Copy-Item $skarnlld (Join-Path $stage "bin")
+# (skarnld is baked into skarn.exe via -Dembed-linker — nothing to copy.)
 
 # LLVM-C.dll (codegen) is the only LLVM DLL the core needs. libclang (bindgen)
 # and ld.lld.exe (Linux cross-link) are separate opt-in components below.
@@ -71,7 +71,7 @@ Copy-Item -Recurse (Join-Path $repo "lib") (Join-Path $stage "lib")
 foreach ($m in @("LICENSE-APACHE-2.0.txt", "LICENSE-GPLv3.txt", "NOTICE", "README.md")) {
     if (Test-Path (Join-Path $repo $m)) { Copy-Item (Join-Path $repo $m) $stage }
 }
-# The platform installer (adds bin/ to PATH, sets K2_HOME). Each OS's archive
+# The platform installer (adds bin/ to PATH, sets SKARN_HOME). Each OS's archive
 # carries its own: install.ps1 here; install.sh ships with the Linux/macOS archive.
 Copy-Item (Join-Path $repo "scripts/install.ps1") $stage
 $ver | Out-File -Encoding ascii (Join-Path $stage "VERSION.txt")
@@ -84,7 +84,7 @@ $size = "{0:N1} MB" -f ((Get-Item $zip).Length / 1MB)
 Write-Host "==> packaged: $zip  ($size)"
 
 # 5. Optional bindgen component - libclang + the clang resource headers, as a
-# `bindgen/` folder you drop next to k2.exe (in bin/) to enable `k2 bindgen`.
+# `bindgen/` folder you drop next to skarn.exe (in bin/) to enable `skarn bindgen`.
 # Kept out of the core archive so the 81 MB libclang only ships if you want it.
 $bgZip = ""
 $libclang = Join-Path $LlvmPath "bin/libclang.dll"
@@ -99,16 +99,16 @@ if (Test-Path $libclang) {
         Sort-Object { [int]($_.Name) } -Descending | Select-Object -First 1
     if ($res) { Copy-Item -Recurse (Join-Path $res.FullName "include") (Join-Path $bgDir "clang-headers") }
     @"
-k2 bindgen component (libclang $ver).
+skarn bindgen component (libclang $ver).
 
-Extract the 'bindgen' folder into the directory that contains k2.exe (k2's bin/).
+Extract the 'bindgen' folder into the directory that contains skarn.exe (skarn's bin/).
 Then C-header binding generation is available:
 
-    k2 bindgen <header.h> [-o out.k2]
+    skarn bindgen <header.h> [-o out.sk]
 
-k2 finds libclang here on demand; the core compiler never loads it.
+skarn finds libclang here on demand; the core compiler never loads it.
 "@ | Out-File -Encoding ascii (Join-Path $bgDir "README.txt")
-    $bgZip = Join-Path $OutDir "k2-bindgen-$fileVer-x86_64-windows.zip"
+    $bgZip = Join-Path $OutDir "skarn-bindgen-$fileVer-x86_64-windows.zip"
     if (Test-Path $bgZip) { Remove-Item -Force $bgZip }
     Compress-Archive -Path $bgDir -DestinationPath $bgZip
     $bgSize = "{0:N1} MB" -f ((Get-Item $bgZip).Length / 1MB)
@@ -118,9 +118,9 @@ k2 finds libclang here on demand; the core compiler never loads it.
 }
 
 # 5b. Optional linux cross-compile component - ld.lld (the ELF linker for
-# `k2 build --target linux`). Windows linking is in-process (k2lld.dll); only
+# `skarn build --target linux`). Windows linking is in-process (skarnlld.dll); only
 # cross-compiling to Linux needs this, so it ships separately. Drop ld.lld.exe
-# into bin/ next to k2.exe; the runtime resolves it there (LLVM-C.dll marker).
+# into bin/ next to skarn.exe; the runtime resolves it there (LLVM-C.dll marker).
 $xZip = ""
 $ldlld = Join-Path $LlvmPath "bin/ld.lld.exe"
 if (Test-Path $ldlld) {
@@ -129,15 +129,15 @@ if (Test-Path $ldlld) {
     New-Item -ItemType Directory -Force $xRoot | Out-Null
     Copy-Item $ldlld $xRoot
     @"
-k2 linux cross-compile component (ld.lld).
+skarn linux cross-compile component (ld.lld).
 
-Put ld.lld.exe into k2's bin/ (next to k2.exe). Then you can cross-compile to
+Put ld.lld.exe into skarn's bin/ (next to skarn.exe). Then you can cross-compile to
 Linux from Windows:
 
-    k2 build <file.k2> --target linux              # static, no-libc ELF
-    k2 build <file.k2> --target linux-gnu --sysroot <dir>   # glibc ELF
+    skarn build <file.sk> --target linux              # static, no-libc ELF
+    skarn build <file.sk> --target linux-gnu --sysroot <dir>   # glibc ELF
 "@ | Out-File -Encoding ascii (Join-Path $xRoot "README.txt")
-    $xZip = Join-Path $OutDir "k2-linux-cross-$fileVer-x86_64-windows.zip"
+    $xZip = Join-Path $OutDir "skarn-linux-cross-$fileVer-x86_64-windows.zip"
     if (Test-Path $xZip) { Remove-Item -Force $xZip }
     Compress-Archive -Path (Join-Path $xRoot "*") -DestinationPath $xZip
     Write-Host ("==> linux-cross component: $xZip  ({0:N1} MB)" -f ((Get-Item $xZip).Length / 1MB))
@@ -151,10 +151,10 @@ if ($env:GITHUB_OUTPUT) {
     "file_version=$fileVer" | Out-File -Append -Encoding ascii $env:GITHUB_OUTPUT
     if ($bgZip) {
         "bindgen_archive=$bgZip" | Out-File -Append -Encoding ascii $env:GITHUB_OUTPUT
-        "bindgen_archive_name=k2-bindgen-$fileVer-x86_64-windows.zip" | Out-File -Append -Encoding ascii $env:GITHUB_OUTPUT
+        "bindgen_archive_name=skarn-bindgen-$fileVer-x86_64-windows.zip" | Out-File -Append -Encoding ascii $env:GITHUB_OUTPUT
     }
     if ($xZip) {
         "linux_cross_archive=$xZip" | Out-File -Append -Encoding ascii $env:GITHUB_OUTPUT
-        "linux_cross_archive_name=k2-linux-cross-$fileVer-x86_64-windows.zip" | Out-File -Append -Encoding ascii $env:GITHUB_OUTPUT
+        "linux_cross_archive_name=skarn-linux-cross-$fileVer-x86_64-windows.zip" | Out-File -Append -Encoding ascii $env:GITHUB_OUTPUT
     }
 }

@@ -1,5 +1,5 @@
 // In-process LLD COFF linker shim. Bundled (with LLD + its LLVM static deps)
-// into k2lld.dll so the compiler can link without spawning a 69 MB lld-link.exe
+// into skarnlld.dll so the compiler can link without spawning a 69 MB lld-link.exe
 // each build. Exposes a single C entry point; all LLVM/LLD symbols stay private
 // to this DLL, so they never clash with the LLVM-C.dll the codegen path uses.
 
@@ -36,7 +36,7 @@ void (*xmlFree)(void *) = nullptr;
 
 // Returns 0 on success, non-zero on link failure. argv[0] must be the linker
 // name ("lld-link"); the rest are normal lld-link arguments.
-extern "C" __declspec(dllexport) int k2_lld_link_coff(int argc, const char **argv) {
+extern "C" __declspec(dllexport) int skarn_lld_link_coff(int argc, const char **argv) {
     llvm::ArrayRef<const char *> args(argv, static_cast<size_t>(argc));
     const bool ok = lld::coff::link(args, llvm::outs(), llvm::errs(),
                                     /*exitEarly=*/false, /*disableOutput=*/false);

@@ -1,6 +1,6 @@
-# K2 Language Overview
+# Skarn Language Overview
 
-K2 is an experimental systems programming language written in Zig. Key design principles:
+Skarn is an experimental systems programming language written in Zig. Key design principles:
 - No hidden allocations
 - Explicit dynamic dispatch through `*Interface` values
 - Static polymorphism via monomorphized generics
@@ -22,26 +22,26 @@ zig build -Dllvm-path=Y:/SDK/LLVM
 
 Compiler commands:
 ```text
-k2 check <file>     Parse and type-check
-k2 ir <file>        Print K2 IR
-k2 object <file>    Emit object file
-k2 build <file>     Build executable (Windows)
+skarn check <file>     Parse and type-check
+skarn ir <file>        Print Skarn IR
+skarn object <file>    Emit object file
+skarn build <file>     Build executable (Windows)
 ```
 
 ## Hello World
 
-```k2
+```skarn
 #import std.io.{ println };
 
 main :: fn() -> i32 {
-    println("hello from K2");
+    println("hello from Skarn");
     return 0;
 }
 ```
 
 ## Language at a Glance
 
-```k2
+```skarn
 #import std.io.{ Writer, println, print_u64 };
 #import std.mem.{ copy, eql_bytes };
 
@@ -96,7 +96,7 @@ parse :: fn(input: []const u8) -> i32 ! AppError {
 main :: fn() -> i32 {
     // Type-inferred locals
     x := 42;
-    name := "K2";
+    name := "Skarn";
     
     // Typed locals  
     count: i32 = 10;

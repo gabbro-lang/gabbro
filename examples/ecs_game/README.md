@@ -1,6 +1,6 @@
 # ecs_game — a headless ECS asteroids simulation
 
-A bigger, multi-module K2 program that exercises the language end to end: local
+A bigger, multi-module Skarn program that exercises the language end to end: local
 modules, a struct-of-arrays ECS, generics-free data-oriented systems, enums,
 fixed-capacity arrays sized by constants, float math, and a deterministic RNG.
 
@@ -12,29 +12,29 @@ renders an ASCII snapshot every 30 ticks, and prints a final report.
 ## Run it
 
 ```
-k2 build            # build into ./ecs_game.exe
-k2 build run        # build and run
+skarn build            # build into ./ecs_game.exe
+skarn build run        # build and run
 ```
 
 ## Layout
 
 ```
-build.k2            the build script (std.build)
+build.sk            the build script (std.build)
 src/
-  main.k2           game setup + the tick loop + the report
-  vec.k2            Vec2 and 2D math (add/sub/scale/len/dist2/norm)
-  components.k2     entity Kind enum + field/world dimensions
-  world.k2          the ECS core: struct-of-arrays component store
-  systems.k2        movement, lifetime, fire, collisions, spawner
-  render.k2         ASCII rasterizer
+  main.sk           game setup + the tick loop + the report
+  vec.sk            Vec2 and 2D math (add/sub/scale/len/dist2/norm)
+  components.sk     entity Kind enum + field/world dimensions
+  world.sk          the ECS core: struct-of-arrays component store
+  systems.sk        movement, lifetime, fire, collisions, spawner
+  render.sk         ASCII rasterizer
 ```
 
 ## The ECS
 
-`world.k2` defines a single `World` with **parallel component arrays** indexed by
+`world.sk` defines a single `World` with **parallel component arrays** indexed by
 entity id:
 
-```k2
+```skarn
 World :: struct {
     pos:    [MAX_ENTITIES]Vec2,
     vel:    [MAX_ENTITIES]Vec2,

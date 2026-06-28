@@ -1,6 +1,6 @@
 # Distribution, packaging & install
 
-How k2 ships: a **slim, relocatable core** plus **optional components** loaded on
+How skarn ships: a **slim, relocatable core** plus **optional components** loaded on
 demand. The model is deliberately close to Jai's (a lean compiler with a separate
 `Bindings_Generator` module) rather than a single monolith.
 
@@ -11,22 +11,22 @@ The compiler links exactly what it needs to *compile and link your code*:
 | Dependency | Why | Shipped in core |
 | --- | --- | --- |
 | `LLVM-C.dll` | code generation | yes (~69 MB) |
-| `k2lld.dll` | **in-process** COFF linker (Windows) | yes (~65 MB) |
-| `lib/std` | the standard library (k2 source) | yes |
-| `lld-link.exe` | spawned COFF linker | **no** — replaced by `k2lld.dll` (§2.5) |
+| `skarnlld.dll` | **in-process** COFF linker (Windows) | yes (~65 MB) |
+| `lib/std` | the standard library (skarn source) | yes |
+| `lld-link.exe` | spawned COFF linker | **no** — replaced by `skarnlld.dll` (§2.5) |
 | `ld.lld.exe` | ELF linker, `--target linux` only | **no** — cross component (§3) |
-| `libclang.dll` | **only** `k2 bindgen` (C-header → bindings) | **no** — bindgen component (§3) |
+| `libclang.dll` | **only** `skarn bindgen` (C-header → bindings) | **no** — bindgen component (§3) |
 
 `libclang` is **81 MB** and is used by a single, optional subcommand most users
-never run. Linking it would force every `k2.exe` to load it just to *start*
+never run. Linking it would force every `skarn.exe` to load it just to *start*
 (Windows resolves all imports at launch). So the core does not link it at all.
 
 ## 2. On-demand libclang (the slim core)
 
-`k2.exe` carries **no dependency** on `libclang.dll` — confirmed in its import
+`skarn.exe` carries **no dependency** on `libclang.dll` — confirmed in its import
 table (`KERNEL32`, `LLVM-C.dll`, the CRT shims, `ntdll`; no `libclang`). The
 binding generator instead **loads libclang at runtime** the first time
-`k2 bindgen` runs, exactly like Jai's module loads it on demand.
+`skarn bindgen` runs, exactly like Jai's module loads it on demand.
 
 Mechanics (`src/clang_c.zig`):
 
@@ -39,51 +39,51 @@ Mechanics (`src/clang_c.zig`):
   POSIX: `std.DynLib`) and `@typeInfo`-iterates the table, resolving each symbol
   by its field name. `bindgen.zig` calls through it as `lib.clang_…(…)`.
 
-The core compiler never touches any of this; it is reached only by `k2 bindgen`.
+The core compiler never touches any of this; it is reached only by `skarn bindgen`.
 
 ### Where libclang is resolved (CLI), in order
 
-1. `$K2_LIBCLANG` — a full path to the library, or a directory containing it
-2. next to `k2.exe`, then `<exe>/bindgen/` (the component layout)
-3. `$K2_LLVM/bin`
+1. `$SKARN_LIBCLANG` — a full path to the library, or a directory containing it
+2. next to `skarn.exe`, then `<exe>/bindgen/` (the component layout)
+3. `$SKARN_LLVM/bin`
 4. the build-time LLVM dir (dev/CI fallback)
 5. the bare name — the OS loader's own search (exe dir, system dirs, `PATH`)
 
-If none resolve, `k2 bindgen` prints exactly how to provide it. The clang
+If none resolve, `skarn bindgen` prints exactly how to provide it. The clang
 *resource headers* (`stddef.h`, …) resolve in parallel: `<exe>/bindgen/clang-headers`
 first, then the build-time LLVM tree.
 
 ## 2.5 In-process linking (no spawned linker exe)
 
-k2 compiles to a `.o`, then needs a linker to make the final `.exe`. Rather than
+skarn compiles to a `.o`, then needs a linker to make the final `.exe`. Rather than
 ship and *spawn* the 69 MB `lld-link.exe`, the LLD COFF driver is built into
-**`k2lld.dll`** (`-Din-process-lld` → `src/backend/llvm/lld_shim.cpp`), which k2
+**`skarnlld.dll`** (`-Din-process-lld` → `src/backend/llvm/lld_shim.cpp`), which skarn
 `LoadLibrary`s and calls in-process — no subprocess, faster, and no standalone
 linker executable in the distribution. The spawn path (`lld-link.exe`) remains a
-fallback only if `k2lld.dll` is somehow absent. LLD is ~65 MB either way (it
+fallback only if `skarnlld.dll` is somehow absent. LLD is ~65 MB either way (it
 carries its own LLVM object-handling code), so this is an *architecture* win, not
 a raw-size one — the size win comes from no longer shipping **two** 69 MB LLD
 exes (`lld-link` + `ld.lld`).
 
-## 2.6 The self-hosted native linker (k2lnk)
+## 2.6 The self-hosted native linker (skarnld)
 
-The release also ships **`k2lnk.dll`** — a PE/COFF linker **written in k2 itself**
-(`linker/k2lnk.k2`). k2 prefers it for eligible programs and falls back to
-`k2lld.dll`/LLD for the rest. Its defining trick, and why it's fast and
-*k2-specific*: it never parses a `.lib` import archive (LLD's single biggest
+The release also ships **`skarnld.dll`** — a PE/COFF linker **written in skarn itself**
+(`linker/skarnld.sk`). skarn prefers it for eligible programs and falls back to
+`skarnlld.dll`/LLD for the rest. Its defining trick, and why it's fast and
+*skarn-specific*: it never parses a `.lib` import archive (LLD's single biggest
 cost). The compiler already knows every import's DLL from `#extern("dll","sym")`
-and emits a `.k2imp` map section; k2lnk reads that and synthesizes one PE import
+and emits a `.skimp` map section; skarnld reads that and synthesizes one PE import
 descriptor per DLL directly.
 
 It is a **full single-object COFF linker**: it reads the AMD64 COFF, classifies
 and **merges sections by class** (`.text`/`.rdata`+`.xdata`/`.data`/`.pdata`/
 `.bss`) honoring each section's required alignment (16/32/64-byte SIMD pools at
--O2), builds **multi-DLL** import tables from the `.k2imp` map, applies the
+-O2), builds **multi-DLL** import tables from the `.skimp` map, applies the
 REL32 / ADDR64 / ADDR32NB relocations, keeps `.pdata`/`.xdata` and wires the
 exception directory, and writes a PE32+ image with the requested **subsystem**
 (console/GUI), **entry**, and **stack**. It also produces **DLLs** — building an
-export table (`.edata`) from the compiler's `.k2exp` map — which means **k2lnk
-builds itself**: the shipped `k2lnk.dll` is linked by `k2lnk`.
+export table (`.edata`) from the compiler's `.skexp` map — which means **skarnld
+builds itself**: the shipped `skarnld.dll` is linked by `skarnld`.
 
 The whole exe-integration suite links through it at `-O2`. It bails to LLD only on
 the genuinely hard cases (multiple objects, raw linker flags, a C library's
@@ -91,26 +91,26 @@ the genuinely hard cases (multiple objects, raw linker flags, a C library's
 
 ### Dev ships the DLL; release bakes it in
 
-- **Dev** (`zig build`): k2.exe + `k2lnk.dll` (separate, fast, single-stage). The
+- **Dev** (`zig build`): skarn.exe + `skarnld.dll` (separate, fast, single-stage). The
   compiler loads it on demand.
 - **Release** (`zig build -Dembed-linker`, used by `package.ps1`): a **two-stage**
-  build compiles `linker/k2lnk.k2` to a freestanding object (`object --no-entry`)
-  *from source* and links it into k2.exe, exporting `k2_link_mem`
-  (`linker/k2lnk_embed.def`). The result is **one self-contained `k2.exe` that is
-  its own linker** — no `k2lnk.dll` in the distribution.
+  build compiles `linker/skarnld.sk` to a freestanding object (`object --no-entry`)
+  *from source* and links it into skarn.exe, exporting `skarn_link_mem`
+  (`linker/skarnld_embed.def`). The result is **one self-contained `skarn.exe` that is
+  its own linker** — no `skarnld.dll` in the distribution.
 
 `link.zig` is identical for both: it finds the linker with `GetProcAddress` on
-k2.exe's own module (embed case), else `LoadLibrary("k2lnk.dll")` (dev). Nothing
+skarn.exe's own module (embed case), else `LoadLibrary("skarnld.dll")` (dev). Nothing
 prebuilt is committed — the embed object is built from source at release time, so
-there's no binary blob to trust. `k2lld.dll` still ships as the LLD fallback.
+there's no binary blob to trust. `skarnlld.dll` still ships as the LLD fallback.
 
 ## 3. Optional components
 
 Two features ship as **separate downloads** instead of bloating the core. Each is
-a folder you drop next to `k2.exe` (in `bin/`); the runtime finds it there with no
+a folder you drop next to `skarn.exe` (in `bin/`); the runtime finds it there with no
 LLVM install and no environment variables.
 
-**`k2-bindgen-<ver>-<target>.zip`** — `k2 bindgen` (C-header → bindings):
+**`skarn-bindgen-<ver>-<target>.zip`** — `skarn bindgen` (C-header → bindings):
 
 ```
 bindgen/
@@ -119,29 +119,29 @@ bindgen/
   README.txt
 ```
 
-**`k2-linux-cross-<ver>-<target>.zip`** — `k2 build --target linux`:
+**`skarn-linux-cross-<ver>-<target>.zip`** — `skarn build --target linux`:
 
 ```
-ld.lld.exe              # the ELF linker; drop into bin/ next to k2.exe
+ld.lld.exe              # the ELF linker; drop into bin/ next to skarn.exe
 README.txt
 ```
 
-(`ld.lld.exe` is resolved from k2's `bin/` via the `LLVM-C.dll` marker — see
+(`ld.lld.exe` is resolved from skarn's `bin/` via the `LLVM-C.dll` marker — see
 `resolveLlvmBin`.) Without either component the core is fully functional; only
 that one feature is unavailable.
 
 ## 4. Packaging (`scripts/package.ps1`)
 
-Builds k2 (ReleaseSafe) and emits, into `dist/`:
+Builds skarn (ReleaseSafe) and emits, into `dist/`:
 
-- **`k2-<ver>-<target>.zip`** — the relocatable core: `bin/` (k2.exe + LLVM-C +
-  `k2lld.dll`), `lib/std`, the licenses, `VERSION.txt`, and the platform
-  installer. The Phase 0 runtime finds the stdlib relative to `k2.exe`, so it
+- **`skarn-<ver>-<target>.zip`** — the relocatable core: `bin/` (skarn.exe + LLVM-C +
+  `skarnlld.dll`), `lib/std`, the licenses, `VERSION.txt`, and the platform
+  installer. The Phase 0 runtime finds the stdlib relative to `skarn.exe`, so it
   runs from anywhere with no flags.
-- **`k2-bindgen-<ver>-<target>.zip`** — the bindgen component (§3).
-- **`k2-linux-cross-<ver>-<target>.zip`** — the Linux cross-compile component (§3).
+- **`skarn-bindgen-<ver>-<target>.zip`** — the bindgen component (§3).
+- **`skarn-linux-cross-<ver>-<target>.zip`** — the Linux cross-compile component (§3).
 
-It builds with `-Din-process-lld` so the core ships `k2lld.dll` instead of a
+It builds with `-Din-process-lld` so the core ships `skarnlld.dll` instead of a
 spawned `lld-link.exe`.
 
 The binary-reported version is the single source of truth; the asset filename
@@ -150,13 +150,13 @@ drops the `+<sha>` build metadata for URL-friendliness.
 ## 5. Install scripts
 
 Each platform's core archive carries its own installer, which copies the layout
-to a stable prefix and wires up `PATH` + `K2_HOME` (idempotent):
+to a stable prefix and wires up `PATH` + `SKARN_HOME` (idempotent):
 
-- **`install.ps1`** (Windows) → `%LOCALAPPDATA%\k2`, user `PATH`.
-- **`install.sh`** (Linux/macOS) → `~/.k2`, via the shell rc.
+- **`install.ps1`** (Windows) → `%LOCALAPPDATA%\skarn`, user `PATH`.
+- **`install.sh`** (Linux/macOS) → `~/.sk`, via the shell rc.
 
 Run it from inside the extracted archive; both accept a custom prefix and a
-"copy only, don't touch PATH" mode. The standard library is OS-agnostic k2
+"copy only, don't touch PATH" mode. The standard library is OS-agnostic skarn
 source — only the *binaries* differ per platform, and the per-OS archive already
 carries the right ones, so the installer just keeps `bin/` and `lib/` together.
 
@@ -168,10 +168,10 @@ The Windows core archive, compressed:
 | --- | --- |
 | Original (libclang + both LLD exes in core) | 110 MB |
 | − `libclang` → bindgen component | 78 MB |
-| − `lld-link.exe`/`ld.lld.exe` → in-process `k2lld.dll` + cross component | **50 MB** |
+| − `lld-link.exe`/`ld.lld.exe` → in-process `skarnlld.dll` + cross component | **50 MB** |
 
-So ~**55 % smaller** than where we started, with `k2 bindgen` (31 MB) and Linux
+So ~**55 % smaller** than where we started, with `skarn bindgen` (31 MB) and Linux
 cross-compile (26 MB) available as opt-ins. The next size lever is
-**static-linking `LLVM-C`** into `k2.exe` (à la C3's single `c3c.exe`), which
+**static-linking `LLVM-C`** into `skarn.exe` (à la C3's single `c3c.exe`), which
 removes `LLVM-C.dll` as a separate file; the static LLVM libs are already wired
 for `-Din-process-lld`.

@@ -1,4 +1,4 @@
-# K2 Roadmap
+# Skarn Roadmap
 
 Where the language and compiler are headed. For the design of the comptime VM and
 metaprogramming layer specifically, see
@@ -46,10 +46,10 @@ the resolution VM, named `constraint($T){}`, and output type params (`-> $Acc`).
 visibility, per-module name mangling.
 
 **C interop** — `#extern`, the Win64 by-value aggregate ABI, thin C function
-pointers, and `k2 bindgen` (libclang → K2 declarations; full `raylib.h`).
+pointers, and `skarn bindgen` (libclang → Skarn declarations; full `raylib.h`).
 
-**Backend & build** — the LLVM backend, in-process LLD plus a from-scratch K2
-linker (`k2lnk`), and `k2 build` running `build.k2` entirely in the comptime VM to
+**Backend & build** — the LLVM backend, in-process LLD plus a from-scratch Skarn
+linker (`skarnld`), and `skarn build` running `build.sk` entirely in the comptime VM to
 produce real executables and DLLs.
 
 **Standard library** — 25 modules: `io`, `fmt`, `mem`, `strings`, `slice`, `vec`,
@@ -57,7 +57,7 @@ produce real executables and DLLs.
 `crypto`, `serde`, `net` (TCP/UDP), `atomics`, `thread`, `fs`, `process`, `c`,
 `build`.
 
-**Tooling** — `k2 lsp` (diagnostics, completion, hover, go-to-definition, document
+**Tooling** — `skarn lsp` (diagnostics, completion, hover, go-to-definition, document
 symbols), a tree-sitter grammar with highlight queries, a Zed extension, and the
 `#test` comptime test lane (a failed assertion fails the build like a type error).
 
@@ -79,13 +79,13 @@ Release-blocking work and the polish needed for a first public build.
 
 ## After v0.1.0
 
-- **Testing** — the runtime lane (`k2 test`, per-test zones + leak checks, TTY/TAP/
+- **Testing** — the runtime lane (`skarn test`, per-test zones + leak checks, TTY/TAP/
   JSON reporters), reflection-driven structural diffs on assertion failure (which
   also unlocks struct equality), property testing, and snapshots (`docs/17` §5).
-- **More tooling** — `k2 fmt` (canonical formatter), `k2 doc` (reflection-driven
-  docs), `k2 repl`, and LSP v2/v3 (rename, semantic tokens, code actions).
+- **More tooling** — `skarn fmt` (canonical formatter), `skarn doc` (reflection-driven
+  docs), `skarn repl`, and LSP v2/v3 (rename, semantic tokens, code actions).
 - **Linux/ELF backend** — the second target (ELF + SysV ABI), designed in
-  `docs/14`; today K2 is Windows-only.
+  `docs/14`; today Skarn is Windows-only.
 - **Packages** — the capability-bounded, content-hashed package manager designed in
   `docs/16` — the structural answer to the `build.rs` / supply-chain problem: a
   dependency's build hook receives only the capabilities it was granted.

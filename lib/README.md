@@ -1,15 +1,15 @@
-# K2 Modules
+# Skarn Modules
 
-This directory contains K2's standard-library and future package modules.
+This directory contains Skarn's standard-library and future package modules.
 
 The compiler resolves:
 
-```k2
+```skarn
 #import std.mem;
 ```
 
-to `std/mem.k2` beneath its configured modules root. The compiler defaults to
-this sibling `k2-modules` directory; use `-Dstdlib-root=<path>` when building the
+to `std/mem.sk` beneath its configured modules root. The compiler defaults to
+this sibling `skarn-modules` directory; use `-Dstdlib-root=<path>` when building the
 compiler to choose another location.
 
 ## std.mem
@@ -18,7 +18,7 @@ compiler to choose another location.
 an import-scoped extension method because its first value parameter is named
 `self`:
 
-```k2
+```skarn
 #import std.mem.{copy, eql_bytes, fill, index_of, zero};
 
 copy(u8, destination, source);

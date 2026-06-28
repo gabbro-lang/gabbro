@@ -1,8 +1,8 @@
 # diskscan
 
-A fast, multithreaded disk-usage analyzer for Windows — written in **k2**, with
+A fast, multithreaded disk-usage analyzer for Windows — written in **skarn**, with
 both a command-line tool and a native Win32 GUI browser. Think WinDirStat, but a
-few hundred lines of k2 and no dependencies.
+few hundred lines of skarn and no dependencies.
 
 ```
 out/diskscan      [dir]     scan, print the biggest items + throughput  (console)
@@ -13,19 +13,19 @@ out/diskscan-gui  [dir]     browse the tree, recycle what you don't want (window
 
 ## Build
 
-Built entirely with the k2 build system (`build.k2`):
+Built entirely with the skarn build system (`build.sk`):
 
 ```
-k2 build            # build both exes into ./out (release)
-k2 build run        # build + run the CLI on the current directory
-k2 build gui        # build + launch the GUI
-k2 build -Ddebug    # unoptimized build with safety checks
+skarn build            # build both exes into ./out (release)
+skarn build run        # build + run the CLI on the current directory
+skarn build gui        # build + launch the GUI
+skarn build -Ddebug    # unoptimized build with safety checks
 ```
 
 ## What makes it fast
 
 A full `C:` scan here is ~2.6 M files / 1.8 TB. The language is never the
-bottleneck — k2 compiles to native code through LLVM, so the cost is the OS's
+bottleneck — skarn compiles to native code through LLVM, so the cost is the OS's
 directory enumeration. diskscan pulls two levers to minimize that cost:
 
 1. **Bulk directory reads.** Instead of `FindNextFile` (one entry per syscall),
@@ -46,17 +46,17 @@ The file size comes *free* with each directory record, so there is no second
 ## Layout
 
 ```
-build.k2              two artifacts (console CLI + windowed GUI), versioned
+build.sk              two artifacts (console CLI + windowed GUI), versioned
 src/
-  win32.k2            kernel32 bindings: bulk reads, threads, CPU count
-  node.k2             the directory tree (lazy-sorted children, tombstone delete)
-  scan.k2             the scanner — both levers, builds the tree
-  fmt.k2              human-readable sizes (1.5 GB, 870.4 KB, 42 B)
-  cli.k2              CLI entry: scan + sorted report + throughput
-  gui.k2             GUI entry: Win32 window, GDI drawing, navigation, delete
+  win32.sk            kernel32 bindings: bulk reads, threads, CPU count
+  node.sk             the directory tree (lazy-sorted children, tombstone delete)
+  scan.sk             the scanner — both levers, builds the tree
+  fmt.sk              human-readable sizes (1.5 GB, 870.4 KB, 42 B)
+  cli.sk              CLI entry: scan + sorted report + throughput
+  gui.sk             GUI entry: Win32 window, GDI drawing, navigation, delete
 ```
 
-`cli.k2` and `gui.k2` are two `#entry` points over the **same** scanner and tree
+`cli.sk` and `gui.sk` are two `#entry` points over the **same** scanner and tree
 — the build system compiles each into its own executable.
 
 ## The GUI

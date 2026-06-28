@@ -1,22 +1,22 @@
 # Syntax Reference
 
-This document is the complete syntax reference for the K2 programming language. It covers every lexical element — from comments and identifiers to operators and punctuation — that makes up a valid K2 program.
+This document is the complete syntax reference for the Skarn programming language. It covers every lexical element — from comments and identifiers to operators and punctuation — that makes up a valid Skarn program.
 
 ---
 
 ## Comments
 
-K2 supports **line comments only**. There are no block comments.
+Skarn supports **line comments only**. There are no block comments.
 
 A line comment begins with `//` and extends to the end of the line:
 
-```k2
+```skarn
 // This is a comment
 x := 42; // inline comment
 ```
 
 > [!NOTE]
-> Block comments (`/* ... */`) are intentionally omitted from K2. Use multiple line comments instead.
+> Block comments (`/* ... */`) are intentionally omitted from Skarn. Use multiple line comments instead.
 
 ---
 
@@ -29,7 +29,7 @@ Identifiers name variables, functions, types, and other declarations.
 - May continue with letters, digits (`0`–`9`), or underscores
 - Are **case-sensitive** — `foo`, `Foo`, and `FOO` are three distinct identifiers
 
-```k2
+```skarn
 x := 1;
 my_variable := 2;
 _private := 3;
@@ -38,9 +38,9 @@ Point2D :: struct { x: f64, y: f64 };
 
 ### Escaped Identifiers
 
-K2 allows you to prefix an identifier with `@` to use a keyword as a regular identifier, or to define special names (like the runtime's `@panic` function) without conflicting with standard user names:
+Skarn allows you to prefix an identifier with `@` to use a keyword as a regular identifier, or to define special names (like the runtime's `@panic` function) without conflicting with standard user names:
 
-```k2
+```skarn
 @if := 42;          // uses the keyword 'if' as a variable name
 @panic("oh no");    // standard library panic function
 ```
@@ -49,7 +49,7 @@ K2 allows you to prefix an identifier with `@` to use a keyword as a regular ide
 
 ## Keywords
 
-The following table lists every keyword in K2, grouped by category.
+The following table lists every keyword in Skarn, grouped by category.
 
 ### Declaration Keywords
 
@@ -110,7 +110,7 @@ The following table lists every keyword in K2, grouped by category.
 
 ## Primitive Type Keywords
 
-K2 provides a fixed set of primitive types:
+Skarn provides a fixed set of primitive types:
 
 | Type | Description |
 |------|-------------|
@@ -140,7 +140,7 @@ K2 provides a fixed set of primitive types:
 
 Integer literals can be written in decimal, hexadecimal, or binary. Underscores may be used anywhere within the digit sequence for readability.
 
-```k2
+```skarn
 42            // decimal, type inferred
 42i32         // explicit i32 suffix
 255u8         // explicit u8 suffix
@@ -167,7 +167,7 @@ An integer literal may end with a type suffix to specify its exact type: `i8`, `
 
 Float literals always contain a decimal point. A fractional part is required.
 
-```k2
+```skarn
 3.14      // f64 by default
 1.0       // decimal with fractional part required
 0.5       // leading zero
@@ -180,7 +180,7 @@ Float literals always contain a decimal point. A fractional part is required.
 
 String literals are enclosed in double quotes. The type of a string literal is `[]const u8`.
 
-```k2
+```skarn
 "hello world"      // simple string
 "line1\nline2"     // escape sequences
 "tab\there"        // tab character
@@ -205,7 +205,7 @@ A character literal is written in single quotes and is **sugar for its integer
 code point** — an untyped integer literal (like `65`) that coerces to `u8`,
 `i32`, a `rune`, etc. from context. There is no dedicated `char` type.
 
-```k2
+```skarn
 'A'        // 65
 '.'        // 46
 '\n'       // 10  — same escapes as strings
@@ -216,7 +216,7 @@ code point** — an untyped integer literal (like `65`) that coerces to `u8`,
 
 Because it is just an integer literal, it works anywhere a number does:
 
-```k2
+```skarn
 nl: u8 = '\n';
 if name[i] == '.' { dots = dots + 1; }   // coerces to u8 in the comparison
 ```
@@ -225,7 +225,7 @@ A bare multi-byte UTF-8 character (e.g. `'é'`) decodes to its Unicode code poin
 
 ### Boolean Literals
 
-```k2
+```skarn
 true
 false
 ```
@@ -234,7 +234,7 @@ false
 
 The `null` literal is used with optional types:
 
-```k2
+```skarn
 null  // for optionals
 ```
 
@@ -353,7 +353,7 @@ Operators are listed from **highest** to **lowest** precedence:
 
 Constants are bound with `::` and must be computable at compile time. By convention, constant names use `UPPER_SNAKE_CASE`:
 
-```k2
+```skarn
 MAX :: 100;
 PI :: 3.14159;
 GREETING :: "hello";
@@ -365,7 +365,7 @@ field and index access work on any top-level constant, not just locals.)
 
 Constants can also bind functions, types, and other compile-time constructs:
 
-```k2
+```skarn
 add :: fn(a: i32, b: i32) -> i32 {
     return a + b;
 };
@@ -384,7 +384,7 @@ is the whole distinction: `::` is an immutable compile-time constant; `: T =`
 (like a local's `=`) is a runtime-mutable variable. No `mut`/`var`/`static`
 keyword.
 
-```k2
+```skarn
 counter: i64 = 0;          // mutable global, explicit type required
 flags:   u32 = 0u32;
 
@@ -400,9 +400,9 @@ compound assignments (`+=`, …) store to it.
 
 Variables are declared with `:=`. The type is inferred from the right-hand side:
 
-```k2
+```skarn
 x := 42;          // inferred as integer
-name := "K2";     // inferred as []const u8
+name := "Skarn";     // inferred as []const u8
 flag := true;     // inferred as bool
 ```
 
@@ -410,7 +410,7 @@ flag := true;     // inferred as bool
 
 When you need to specify the type explicitly, use `: Type =` syntax:
 
-```k2
+```skarn
 count: i32 = 0;
 data: [4]u8 = .{ 1u8, 2u8, 3u8, 4u8 };
 buffer: [256]u8 = .{};
@@ -441,9 +441,9 @@ buffer: [256]u8 = .{};
 
 ## Quick Example
 
-Putting it all together — a small K2 program demonstrating core syntax elements:
+Putting it all together — a small Skarn program demonstrating core syntax elements:
 
-```k2
+```skarn
 std :: #import("std");
 
 MAX_SIZE :: 1024;

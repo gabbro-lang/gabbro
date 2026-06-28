@@ -1,17 +1,17 @@
-# K2 Comptime VM & Metaprogramming — Status & Roadmap
+# Skarn Comptime VM & Metaprogramming — Status & Roadmap
 
 > Status: **Phases 1–4 substantially IMPLEMENTED.** The bytecode VM is the sole
 > comptime engine (the tree-walker is deleted), and the metaprogramming surface
 > (`#run`/`#insert`/`#quote`/`#parse`/macros/reflection/`#compiler` hooks/comptime
-> FFI/comptime zones/`k2 build`) works end-to-end. What remains is the **iterative
+> FFI/comptime zones/`skarn build`) works end-to-end. What remains is the **iterative
 > message loop**, a **richer `std.compiler` surface**, and **Phase 5 capability
-> sandboxing** — plus the K2-unique innovations at the end of this doc.
+> sandboxing** — plus the Skarn-unique innovations at the end of this doc.
 
 ## Context
 
-K2's compile-time execution runs on a **register bytecode VM** (`src/vm/`) that
+Skarn's compile-time execution runs on a **register bytecode VM** (`src/vm/`) that
 executes the same **IR** (`src/ir.zig`) the native backend lowers, so **comptime ≡
-runtime**: one lowering, identical semantics. The VM faithfully models K2's
+runtime**: one lowering, identical semantics. The VM faithfully models Skarn's
 signature **Zone/Arena** memory at compile time (host arenas that free as zones
 exit), giving zero-leak comptime execution. The original tree-walker
 (`src/comptime.zig`) has been **deleted**; `#run` routes only through the VM.
@@ -70,7 +70,7 @@ The north star is to match and then exceed Jai's metaprogramming, and to close t
   `ret` — so a hook can generate code driven by a type's real shape.
 - **Comptime FFI** — `src/vm/ffi.zig` loads host DLLs (`LoadLibraryA`/
   `GetProcAddress`) and marshals `Value` ↔ C ABI, callable from `#run`.
-- **`k2 build`** — `build.k2` runs entirely in the VM (`host_call` → `__build_*`
+- **`skarn build`** — `build.sk` runs entirely in the VM (`host_call` → `__build_*`
   intrinsics → `BuildPlan` → real exes/DLLs). See
   [10_build_system.md](10_build_system.md).
 
@@ -86,15 +86,15 @@ The north star is to match and then exceed Jai's metaprogramming, and to close t
 | **`std.heap`/byte-addressed memory at comptime** | **done** | The comptime VM now models **real host memory** (`host_ptr`/`host_buf` values; `ptr_from_int`/`slice_from_raw_parts` + host load/store/index do real `@ptrFromInt` access; `VirtualAlloc` via the existing FFI). So `std.heap.Arena` (and `StringBuilder`, …) **run at comptime exactly as at runtime** — comptime ≡ runtime for memory. (`compiler_decls()` is scoped to the user's own declarations so a hook that imports std for codegen doesn't see std's types.) |
 | **`zone X: Arena {}` at `#run`** | **done** | A `zone` block folds via the VM (no runtime fallback). The blocker was `@panic`: `std.heap.alloc_bytes` `@panic`s on its OOM branch, and the VM couldn't lower a `@panic`/`exit`/`abort` call (a no-return runtime intrinsic — sometimes a direct call, sometimes an indirect call to a `.local` of that name). The VM compiler now lowers all three to a `trap` opcode — harmless unless the branch actually runs (then comptime correctly halts). Any function that merely *contains* `@panic` (i.e. almost all of std) now folds at compile time. |
 | **Capability sandboxing (Phase 5)** | not started | Comptime FFI/`unsafe` are **unconditionally available** (`ffi.zig`: "for now it is unconditionally available"). A malicious dependency macro can reach the host — the `build.rs` hole is **not** yet closed. |
-| **Host stdlib in the VM** | partial | `build.k2` uses `host_call` intrinsics; general `std.fs`/`std.io` at comptime behind capability interfaces is not generalized. |
+| **Host stdlib in the VM** | partial | `build.sk` uses `host_call` intrinsics; general `std.fs`/`std.io` at comptime behind capability interfaces is not generalized. |
 | **`#quote` fidelity for new match patterns** | lossy | range/string/guard/binding patterns reflect as the catch-all `anything`. |
 
 ---
 
-## Roadmap — and K2-unique innovations
+## Roadmap — and Skarn-unique innovations
 
 The first two items finish the "match Jai" story; the rest are **genuinely novel**
-and only sound *because* of K2's design (capability interfaces + zone purity +
+and only sound *because* of Skarn's design (capability interfaces + zone purity +
 typed AST + IR-shared comptime).
 
 ### R1. The iterative message loop (`std.compiler`)
@@ -133,28 +133,28 @@ typed AST + IR-shared comptime).
   resulting `[]const u8` (string, zone slice, or host_buf). The `#derive(sum)` demo
   (emit a `sum_<T>` for every struct, summing its fields) works end-to-end with
   both. (Bonus robustness: the hook-pass sema is continue-on-error, and an
-  unknown-typed slice lowering is graceful, not an ICE.) Minor known limit: K2
+  unknown-typed slice lowering is graceful, not an ICE.) Minor known limit: Skarn
   string literals don't process `\n` escapes, so use a space separator between
   generated decls.
 
 ### R2. Capability-sandboxed metaprogramming — *the flagship*
-**The structural fix to the `build.rs`/Jai supply-chain hole.** K2 already has no
+**The structural fix to the `build.rs`/Jai supply-chain hole.** Skarn already has no
 ambient authority: the only way to touch the OS is through a granted **interface**.
 So a dependency's compile-time hook receives a `*Compiler` carrying only an
 `AstTransform` capability — it can rewrite ASTs but **physically cannot** open a
-file, call FFI, or run `unsafe`. The root `build.k2` workspace gets the privileged
+file, call FFI, or run `unsafe`. The root `build.sk` workspace gets the privileged
 capabilities; third-party macros are limited to **pure AST transforms**. Enforced
 by the VM capability table + restricting FFI/`unsafe` opcodes to the root
 workspace. *No other systems language can offer "install this dependency, its
 macros cannot harm your machine" as a structural guarantee.*
 
-### R3. Content-addressed comptime caching — *sound only in K2*
+### R3. Content-addressed comptime caching — *sound only in Skarn*
 Because R2 makes third-party comptime **pure** (no hidden I/O — all effects flow
 through capabilities the compiler can observe or deny), a `#run f(args)` result
 can be **cached by the content hash of (function IR + argument values)**. Re-builds
 hit the cache; heavy generators (serializers, parser tables) compute once and are
 reused across builds and machines. Zig/Jai can't safely cache comptime because it
-may perform arbitrary, unobservable I/O. K2 *can*, because purity is enforced, not
+may perform arbitrary, unobservable I/O. Skarn *can*, because purity is enforced, not
 hoped for. (We already have a stable content-hash primitive: `typeid_of`/FNV.)
 
 ### R4. `#derive` — reflective, capability-scoped generators
@@ -176,7 +176,7 @@ OOM-ing the compiler. Turns "zero-leak comptime" into "**bounded, fair** comptim
 After typecheck, a `#compiler` predicate runs over the **entire** typed program and
 can assert global properties — "every `Component` struct is `#packed`", "no public
 fn returns a zone-owned pointer", "this enum's variants form a closed protocol".
-Program-wide, machine-checked design rules expressed in plain K2, enforced at build
+Program-wide, machine-checked design rules expressed in plain Skarn, enforced at build
 time. Distinct from per-decl attributes: these are *cross-cutting* invariants.
 
 ### R7. Finish `#quote` reflection fidelity
@@ -192,11 +192,11 @@ matches.
   materialize/reify), `src/pipeline.zig` (`runCompilerHookPass`, prelude
   injection), `src/macroexpand.zig` (template macros).
 - Surface: `src/ast_prelude.zig` (`std.compiler` `Decl`, `Any`, `TypeInfo`),
-  `src/build.zig` (`k2 build`), `src/parser.zig`/`src/ast.zig` (`#quote`/`#insert`).
+  `src/build.zig` (`skarn build`), `src/parser.zig`/`src/ast.zig` (`#quote`/`#insert`).
 
 ## Verification
 - `zig build test` — VM opcode/e2e `#run`, zones (leak checks), reflection,
-  macros, `#compiler` hooks, `k2 build`. comptime ≡ runtime is asserted by running
+  macros, `#compiler` hooks, `skarn build`. comptime ≡ runtime is asserted by running
   the same programs at comptime and natively.
 - Next (R1–R6): message-loop golden tests; a sandbox test proving a dependency
   hook is denied FFI/fs and that `unsafe`/`#extern` are rejected outside the root

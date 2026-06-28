@@ -233,7 +233,7 @@ test "vm corpus: wide #run coverage" {
         \\C_math :: #run mathfold();
     ;
 
-    var fe = try k2.compile(a, "corpus.k2", src);
+    var fe = try k2.compile(a, "corpus.sk", src);
     defer fe.deinit(a);
 
     const stats = ir.evalCorpus(a, fe);

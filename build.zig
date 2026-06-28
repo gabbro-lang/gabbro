@@ -61,8 +61,8 @@ pub fn build(b: *std.Build) void {
     // `std.heap.Arena`) works in every compile path — including the inline
     // `compile(source)` path that never touches disk. `@embedFile` resolves
     // these import names; the files remain the single source of truth in lib/.
-    compiler_mod.addAnonymousImport("std_heap_k2", .{ .root_source_file = b.path("lib/std/heap.k2") });
-    compiler_mod.addAnonymousImport("std_ptr_k2", .{ .root_source_file = b.path("lib/std/ptr.k2") });
+    compiler_mod.addAnonymousImport("std_heap_k2", .{ .root_source_file = b.path("lib/std/heap.sk") });
+    compiler_mod.addAnonymousImport("std_ptr_k2", .{ .root_source_file = b.path("lib/std/ptr.sk") });
 
     // Wire LLVM into the compiler library when a path is provided.
     if (llvm_path) |lp| {
@@ -195,13 +195,13 @@ pub fn build(b: *std.Build) void {
     ) orelse "C:\\Users\\chris\\backend\\basalt\\bin";
 
     // ── CLI executable ────────────────────────────────────────────────────
-    const exe_mod = b.addModule("k2", .{
+    const exe_mod = b.addModule("skarn", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    const exe = b.addExecutable(.{ .name = "k2", .root_module = exe_mod });
+    const exe = b.addExecutable(.{ .name = "skarn", .root_module = exe_mod });
     exe.root_module.addImport("k2_compiler", compiler_mod);
     exe.root_module.addLibraryPath(.{ .cwd_relative = basalt_lib_dir });
 
@@ -212,7 +212,7 @@ pub fn build(b: *std.Build) void {
         const lp = llvm_path.?;
         const gen = b.addRunArtifact(exe);
         gen.addArg("object");
-        gen.addFileArg(b.path("linker/k2lnk.k2"));
+        gen.addFileArg(b.path("linker/k2lnk.sk"));
         gen.addArgs(&.{ "--no-entry", "-O2", "-o" });
         const k2lnk_obj = gen.addOutputFileArg("k2lnk.obj");
         gen.addPathDir(b.fmt("{s}/bin", .{lp})); // so LLVM-C.dll resolves at run time
@@ -232,7 +232,7 @@ pub fn build(b: *std.Build) void {
         // The embedded object carries the k2 runtime, which references ws2_32
         // (the net module). kernel32 is already linked; add Winsock.
         final_mod.linkSystemLibrary("ws2_32", .{});
-        const final = b.addExecutable(.{ .name = "k2", .root_module = final_mod });
+        const final = b.addExecutable(.{ .name = "skarn", .root_module = final_mod });
         final.win32_module_definition = b.path("linker/k2lnk_embed.def");
         b.installArtifact(final);
     } else {
@@ -242,7 +242,7 @@ pub fn build(b: *std.Build) void {
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| run_cmd.addArgs(args);
-    const run_step = b.step("run", "Run k2");
+    const run_step = b.step("run", "Run skarn");
     run_step.dependOn(&run_cmd.step);
 
     // ── Tests ─────────────────────────────────────────────────────────────

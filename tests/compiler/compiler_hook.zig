@@ -23,7 +23,7 @@ test "compiler-hook: a hook builds source with the REAL StringBuilder (host memo
     // pointers). A `#compiler` hook runs at compile time and cannot fall back to
     // runtime, so this only works because the comptime VM now models real host
     // memory. The hook emits a `sum_<T>` for every user struct.
-    var fe = try k2.compileFileWithRuntime(a, std.testing.io, "tests/fixtures/hostmem/derive_sb.k2");
+    var fe = try k2.compileFileWithRuntime(a, std.testing.io, "tests/fixtures/hostmem/derive_sb.sk");
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -59,7 +59,7 @@ test "compiler-hook: a hook reads a declaration's BODY text (R1b-A)" {
         \\}
         \\main :: fn() -> i32 { return answer(); }
     ;
-    var fe = try k2.compile(a, "body.k2", src);
+    var fe = try k2.compile(a, "body.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -84,7 +84,7 @@ test "compiler-hook: `compiler_remove` drops an existing declaration (R1b-B)" {
         \\}
         \\main :: fn() -> i32 { return 0; }
     ;
-    var fe = try k2.compile(a, "remove.k2", src);
+    var fe = try k2.compile(a, "remove.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -113,7 +113,7 @@ test "compiler-hook: a `#compiler(final)` hook runs AFTER generation and sees ge
         \\}
         \\main :: fn() -> i32 { return answer(); }
     ;
-    var fe = try k2.compile(a, "final_phase.k2", src);
+    var fe = try k2.compile(a, "final_phase.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -137,7 +137,7 @@ test "compiler-hook: a `#compiler(final)` hook can halt the build (whole-program
         \\}
         \\main :: fn() -> i32 { return 0; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "final_policy.k2", bad));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "final_policy.sk", bad));
 }
 
 test "compiler-hook: `compiler_error` halts the build with a custom diagnostic (R1b)" {
@@ -155,7 +155,7 @@ test "compiler-hook: `compiler_error` halts the build with a custom diagnostic (
         \\}
         \\main :: fn() -> i32 { return 0; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "policy.k2", bad));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "policy.sk", bad));
 }
 
 test "compiler-hook: a hook that does NOT call compiler_error compiles normally" {
@@ -166,7 +166,7 @@ test "compiler-hook: a hook that does NOT call compiler_error compiles normally"
         \\#compiler ok :: fn() -> []const u8 { return "gen :: fn() -> i32 { return 1; }"; }
         \\main :: fn() -> i32 { return gen(); }
     ;
-    var fe = try k2.compile(a, "ok.k2", src);
+    var fe = try k2.compile(a, "ok.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -202,7 +202,7 @@ test "compiler-hook: rich introspection — reads struct fields and enum variant
         \\}
         \\main :: fn() -> i32 { return answer(); }
     ;
-    var fe = try k2.compile(a, "hook_introspect.k2", src);
+    var fe = try k2.compile(a, "hook_introspect.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -222,7 +222,7 @@ test "compiler-hook: generated top-level declaration is added to the module" {
         \\}
         \\main :: fn() -> i32 { return doubled(21); }
     ;
-    var fe = try k2.compile(a, "hook_gen.k2", src);
+    var fe = try k2.compile(a, "hook_gen.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -261,7 +261,7 @@ test "compiler-hook: core::compiler_decls() inspection drives conditional genera
         \\}
         \\main :: fn() -> i32 { return answer(); }
     ;
-    var fe = try k2.compile(a, "hook_inspect.k2", src);
+    var fe = try k2.compile(a, "hook_inspect.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -278,7 +278,7 @@ test "compiler-hook: no hook means no compiler-prelude injection" {
     const src =
         \\main :: fn() -> i32 { return 7; }
     ;
-    var fe = try k2.compile(a, "no_hook.k2", src);
+    var fe = try k2.compile(a, "no_hook.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);

@@ -455,7 +455,7 @@ test "build: the expanded std.build API runs through the build hook" {
         \\build :: fn(b: Build) {
         \\    b.workspace("t");
         \\    b.out_root("bin");
-        \\    app := b.executable("app", "src/main.k2");
+        \\    app := b.executable("app", "src/main.sk");
         \\    app.optimize(.release_fast);
         \\    app.windowed();
         \\    app.entry("mainCRTStartup");
@@ -479,9 +479,9 @@ test "build: the expanded std.build API runs through the build hook" {
         \\    b.summary();
         \\}
     ;
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/build.k2", .data = build_src });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/build.sk", .data = build_src });
 
-    try k2.build_driver.run(arena.allocator(), io, dir ++ "/build.k2", .{
+    try k2.build_driver.run(arena.allocator(), io, dir ++ "/build.sk", .{
         .list = true,
         .quiet = true,
         .options = &.{ "fast", "name=cool" },
@@ -497,23 +497,23 @@ test "build: a test_dir step compiles+runs tests and fails on a failing one" {
 
     const dir = ".zig-cache/bt_test";
     std.Io.Dir.cwd().createDirPath(io, dir ++ "/tests") catch {};
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/p1.k2", .data = "main :: fn() -> i32 { return 0; }\n" });
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/p2.k2", .data = "main :: fn() -> i32 { return 0; }\n" });
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/f1.k2", .data = "main :: fn() -> i32 { return 3; }\n" });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/p1.sk", .data = "main :: fn() -> i32 { return 0; }\n" });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/p2.sk", .data = "main :: fn() -> i32 { return 0; }\n" });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/f1.sk", .data = "main :: fn() -> i32 { return 3; }\n" });
     const build_src =
         \\#import std.build.{ Build, Artifact };
         \\build :: fn(b: Build) {
-        \\    app := b.executable("app", "tests/p1.k2");
+        \\    app := b.executable("app", "tests/p1.sk");
         \\    b.test_dir("test", "tests");
         \\    b.default(app);
         \\}
     ;
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/build.k2", .data = build_src });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/build.sk", .data = build_src });
 
     const lp = k2.windows_sdk_lib_path;
     const lib_paths: []const []const u8 = if (lp.len > 0) &.{lp} else &.{};
     // One test exits non-zero, so the test step must fail.
-    try std.testing.expectError(error.RunFailed, k2.build_driver.run(arena.allocator(), io, dir ++ "/build.k2", .{
+    try std.testing.expectError(error.RunFailed, k2.build_driver.run(arena.allocator(), io, dir ++ "/build.sk", .{
         .target = "test",
         .quiet = true,
         .llvm_bin = k2.llvm_path ++ "/bin",
@@ -1682,24 +1682,24 @@ test "exe: std.path / std.time / std.crypto / std.serde run correctly cross-modu
     // (path: query/join; time: UTC calendar + live clocks; crypto: crc32/fnv;
     // serde: reflection-driven JSON for scalars/strings/nested structs/all widths).
     inline for (.{
-        .{ "tests/fixtures/stdlib/path_app.k2", "exe_path_app" },
-        .{ "tests/fixtures/stdlib/time_app.k2", "exe_time_app" },
-        .{ "tests/fixtures/stdlib/crypto_app.k2", "exe_crypto_app" },
-        .{ "tests/fixtures/stdlib/serde_app.k2", "exe_serde_app" },
-        .{ "tests/fixtures/stdlib/slice_app.k2", "exe_slice_app" },
-        .{ "tests/fixtures/stdlib/atomics_app.k2", "exe_atomics_app" },
-        .{ "tests/fixtures/stdlib/atomics_thread_app.k2", "exe_atomics_thread_app" },
-        .{ "tests/fixtures/stdlib/atomic_cell_app.k2", "exe_atomic_cell_app" },
-        .{ "tests/fixtures/stdlib/atomic_qualified_app.k2", "exe_atomic_qualified_app" },
-        .{ "tests/fixtures/lang/struct_methods_app.k2", "exe_struct_methods_app" },
-        .{ "tests/fixtures/lang/extern_fnptr_app.k2", "exe_extern_fnptr_app" },
-        .{ "tests/fixtures/lang/derive_eq_app.k2", "exe_derive_eq_app" },
-        .{ "tests/fixtures/lang/user_derive_app.k2", "exe_user_derive_app" },
-        .{ "tests/fixtures/stdlib/thread_app.k2", "exe_thread_app" },
-        .{ "tests/fixtures/stdlib/net_addr_app.k2", "exe_net_addr_app" },
-        .{ "tests/fixtures/stdlib/vec_app.k2", "exe_vec_app" },
-        .{ "tests/fixtures/stdlib/map_app.k2", "exe_map_app" },
-        .{ "tests/fixtures/stdlib/env_app.k2", "exe_env_app" },
+        .{ "tests/fixtures/stdlib/path_app.sk", "exe_path_app" },
+        .{ "tests/fixtures/stdlib/time_app.sk", "exe_time_app" },
+        .{ "tests/fixtures/stdlib/crypto_app.sk", "exe_crypto_app" },
+        .{ "tests/fixtures/stdlib/serde_app.sk", "exe_serde_app" },
+        .{ "tests/fixtures/stdlib/slice_app.sk", "exe_slice_app" },
+        .{ "tests/fixtures/stdlib/atomics_app.sk", "exe_atomics_app" },
+        .{ "tests/fixtures/stdlib/atomics_thread_app.sk", "exe_atomics_thread_app" },
+        .{ "tests/fixtures/stdlib/atomic_cell_app.sk", "exe_atomic_cell_app" },
+        .{ "tests/fixtures/stdlib/atomic_qualified_app.sk", "exe_atomic_qualified_app" },
+        .{ "tests/fixtures/lang/struct_methods_app.sk", "exe_struct_methods_app" },
+        .{ "tests/fixtures/lang/extern_fnptr_app.sk", "exe_extern_fnptr_app" },
+        .{ "tests/fixtures/lang/derive_eq_app.sk", "exe_derive_eq_app" },
+        .{ "tests/fixtures/lang/user_derive_app.sk", "exe_user_derive_app" },
+        .{ "tests/fixtures/stdlib/thread_app.sk", "exe_thread_app" },
+        .{ "tests/fixtures/stdlib/net_addr_app.sk", "exe_net_addr_app" },
+        .{ "tests/fixtures/stdlib/vec_app.sk", "exe_vec_app" },
+        .{ "tests/fixtures/stdlib/map_app.sk", "exe_map_app" },
+        .{ "tests/fixtures/stdlib/env_app.sk", "exe_env_app" },
     }) |c| {
         const code = try compileFileAndRun(arena.allocator(), c[0], c[1]);
         try std.testing.expectEqual(@as(u32, 42), code);
@@ -1765,7 +1765,7 @@ test "exe: fallible tail-forward + qualified `! ns::Error` return type" {
     // qualifies an error type from another module without a dual-import. (A fixture
     // because both features need a real cross-module import.)
     const code = try compileFileAndRun(arena.allocator(),
-        "tests/fixtures/lang/fallible_forward_app.k2", "exe_fallible_forward_qualerr");
+        "tests/fixtures/lang/fallible_forward_app.sk", "exe_fallible_forward_qualerr");
     try std.testing.expectEqual(@as(u32, 42), code);
 }
 
@@ -1831,8 +1831,8 @@ test "exe: std.net layered TCP + UDP loopback round-trips (os/socket/tcp/udp)" {
     //   udp: bind / recv_from / send_to / connected connect+send+recv
     // Each returns 42 iff the bytes echoed back intact.
     inline for (.{
-        .{ "tests/fixtures/stdlib/net_echo_app.k2", "exe_net_echo_app" },
-        .{ "tests/fixtures/stdlib/net_udp_app.k2", "exe_net_udp_app" },
+        .{ "tests/fixtures/stdlib/net_echo_app.sk", "exe_net_echo_app" },
+        .{ "tests/fixtures/stdlib/net_udp_app.sk", "exe_net_udp_app" },
     }) |c| {
         const code = try compileFileAndRun(arena.allocator(), c[0], c[1]);
         try std.testing.expectEqual(@as(u32, 42), code);
@@ -2304,7 +2304,7 @@ test "exe: std.list works cross-module (issue #6 + generic collision/realloc fix
     // module that defines `List`.
     const code = try compileFileAndRun(
         arena.allocator(),
-        "tests/fixtures/stdlib/list_app.k2",
+        "tests/fixtures/stdlib/list_app.sk",
         "exe_list_app",
     );
     try std.testing.expectEqual(@as(u32, 42), code);

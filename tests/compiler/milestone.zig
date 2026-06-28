@@ -127,7 +127,7 @@ test "milestone syntax parses and checks" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var front_end = try k2.compile(arena.allocator(), "milestone.k2", sample);
+    var front_end = try k2.compile(arena.allocator(), "milestone.sk", sample);
     defer front_end.deinit(arena.allocator());
 
     try std.testing.expectEqual(@as(usize, 15), front_end.module.items.len);
@@ -171,12 +171,12 @@ test "return type mismatch fails semantic checking" {
         \\}
     ;
 
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_return.k2", bad));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_return.sk", bad));
 }
 
 test "ir validation rejects missing branch targets" {
     const invalid = k2.IrModule{
-        .file_name = "invalid.k2",
+        .file_name = "invalid.sk",
         .functions = &.{
             .{
                 .name = "broken",

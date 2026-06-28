@@ -122,7 +122,7 @@ fn runSource(
     defer arena.deinit();
     const a = arena.allocator();
 
-    var fe = try k2.compile(a, "vm_test.k2", src);
+    var fe = try k2.compile(a, "vm_test.sk", src);
     defer fe.deinit(a);
     const ir_module = try k2.lowerFrontend(a, fe);
 
@@ -166,7 +166,7 @@ test "e2e: #run calls a function, folded to a constant" {
         \\square :: fn(x: i32) -> i32 { return x * x; }
         \\ANSWER :: #run square(7);
     ;
-    var fe = try k2.compile(a, "run.k2", src);
+    var fe = try k2.compile(a, "run.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
 
@@ -198,7 +198,7 @@ test "e2e: #run sizeof folds scalar, struct, and array sizes" {
         \\SP :: #run core::sizeof(Point);
         \\SA :: #run core::sizeof([4]i32);
     ;
-    var fe = try k2.compile(a, "sz.k2", src);
+    var fe = try k2.compile(a, "sz.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
 
@@ -225,7 +225,7 @@ test "e2e: #run enum match folds to a constant" {
         \\}
         \\R :: #run rank(Dir.east);
     ;
-    var fe = try k2.compile(a, "enum.k2", src);
+    var fe = try k2.compile(a, "enum.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try std.testing.expectEqual(@as(i128, 3), try globalInt(m, "R"));
@@ -253,7 +253,7 @@ test "e2e: #run optionals (?? coalesce and !! unwrap)" {
         \\NONE :: #run none_or();
         \\UNW  :: #run unwrapped();
     ;
-    var fe = try k2.compile(a, "opt.k2", src);
+    var fe = try k2.compile(a, "opt.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try std.testing.expectEqual(@as(i128, 5), try globalInt(m, "SOME"));
@@ -280,7 +280,7 @@ test "e2e: #run interface dynamic dispatch" {
         \\}
         \\AREA :: #run go();
     ;
-    var fe = try k2.compile(a, "iface.k2", src);
+    var fe = try k2.compile(a, "iface.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try std.testing.expectEqual(@as(i128, 25), try globalInt(m, "AREA"));
@@ -308,7 +308,7 @@ test "e2e: #run fallible with catch" {
         \\OKV :: #run safe(5);
         \\BADV :: #run safe(-3);
     ;
-    var fe = try k2.compile(a, "fallible.k2", src);
+    var fe = try k2.compile(a, "fallible.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try std.testing.expectEqual(@as(i128, 10), try globalInt(m, "OKV"));

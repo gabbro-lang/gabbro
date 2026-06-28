@@ -14,7 +14,7 @@ test "runtime: @panic and assert are available via compileWithRuntime" {
         \\}
     ;
     // compile() alone would fail ("unknown function `assert`")
-    var fe = try k2.compileWithRuntime(arena.allocator(), "main.k2", src);
+    var fe = try k2.compileWithRuntime(arena.allocator(), "main.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -43,7 +43,7 @@ test "runtime: supported platform sources are explicit and independently valid" 
 
     var fe = try k2.compileMulti(arena.allocator(), &.{
         .{ .file_name = "<runtime-linux>", .source = k2.k2_runtime.runtimeSourceFor(.linux, false).? },
-        .{ .file_name = "main.k2", .source = "main :: fn() -> i32 { return 0; }" },
+        .{ .file_name = "main.sk", .source = "main :: fn() -> i32 { return 0; }" },
     });
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
@@ -58,7 +58,7 @@ test "runtime: compile() without runtime — assert not available" {
         \\use :: fn() { assert(true); }
     ;
     // compile() has no runtime → assert is unknown → SemanticFailed
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bare.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bare.sk", src));
 }
 
 test "runtime: write_stdout is available for programs" {
@@ -70,7 +70,7 @@ test "runtime: write_stdout is available for programs" {
         \\    return write_stdout("Hello, K2!\n") as i32;
         \\}
     ;
-    var fe = try k2.compileWithRuntime(arena.allocator(), "hello.k2", src);
+    var fe = try k2.compileWithRuntime(arena.allocator(), "hello.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -88,7 +88,7 @@ test "runtime: exit and abort are terminating calls" {
         \\    abort();
         \\}
     ;
-    var fe = try k2.compileWithRuntime(arena.allocator(), "terminate.k2", src);
+    var fe = try k2.compileWithRuntime(arena.allocator(), "terminate.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(module);
@@ -108,7 +108,7 @@ test "runtime: @panic is #noreturn — CFG allows body without return" {
         \\    return x;
         \\}
     ;
-    var fe = try k2.compileWithRuntime(arena.allocator(), "validate.k2", src);
+    var fe = try k2.compileWithRuntime(arena.allocator(), "validate.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);

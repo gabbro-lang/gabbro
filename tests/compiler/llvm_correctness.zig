@@ -26,7 +26,7 @@ test "LLVM lowering selects signed, unsigned, and floating-point operations" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "llvm_ops.k2", src);
+    var fe = try k2.compile(arena.allocator(), "llvm_ops.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -67,7 +67,7 @@ test "LLVM lowering accepts full-width u64 constants" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "full_width_u64.k2", src);
+    var fe = try k2.compile(arena.allocator(), "full_width_u64.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -97,7 +97,7 @@ test "inferred local takes its width from a suffixed integer literal" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "inferred_i64.k2", src);
+    var fe = try k2.compile(arena.allocator(), "inferred_i64.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -130,7 +130,7 @@ test "LLVM lowering applies #align to struct allocas" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "align_struct.k2", src);
+    var fe = try k2.compile(arena.allocator(), "align_struct.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -156,7 +156,7 @@ test "LLVM force unwrap calls the embedded runtime panic" {
         \\}
     ;
 
-    var fe = try k2.compileWithRuntime(arena.allocator(), "force_unwrap.k2", src);
+    var fe = try k2.compileWithRuntime(arena.allocator(), "force_unwrap.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -181,7 +181,7 @@ test "LLVM optional equality compares presence instead of aggregate values" {
         \\is_empty :: fn(value: ?i32) -> bool { return null == value; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "optional_equality.k2", src);
+    var fe = try k2.compile(arena.allocator(), "optional_equality.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -207,7 +207,7 @@ test "LLVM optional payload is coerced to its declared integer width" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "optional_payload_width.k2", src);
+    var fe = try k2.compile(arena.allocator(), "optional_payload_width.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -236,7 +236,7 @@ test "LLVM panic lowering synthesizes the runtime declaration when absent" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "standalone_unwrap.k2", src);
+    var fe = try k2.compile(arena.allocator(), "standalone_unwrap.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -272,7 +272,7 @@ test "LLVM error/fallible ABI: fail and return lower to { ok, i32 } struct" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "fallible.k2", src);
+    var fe = try k2.compile(arena.allocator(), "fallible.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -305,7 +305,7 @@ test "LLVM fallible return coerces to its declared integer width" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "fallible_width.k2", src);
+    var fe = try k2.compile(arena.allocator(), "fallible_width.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -327,7 +327,7 @@ test "LLVM debug: division by zero inserts a runtime check" {
         \\divide :: fn(a: i32, b: i32) -> i32 { return a / b; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "div_check.k2", src);
+    var fe = try k2.compile(arena.allocator(), "div_check.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -355,7 +355,7 @@ test "LLVM debug: integer overflow inserts a located runtime check" {
         \\multiply :: fn(a: u32, b: u32) -> u32 { return a * b; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "overflow.k2", src);
+    var fe = try k2.compile(arena.allocator(), "overflow.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -379,7 +379,7 @@ test "LLVM release: division omits debug runtime check" {
         \\divide :: fn(a: i32, b: i32) -> i32 { return a / b; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "div_release.k2", src);
+    var fe = try k2.compile(arena.allocator(), "div_release.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -402,7 +402,7 @@ test "LLVM debug: shift overflow inserts a runtime check" {
         \\shift_it :: fn(a: u32, b: u32) -> u32 { return a << b; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "shift_check.k2", src);
+    var fe = try k2.compile(arena.allocator(), "shift_check.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -425,7 +425,7 @@ test "LLVM debug: slice bounds check inserts a runtime check" {
         \\get :: fn(data: []const u8, i: usize) -> u8 { return data[i]; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "bounds.k2", src);
+    var fe = try k2.compile(arena.allocator(), "bounds.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -448,7 +448,7 @@ test "LLVM debug: array bounds check uses static array length" {
         \\get :: fn(data: [4]u8, i: usize) -> u8 { return data[i]; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "array_bounds.k2", src);
+    var fe = try k2.compile(arena.allocator(), "array_bounds.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -476,7 +476,7 @@ test "LLVM float casts emit correct instructions" {
         \\widen_u :: fn(x: u8) -> u32 { return x as u32; }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "float_casts.k2", src);
+    var fe = try k2.compile(arena.allocator(), "float_casts.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -513,7 +513,7 @@ test "LLVM lowering reads and writes fields through struct pointers" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "pointer_fields.k2", src);
+    var fe = try k2.compile(arena.allocator(), "pointer_fields.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -543,7 +543,7 @@ test "LLVM zones are backed by std.heap (make/deinit over VirtualAlloc)" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "zones.k2", src);
+    var fe = try k2.compile(arena.allocator(), "zones.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -569,7 +569,7 @@ test "LLVM borrow parameters erase to their underlying ABI type" {
     const src =
         \\touch :: fn(data: borrow []u8) { data[0] = 1u8; }
     ;
-    var fe = try k2.compile(arena.allocator(), "borrow_abi.k2", src);
+    var fe = try k2.compile(arena.allocator(), "borrow_abi.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -601,7 +601,7 @@ test "LLVM lowering applies #cold / #section / #weak / #link_name (Phase 3)" {
         \\main :: fn() -> i32 { return rare() + sec() + wk() + rn(); }
     ;
 
-    var fe = try k2.compile(arena.allocator(), "attrs.k2", src);
+    var fe = try k2.compile(arena.allocator(), "attrs.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
 

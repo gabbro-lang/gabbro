@@ -15,7 +15,7 @@ test "comptime: #if with TARGET.os compiles both branches" {
         \\    }
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "ct.k2", src);
+    var fe = try k2.compile(arena.allocator(), "ct.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -29,7 +29,7 @@ test "comptime: #run expression as value" {
         \\double :: fn(x: i32) -> i32 { return x * 2; }
         \\ANSWER :: #run double(21);
     ;
-    var fe = try k2.compile(arena.allocator(), "ct2.k2", src);
+    var fe = try k2.compile(arena.allocator(), "ct2.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -50,7 +50,7 @@ test "comptime: #run block at statement level" {
         \\    return result;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "ct3.k2", src);
+    var fe = try k2.compile(arena.allocator(), "ct3.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -75,7 +75,7 @@ test "#run: constant computed at compile time, not runtime" {
         \\    return FIB_10 + FIB_7;   // 55 + 13 = 68
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "fib_ct.k2", src);
+    var fe = try k2.compile(arena.allocator(), "fib_ct.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -120,7 +120,7 @@ test "#run: string .len and enum-payload construction fold on the VM" {
         \\EP  :: #run enum_payload();  // 21
         \\SP  :: #run str_payload();   // 4
     ;
-    var fe = try k2.compile(arena.allocator(), "vmstr.k2", src);
+    var fe = try k2.compile(arena.allocator(), "vmstr.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -166,7 +166,7 @@ test "#run: taking the address of a scalar local folds on the VM" {
         \\R1 :: #run bump();          // 6
         \\R2 :: #run via_param(1);    // 11
     ;
-    var fe = try k2.compile(arena.allocator(), "addr_ct.k2", src);
+    var fe = try k2.compile(arena.allocator(), "addr_ct.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -198,7 +198,7 @@ test "#run: an un-foldable constant fails with a diagnostic, not silent garbage"
         \\make_p :: fn() -> P { return .{ 1, 2 }; }
         \\BAD :: #run make_p();
     ;
-    var fe = try k2.compile(arena.allocator(), "bad_ct.k2", src);
+    var fe = try k2.compile(arena.allocator(), "bad_ct.sk", src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectError(error.LoweringFailed, k2.lowerFrontend(arena.allocator(), fe));
 }
@@ -215,7 +215,7 @@ test "#run: a comptime @panic halts the build with its message (#2)" {
         \\boom :: fn() -> i32 { @panic("explicit comptime panic"); return 0; }
         \\BAD :: #run boom();
     ;
-    var fe = try k2.compile(arena.allocator(), "panic_ct.k2", src);
+    var fe = try k2.compile(arena.allocator(), "panic_ct.sk", src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectError(error.LoweringFailed, k2.lowerFrontend(arena.allocator(), fe));
 }
@@ -233,7 +233,7 @@ test "#if: only live branch emitted to IR" {
         \\    }
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "platform.k2", src);
+    var fe = try k2.compile(arena.allocator(), "platform.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -276,7 +276,7 @@ test "comptime: matchable TypeInfo — scalar kinds + fields" {
         \\U8_SIGNED  :: #run is_signed(u8);
         \\BOOL_IS    :: #run is_bool(bool);
     ;
-    var fe = try k2.compile(arena.allocator(), "ti1.k2", src);
+    var fe = try k2.compile(arena.allocator(), "ti1.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -304,7 +304,7 @@ test "comptime: matchable TypeInfo — struct fields (iterate names + types)" {
         \\NAME_SUM :: #run namesum(Point);
         \\INT_FIELDS :: #run int_flds(Point);
     ;
-    var fe = try k2.compile(arena.allocator(), "ti2.k2", src);
+    var fe = try k2.compile(arena.allocator(), "ti2.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -329,7 +329,7 @@ test "comptime: matchable TypeInfo — pointer/slice/optional + element navigati
         \\IS_OPT   :: #run is_opt(?i32);
         \\ELEM_BITS :: #run elem_bits([]u8);
     ;
-    var fe = try k2.compile(arena.allocator(), "ti3.k2", src);
+    var fe = try k2.compile(arena.allocator(), "ti3.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -347,7 +347,7 @@ test "comptime: type_name returns mangled type name" {
     const src =
         \\NAME :: #run core::type_name(i32);
     ;
-    var fe = try k2.compile(arena.allocator(), "tn1.k2", src);
+    var fe = try k2.compile(arena.allocator(), "tn1.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);

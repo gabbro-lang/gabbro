@@ -22,8 +22,8 @@ test "modules: compileMulti with two source files" {
     ;
 
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "math.k2", .source = math_src },
-        .{ .file_name = "main.k2", .source = main_src },
+        .{ .file_name = "math.sk", .source = math_src },
+        .{ .file_name = "main.sk", .source = main_src },
     });
     defer fe.deinit(arena.allocator());
 
@@ -48,8 +48,8 @@ test "modules: public symbols from imported file are visible" {
     ;
 
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "utils.k2", .source = utils },
-        .{ .file_name = "app.k2", .source = app },
+        .{ .file_name = "utils.sk", .source = utils },
+        .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 
@@ -75,15 +75,15 @@ test "modules: namespace import forms — as alias and .* glob" {
     ;
 
     var fe1 = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "lib.k2", .source = lib },
-        .{ .file_name = "aliased.k2", .source = aliased },
+        .{ .file_name = "lib.sk", .source = lib },
+        .{ .file_name = "aliased.sk", .source = aliased },
     });
     defer fe1.deinit(arena.allocator());
     try k2.ir_mod.validateModule(try k2.lowerFrontend(arena.allocator(), fe1));
 
     var fe2 = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "lib.k2", .source = lib },
-        .{ .file_name = "globbed.k2", .source = globbed },
+        .{ .file_name = "lib.sk", .source = lib },
+        .{ .file_name = "globbed.sk", .source = globbed },
     });
     defer fe2.deinit(arena.allocator());
     try k2.ir_mod.validateModule(try k2.lowerFrontend(arena.allocator(), fe2));
@@ -103,9 +103,9 @@ test "modules: two modules may define the same name (collision mangling)" {
         \\main :: fn() -> i32 { return a::greet() + b::greet() * 10; }
     ;
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "a.k2", .source = a },
-        .{ .file_name = "b.k2", .source = b },
-        .{ .file_name = "main.k2", .source = main },
+        .{ .file_name = "a.sk", .source = a },
+        .{ .file_name = "b.sk", .source = b },
+        .{ .file_name = "main.sk", .source = main },
     });
     defer fe.deinit(arena.allocator());
 
@@ -135,8 +135,8 @@ test "modules: cross-module UFCS finds a method in the type's module" {
         \\run :: fn(b: Box) -> i32 { return b.get(); }
     ;
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "lib.k2", .source = lib },
-        .{ .file_name = "app.k2", .source = app },
+        .{ .file_name = "lib.sk", .source = lib },
+        .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
     try k2.ir_mod.validateModule(try k2.lowerFrontend(arena.allocator(), fe));
@@ -152,8 +152,8 @@ test "modules: #run of a namespace call folds at comptime" {
         \\main :: fn() -> i32 { return #run lib::twice(21); }
     ;
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "lib.k2", .source = lib },
-        .{ .file_name = "app.k2", .source = app },
+        .{ .file_name = "lib.sk", .source = lib },
+        .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 
@@ -184,8 +184,8 @@ test "modules: bare import is namespace-only (no unqualified access)" {
         \\run :: fn() -> i32 { return helper(); }
     ;
     const result = k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "lib.k2", .source = lib },
-        .{ .file_name = "app.k2", .source = app },
+        .{ .file_name = "lib.sk", .source = lib },
+        .{ .file_name = "app.sk", .source = app },
     });
     try std.testing.expectError(error.SemanticFailed, result);
 }
@@ -198,7 +198,7 @@ test "modules: compile parses imports without resolving them" {
         \\#import std.io;
         \\hello :: fn() -> i32 { return 42; }
     ;
-    var fe = try k2.compile(arena.allocator(), "hello.k2", src);
+    var fe = try k2.compile(arena.allocator(), "hello.sk", src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectEqual(@as(usize, 2), fe.module.items.len);
 }
@@ -217,8 +217,8 @@ test "modules: selective import exposes only selected public names" {
     ;
 
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "math.k2", .source = math_src },
-        .{ .file_name = "app.k2", .source = app_src },
+        .{ .file_name = "math.sk", .source = math_src },
+        .{ .file_name = "app.sk", .source = app_src },
     });
     defer fe.deinit(arena.allocator());
 }
@@ -242,12 +242,12 @@ test "modules: unselected and private names are not visible" {
     ;
 
     try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "dependency.k2", .source = dependency },
-        .{ .file_name = "private_use.k2", .source = private_use },
+        .{ .file_name = "dependency.sk", .source = dependency },
+        .{ .file_name = "private_use.sk", .source = private_use },
     }));
     try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "dependency.k2", .source = dependency },
-        .{ .file_name = "unselected_use.k2", .source = unselected_use },
+        .{ .file_name = "dependency.sk", .source = dependency },
+        .{ .file_name = "unselected_use.sk", .source = unselected_use },
     }));
 }
 
@@ -261,12 +261,12 @@ test "modules: selective imports reject missing and private declarations" {
     ;
 
     try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "dependency.k2", .source = dependency },
-        .{ .file_name = "private.k2", .source = "#import dependency.{hidden};" },
+        .{ .file_name = "dependency.sk", .source = dependency },
+        .{ .file_name = "private.sk", .source = "#import dependency.{hidden};" },
     }));
     try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "dependency.k2", .source = dependency },
-        .{ .file_name = "missing.k2", .source = "#import dependency.{missing};" },
+        .{ .file_name = "dependency.sk", .source = dependency },
+        .{ .file_name = "missing.sk", .source = "#import dependency.{missing};" },
     }));
 }
 
@@ -275,7 +275,7 @@ test "modules: missing modules are errors" {
     defer arena.deinit();
 
     try std.testing.expectError(error.IoError, k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "app.k2", .source = "#import missing;" },
+        .{ .file_name = "app.sk", .source = "#import missing;" },
     }));
 }
 
@@ -284,8 +284,8 @@ test "modules: std root resolves independently of importing directory" {
     defer arena.deinit();
 
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "std/io.k2", .source = "pub write_stdout :: fn() {}" },
-        .{ .file_name = "app/main.k2", .source = "#import std.io.{write_stdout}; run :: fn() { write_stdout(); }" },
+        .{ .file_name = "std/io.sk", .source = "pub write_stdout :: fn() {}" },
+        .{ .file_name = "app/main.sk", .source = "#import std.io.{write_stdout}; run :: fn() { write_stdout(); }" },
     });
     defer fe.deinit(arena.allocator());
 }
@@ -306,8 +306,8 @@ test "modules: public constants and types respect visibility" {
     ;
 
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "dependency.k2", .source = dependency },
-        .{ .file_name = "app.k2", .source = app },
+        .{ .file_name = "dependency.sk", .source = dependency },
+        .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 }
@@ -319,7 +319,7 @@ test "modules: compileFile resolves local imports from disk" {
     var fe = try k2.compileFile(
         arena.allocator(),
         std.testing.io,
-        "tests/fixtures/modules/main.k2",
+        "tests/fixtures/modules/main.sk",
     );
     defer fe.deinit(arena.allocator());
 
@@ -332,8 +332,8 @@ test "modules: compileMulti normalizes logical module paths" {
     defer arena.deinit();
 
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = ".\\app\\dependency.k2", .source = "pub answer :: fn() -> i32 { return 42; }" },
-        .{ .file_name = "./app/main.k2", .source = "#import dependency.{answer}; run :: fn() -> i32 { return answer(); }" },
+        .{ .file_name = ".\\app\\dependency.sk", .source = "pub answer :: fn() -> i32 { return 42; }" },
+        .{ .file_name = "./app/main.sk", .source = "#import dependency.{answer}; run :: fn() -> i32 { return answer(); }" },
     });
     defer fe.deinit(arena.allocator());
 }
@@ -345,7 +345,7 @@ test "modules: configured std root loads std.mem" {
     var fe = try k2.compileFile(
         arena.allocator(),
         std.testing.io,
-        "tests/fixtures/stdlib/mem_app.k2",
+        "tests/fixtures/stdlib/mem_app.sk",
     );
     defer fe.deinit(arena.allocator());
 
@@ -360,7 +360,7 @@ test "modules: configured std root loads std.io" {
     var fe = try k2.compileFileWithRuntime(
         arena.allocator(),
         std.testing.io,
-        "tests/fixtures/stdlib/io_app.k2",
+        "tests/fixtures/stdlib/io_app.sk",
     );
     defer fe.deinit(arena.allocator());
 
@@ -375,7 +375,7 @@ test "modules: game stdlib (std.math + std.rand + std.color) resolves and lowers
     var fe = try k2.compileFileWithRuntime(
         arena.allocator(),
         std.testing.io,
-        "tests/fixtures/stdlib/game_app.k2",
+        "tests/fixtures/stdlib/game_app.sk",
     );
     defer fe.deinit(arena.allocator());
 
@@ -387,9 +387,9 @@ test "modules: general stdlib (std.path + std.time + std.crypto) resolves and lo
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     inline for (.{
-        "tests/fixtures/stdlib/path_app.k2",
-        "tests/fixtures/stdlib/time_app.k2",
-        "tests/fixtures/stdlib/crypto_app.k2",
+        "tests/fixtures/stdlib/path_app.sk",
+        "tests/fixtures/stdlib/time_app.sk",
+        "tests/fixtures/stdlib/crypto_app.sk",
     }) |fixture| {
         var fe = try k2.compileFileWithRuntime(arena.allocator(), std.testing.io, fixture);
         defer fe.deinit(arena.allocator());
@@ -405,7 +405,7 @@ test "modules: configured std root loads std.heap" {
     var fe = try k2.compileFileWithRuntime(
         arena.allocator(),
         std.testing.io,
-        "tests/fixtures/stdlib/heap_app.k2",
+        "tests/fixtures/stdlib/heap_app.sk",
     );
     defer fe.deinit(arena.allocator());
 
@@ -427,8 +427,8 @@ test "modules: imported self functions are extension methods" {
     ;
 
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "helpers.k2", .source = helpers },
-        .{ .file_name = "app.k2", .source = app },
+        .{ .file_name = "helpers.sk", .source = helpers },
+        .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 
@@ -448,7 +448,7 @@ test "parser: namespace-qualified generic type in a typed local (ns::Name(args))
         \\    return 0;
         \\}
     ;
-    const module = try k2.parseSource(arena.allocator(), "q.k2", src);
+    const module = try k2.parseSource(arena.allocator(), "q.sk", src);
     const ty = module.items[0].function.body.?.statements[0].local_typed.ty;
     try std.testing.expect(ty == .generic_inst);
     try std.testing.expectEqualStrings("Atomic", ty.generic_inst.name);
@@ -474,8 +474,8 @@ test "modules: namespace-qualified generic type resolves + lowers (ns::Name(args
         \\}
     ;
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "lib.k2", .source = lib },
-        .{ .file_name = "app.k2", .source = app },
+        .{ .file_name = "lib.sk", .source = lib },
+        .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 
@@ -488,8 +488,8 @@ test "modules: unimported self functions are not extension methods" {
     defer arena.deinit();
 
     try std.testing.expectError(error.SemanticFailed, k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "helpers.k2", .source = "pub doubled :: fn(self: i32) -> i32 { return self * 2; }" },
-        .{ .file_name = "app.k2", .source = "run :: fn() -> i32 { return 20.doubled(); }" },
+        .{ .file_name = "helpers.sk", .source = "pub doubled :: fn(self: i32) -> i32 { return self * 2; }" },
+        .{ .file_name = "app.sk", .source = "run :: fn() -> i32 { return 20.doubled(); }" },
     }));
 }
 
@@ -512,8 +512,8 @@ test "modules: generic extension methods retain explicit type arguments" {
     ;
 
     var fe = try k2.compileMulti(arena.allocator(), &.{
-        .{ .file_name = "helpers.k2", .source = helpers },
-        .{ .file_name = "app.k2", .source = app },
+        .{ .file_name = "helpers.sk", .source = helpers },
+        .{ .file_name = "app.sk", .source = app },
     });
     defer fe.deinit(arena.allocator());
 

@@ -39,7 +39,7 @@ test "interfaces: explicit conformance and dynamic dispatch lower end to end" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "interfaces.k2", src);
+    var fe = try k2.compile(arena.allocator(), "interfaces.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -101,7 +101,7 @@ test "interfaces: missing required method fails sema" {
         \\    flush :: fn(self: *Self) {}
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "missing_method.k2", bad));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "missing_method.sk", bad));
 }
 
 test "interfaces: dynamic coercion requires explicit conformance" {
@@ -117,5 +117,5 @@ test "interfaces: dynamic coercion requires explicit conformance" {
         \\    writer: *Writer = file;
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "missing_impl.k2", bad));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "missing_impl.sk", bad));
 }

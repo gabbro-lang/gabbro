@@ -59,7 +59,7 @@ test "k2 errors: declarations fail propagate catch and split defer" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "errors.k2", src);
+    var fe = try k2.compile(arena.allocator(), "errors.sk", src);
     defer fe.deinit(arena.allocator());
 
     const module = try k2.lowerFrontend(arena.allocator(), fe);
@@ -98,7 +98,7 @@ test "k2 errors: fail payload type is checked" {
         \\}
     ;
 
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_error_payload.k2", bad));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_error_payload.sk", bad));
 }
 
 test "k2 errors: anonymous inline error sets are checked" {
@@ -118,7 +118,7 @@ test "k2 errors: anonymous inline error sets are checked" {
         \\}
     ;
 
-    var fe = try k2.compile(arena.allocator(), "anon_errors.k2", src);
+    var fe = try k2.compile(arena.allocator(), "anon_errors.sk", src);
     defer fe.deinit(arena.allocator());
     const module = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(module);
@@ -134,7 +134,7 @@ test "k2 errors: unknown variants in inline error sets fail" {
         \\}
     ;
 
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_error_variant.k2", bad));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_error_variant.sk", bad));
 }
 
 test "k2 errors: postfix try outside fallible function fails" {
@@ -148,7 +148,7 @@ test "k2 errors: postfix try outside fallible function fails" {
         \\}
     ;
 
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_try.k2", bad));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bad_try.sk", bad));
 }
 
 fn findFunction(module: k2.IrModule, name: []const u8) ?k2.ir_mod.IrFunction {

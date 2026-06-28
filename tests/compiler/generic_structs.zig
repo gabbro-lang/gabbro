@@ -21,7 +21,7 @@ test "generic struct: declaration and basic instantiation" {
         \\    return p.first + p.second;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "pair.k2", src);
+    var fe = try k2.compile(arena.allocator(), "pair.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -56,7 +56,7 @@ test "generic struct: ArrayList-style container" {
         \\    return list.len;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "list.k2", src);
+    var fe = try k2.compile(arena.allocator(), "list.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -85,7 +85,7 @@ test "generic struct: two type params" {
         \\    return 0;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "map.k2", src);
+    var fe = try k2.compile(arena.allocator(), "map.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -110,7 +110,7 @@ test "generic struct: same type used twice gives one instantiation" {
         \\a :: fn(b: *Box(i32)) -> i32 { return b.value; }
         \\c :: fn(b: *Box(i32)) -> i32 { return b.value + 1; }
     ;
-    var fe = try k2.compile(arena.allocator(), "box.k2", src);
+    var fe = try k2.compile(arena.allocator(), "box.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);

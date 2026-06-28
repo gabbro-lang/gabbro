@@ -20,7 +20,7 @@ test "metaprogram: #insert literal #quote lowers to valid IR" {
         \\    return x;
         \\}
     ;
-    var fe = try k2.compile(a, "mp1.k2", src);
+    var fe = try k2.compile(a, "mp1.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -48,7 +48,7 @@ test "metaprogram: spliced locals are visible to following statements" {
         \\    return total + 1;
         \\}
     ;
-    var fe = try k2.compile(a, "mp2.k2", src);
+    var fe = try k2.compile(a, "mp2.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -69,7 +69,7 @@ test "metaprogram: block macro expands and lowers to valid IR" {
         \\    return n;
         \\}
     ;
-    var fe = try k2.compile(a, "mac1.k2", src);
+    var fe = try k2.compile(a, "mac1.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -94,7 +94,7 @@ test "metaprogram: #for unrolls and lowers to valid IR" {
         \\    return total;
         \\}
     ;
-    var fe = try k2.compile(a, "for1.k2", src);
+    var fe = try k2.compile(a, "for1.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -114,7 +114,7 @@ test "metaprogram: #for with non-constant bounds is rejected" {
         \\    return total;
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "for2.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "for2.sk", src));
 }
 
 test "metaprogram: macro with wrong argument count is rejected" {
@@ -128,7 +128,7 @@ test "metaprogram: macro with wrong argument count is rejected" {
         \\    #insert one(#quote(1), #quote(2));
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "mac2.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "mac2.sk", src));
 }
 
 test "metaprogram: stray $ splice outside a macro is rejected" {
@@ -141,7 +141,7 @@ test "metaprogram: stray $ splice outside a macro is rejected" {
         \\    return $x;
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "mac3.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "mac3.sk", src));
 }
 
 test "metaprogram: ast.* types resolve and match in a metaprogramming module" {
@@ -165,7 +165,7 @@ test "metaprogram: ast.* types resolve and match in a metaprogramming module" {
         \\    return 0;
         \\}
     ;
-    var fe = try k2.compile(a, "astuse.k2", src);
+    var fe = try k2.compile(a, "astuse.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -198,7 +198,7 @@ test "metaprogram: #quote(expr) materializes an AstExpr value at comptime" {
         \\SEVEN :: #run peek_int();
         \\KIND  :: #run peek_kind();
     ;
-    var fe = try k2.compile(a, "mat.k2", src);
+    var fe = try k2.compile(a, "mat.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -235,7 +235,7 @@ test "metaprogram: #quote block materializes an AstBlock with its statements" {
         \\}
         \\LEN :: #run blocklen();
     ;
-    var fe = try k2.compile(a, "blk.k2", src);
+    var fe = try k2.compile(a, "blk.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -272,7 +272,7 @@ test "metaprogram: #insert #run gen() splices VM-computed code (two-pass)" {
         \\}
         \\ANSWER :: #run run();
     ;
-    var fe = try k2.compile(a, "gen.k2", src);
+    var fe = try k2.compile(a, "gen.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -316,7 +316,7 @@ test "metaprogram: generative control flow picks different blocks" {
         \\}
         \\ANSWER :: #run run();
     ;
-    var fe = try k2.compile(a, "pick.k2", src);
+    var fe = try k2.compile(a, "pick.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -358,7 +358,7 @@ test "metaprogram: generated control flow (while + if) round-trips" {
         \\}
         \\ANSWER :: #run run();
     ;
-    var fe = try k2.compile(a, "wide.k2", src);
+    var fe = try k2.compile(a, "wide.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -393,7 +393,7 @@ test "metaprogram: generated calls, unary, and negatives round-trip" {
         \\}
         \\ANSWER :: #run run();
     ;
-    var fe = try k2.compile(a, "calls.k2", src);
+    var fe = try k2.compile(a, "calls.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -432,7 +432,7 @@ test "metaprogram: ast.* exposes the widened node kinds for inspection" {
         \\K_INDEX :: #run classify(#quote(arr[0]));
         \\K_STR   :: #run classify(#quote("hi"));
     ;
-    var fe = try k2.compile(a, "classify.k2", src);
+    var fe = try k2.compile(a, "classify.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -470,7 +470,7 @@ test "metaprogram: generated declared locals are visible after #insert" {
         \\}
         \\ANSWER :: #run run();
     ;
-    var fe = try k2.compile(a, "decl.k2", src);
+    var fe = try k2.compile(a, "decl.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -506,7 +506,7 @@ test "metaprogram: wide inspection covers types, slices, optionals, control flow
         \\K_COAL  :: #run classify(#quote(opt ?? 9));
         \\K_UNWRAP :: #run classify(#quote(opt!!));
     ;
-    var fe = try k2.compile(a, "wideinspect.k2", src);
+    var fe = try k2.compile(a, "wideinspect.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -550,7 +550,7 @@ test "metaprogram: generated compound literal + call round-trips" {
         \\}
         \\ANSWER :: #run run();
     ;
-    var fe = try k2.compile(a, "compound.k2", src);
+    var fe = try k2.compile(a, "compound.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -580,7 +580,7 @@ test "metaprogram: #parse turns a comptime string into spliced code" {
         \\}
         \\ANSWER :: #run run();
     ;
-    var fe = try k2.compile(a, "parse.k2", src);
+    var fe = try k2.compile(a, "parse.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -605,7 +605,7 @@ test "metaprogram: typed macro param rejects a mismatched argument" {
         \\wrap :: macro(body: AstBlock) -> AstBlock { return #quote { $body; }; }
         \\main :: fn() { #insert wrap(#quote(1 + 2)); }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "tmacro.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "tmacro.sk", src));
 }
 
 test "metaprogram: ast.* types are absent without metaprogramming" {
@@ -618,7 +618,7 @@ test "metaprogram: ast.* types are absent without metaprogramming" {
     const src =
         \\describe :: fn(e: AstExpr) -> i64 { return 0; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "nometa.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "nometa.sk", src));
 }
 
 test "metaprogram: non-quote #insert operand is rejected" {
@@ -633,5 +633,5 @@ test "metaprogram: non-quote #insert operand is rejected" {
         \\}
     ;
     // Sema must reject: the operand is not a #quote block.
-    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "mp3.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(a, "mp3.sk", src));
 }

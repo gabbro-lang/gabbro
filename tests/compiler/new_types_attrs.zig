@@ -22,7 +22,7 @@ test "u1-u7 as struct fields in packed struct" {
         \\    return r;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "subbyte.k2", src);
+    var fe = try k2.compile(arena.allocator(), "subbyte.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -48,7 +48,7 @@ test "u4 field: 4-bit integer" {
         \\    return .{ lo, hi };
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "nibble.k2", src);
+    var fe = try k2.compile(arena.allocator(), "nibble.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -66,7 +66,7 @@ test "i1-i7 signed sub-byte integers" {
         \\    pad:   u4,
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "signed_bits.k2", src);
+    var fe = try k2.compile(arena.allocator(), "signed_bits.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -95,7 +95,7 @@ test "#noreturn: function with noreturn attribute" {
         \\    // no return statement — allowed because #noreturn
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "noreturn.k2", src);
+    var fe = try k2.compile(arena.allocator(), "noreturn.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -117,7 +117,7 @@ test "#noinline: function with noinline attribute" {
         \\    return x * 2;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "noinline.k2", src);
+    var fe = try k2.compile(arena.allocator(), "noinline.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -139,7 +139,7 @@ test "#export: function marked for export" {
         \\#export
         \\multiply :: fn(a: i32, b: i32) -> i32 { return a * b; }
     ;
-    var fe = try k2.compile(arena.allocator(), "export.k2", src);
+    var fe = try k2.compile(arena.allocator(), "export.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -167,7 +167,7 @@ test "#deprecated: calling deprecated function emits warning" {
         \\    old_print("hello");   // should trigger warning
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "deprecated.k2", src);
+    var fe = try k2.compile(arena.allocator(), "deprecated.sk", src);
     defer fe.deinit(arena.allocator());
 
     // Compile succeeds, but diagnostics contain a warning
@@ -193,7 +193,7 @@ test "#system_library: standalone declaration is collected into IrModule.extern_
         \\    InitWindow(800, 450, "hi".ptr);
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "syslib.k2", src);
+    var fe = try k2.compile(arena.allocator(), "syslib.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -220,7 +220,7 @@ test "#foreign: alias for #extern binds external functions and contributes to ex
         \\    return WindowShouldClose();
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "foreign.k2", src);
+    var fe = try k2.compile(arena.allocator(), "foreign.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -254,7 +254,7 @@ test "distinct integer type: lowers to underlying integer type in IR" {
         \\    return id as i32;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "distinct_int.k2", src);
+    var fe = try k2.compile(arena.allocator(), "distinct_int.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -285,7 +285,7 @@ test "distinct pointer type: *opaque-based handle lowers to ptr" {
         \\    return GetStdHandle(-11);
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "distinct_ptr.k2", src);
+    var fe = try k2.compile(arena.allocator(), "distinct_ptr.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -309,7 +309,7 @@ test "distinct type in struct field lowers to underlying type" {
         \\    alive: bool,
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "distinct_field.k2", src);
+    var fe = try k2.compile(arena.allocator(), "distinct_field.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -335,7 +335,7 @@ test "opaque type: *Opaque parameter lowers to ptr" {
         \\    return 0;
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "opaque_ptr.k2", src);
+    var fe = try k2.compile(arena.allocator(), "opaque_ptr.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -359,7 +359,7 @@ test "atomic field: struct with atomic u32 fields lowers to regular u32" {
         \\    padding: u32,
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "atomic_field.k2", src);
+    var fe = try k2.compile(arena.allocator(), "atomic_field.sk", src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
     try k2.ir_mod.validateModule(m);
@@ -388,7 +388,7 @@ test "atomic_load and atomic_store: parse, type-check, and lower to IR" {
         \\    return core::atomic_load(&f.ready, .acquire);
         \\}
     ;
-    var fe = try k2.compile(arena.allocator(), "atomic_ops.k2", src);
+    var fe = try k2.compile(arena.allocator(), "atomic_ops.sk", src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectEqual(@as(usize, 0), fe.diagnostics().len);
     const m = try k2.lowerFrontend(arena.allocator(), fe);
@@ -433,7 +433,7 @@ test "C ABI: #extern declarations lower by-value aggregates per Win64" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compile(arena.allocator(), "raylib_abi.k2", raylib_abi_src);
+    var fe = try k2.compile(arena.allocator(), "raylib_abi.sk", raylib_abi_src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectEqual(@as(usize, 0), fe.diagnostics().len);
     const m = try k2.lowerFrontend(arena.allocator(), fe);
@@ -463,7 +463,7 @@ test "C ABI: call sites coerce by-value struct arguments and sret returns" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var fe = try k2.compile(arena.allocator(), "raylib_abi.k2", raylib_abi_src);
+    var fe = try k2.compile(arena.allocator(), "raylib_abi.sk", raylib_abi_src);
     defer fe.deinit(arena.allocator());
     const m = try k2.lowerFrontend(arena.allocator(), fe);
 
@@ -605,7 +605,7 @@ test "core::: a bare builtin call is rejected (must use core::)" {
         \\P :: struct { x: i32 }
         \\main :: fn() -> i32 { return sizeof(P) as i32; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bare.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "bare.sk", src));
 }
 
 test "core::: `core::sizeof` and `core::type_id` are accepted" {
@@ -616,7 +616,7 @@ test "core::: `core::sizeof` and `core::type_id` are accepted" {
         \\P :: struct { x: i32, y: i32 }
         \\main :: fn() -> i32 { return (core::sizeof(P) as i32) + (core::type_id(P) as i32); }
     ;
-    var fe = try k2.compile(a, "ns.k2", src);
+    var fe = try k2.compile(a, "ns.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -630,7 +630,7 @@ test "attrs: `#must_use` rejects a discarded call result" {
         \\compute :: fn() -> i32 { return 7; }
         \\main :: fn() -> i32 { compute(); return 0; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "mu.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "mu.sk", src));
 }
 
 test "attrs: `#must_use` allows a used call result" {
@@ -642,7 +642,7 @@ test "attrs: `#must_use` allows a used call result" {
         \\compute :: fn() -> i32 { return 7; }
         \\main :: fn() -> i32 { x := compute(); return x; }
     ;
-    var fe = try k2.compile(a, "mu_ok.k2", src);
+    var fe = try k2.compile(a, "mu_ok.sk", src);
     defer fe.deinit(a);
     const m = try k2.lowerFrontend(a, fe);
     try k2.ir_mod.validateModule(m);
@@ -656,5 +656,5 @@ test "core::: `core` is a reserved import alias" {
         \\#import std.heap as core;
         \\main :: fn() -> i32 { return 0; }
     ;
-    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "reserve.k2", src));
+    try std.testing.expectError(error.SemanticFailed, k2.compile(arena.allocator(), "reserve.sk", src));
 }

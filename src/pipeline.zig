@@ -302,7 +302,7 @@ fn moduleImportsStdHeap(items: []const ast.Item) bool {
     return false;
 }
 
-/// Turn an import path like ["utils", "math"] into "utils/math.k2"
+/// Turn an import path like ["utils", "math"] into "utils/math.sk"
 /// relative to `base_dir`.
 fn resolveImportPath(
     allocator: std.mem.Allocator,
@@ -325,7 +325,7 @@ fn resolveImportPath(
         if (i > 0) try buf.append(allocator, std.fs.path.sep);
         try buf.appendSlice(allocator, part);
     }
-    try buf.appendSlice(allocator, ".k2");
+    try buf.appendSlice(allocator, ".sk");
     return buf.toOwnedSlice(allocator);
 }
 

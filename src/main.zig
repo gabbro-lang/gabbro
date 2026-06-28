@@ -117,7 +117,7 @@ pub fn main(init: std.process.Init) u8 {
     if (std.mem.eql(u8, cmd, "build")) {
         const arg2: ?[]const u8 = if (args.len >= 3) args[2] else null;
         const is_direct = arg2 != null and
-            std.mem.endsWith(u8, arg2.?, ".k2") and
+            std.mem.endsWith(u8, arg2.?, ".sk") and
             fileExists(io, arg2.?);
         if (!is_direct) return cmdBuildDir(allocator, io, args[2..]);
     }
@@ -322,7 +322,7 @@ fn cmdBindgen(allocator: std.mem.Allocator, io: std.Io, env: anytype, args: []co
         }
     }
 
-    const out_path = out orelse deriveOut(allocator, header, ".k2");
+    const out_path = out orelse deriveOut(allocator, header, ".sk");
     defer if (out == null) allocator.free(out_path);
 
     // libclang is loaded on demand (the core compiler carries no dependency on
@@ -565,7 +565,7 @@ fn cmdBuildDir(allocator: std.mem.Allocator, io: std.Io, rest: []const []const u
     opts.run_args = run_args.items;
     opts.options = options.items;
 
-    const build_path = "build.k2";
+    const build_path = "build.sk";
     if (!fileExists(io, build_path)) {
         std.debug.print("k2 build: no build.k2 in the current directory\n", .{});
         return 1;
@@ -599,18 +599,18 @@ fn dirHasFile(io: std.Io, dir: []const u8, rel: []const u8) bool {
 fn resolveStdRoot(ra: std.mem.Allocator, io: std.Io, env: anytype, flag: []const u8, exe_dir: ?[]const u8) ?[]const u8 {
     if (flag.len > 0) return ra.dupe(u8, flag) catch null;
     if (env.get("K2_STD")) |v|
-        if (dirHasFile(io, v, "std/io.k2")) return ra.dupe(u8, v) catch null;
+        if (dirHasFile(io, v, "std/io.sk")) return ra.dupe(u8, v) catch null;
     if (env.get("K2_HOME")) |home| {
         if (std.fmt.allocPrint(ra, "{s}/lib", .{home}) catch null) |c|
-            if (dirHasFile(io, c, "std/io.k2")) return c;
+            if (dirHasFile(io, c, "std/io.sk")) return c;
     }
     if (exe_dir) |ed| {
         for ([_][]const u8{ "lib", "../lib", "../../lib" }) |rel| {
             const cand = std.fmt.allocPrint(ra, "{s}/{s}", .{ ed, rel }) catch continue;
-            if (dirHasFile(io, cand, "std/io.k2")) return cand;
+            if (dirHasFile(io, cand, "std/io.sk")) return cand;
         }
     }
-    if (k2.stdlib_root.len > 0 and dirHasFile(io, k2.stdlib_root, "std/io.k2"))
+    if (k2.stdlib_root.len > 0 and dirHasFile(io, k2.stdlib_root, "std/io.sk"))
         return ra.dupe(u8, k2.stdlib_root) catch null;
     return null;
 }

@@ -9,11 +9,11 @@
 /// `__libc_start_main` (the dynamically-linked `linux-gnu` target).
 const builtin = @import("builtin");
 
-pub const windows_src = @embedFile("runtime/windows.k2");
+pub const windows_src = @embedFile("runtime/windows.sk");
 
-const linux_body = @embedFile("runtime/linux.k2");
-const linux_start_none = @embedFile("runtime/linux_start_none.k2");
-const linux_start_gnu = @embedFile("runtime/linux_start_gnu.k2");
+const linux_body = @embedFile("runtime/linux.sk");
+const linux_start_none = @embedFile("runtime/linux_start_none.sk");
+const linux_start_gnu = @embedFile("runtime/linux_start_gnu.sk");
 
 pub const linux_none_src = linux_body ++ "\n" ++ linux_start_none;
 pub const linux_gnu_src = linux_body ++ "\n" ++ linux_start_gnu;

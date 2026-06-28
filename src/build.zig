@@ -620,7 +620,7 @@ fn runTestDir(gpa: std.mem.Allocator, io: std.Io, plan: *BuildPlan, base_dir: []
     var it = dir.iterate();
     while (it.next(io) catch null) |entry| {
         if (entry.kind != .file) continue;
-        if (!std.mem.endsWith(u8, entry.name, ".k2")) continue;
+        if (!std.mem.endsWith(u8, entry.name, ".sk")) continue;
         // `entry.name` is only valid until the next iteration — copy it.
         const name = a.dupe(u8, entry.name) catch continue;
         const src_path = joinPath(a, dir_abs, name) catch continue;

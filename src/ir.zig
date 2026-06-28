@@ -5457,7 +5457,7 @@ fn isCoreNs(sa: ast.ScopeAccess) bool {
 fn moduleNameOf(file: []const u8) []const u8 {
     var base = file;
     if (std.mem.lastIndexOfAny(u8, base, "/\\")) |i| base = base[i + 1 ..];
-    if (std.mem.endsWith(u8, base, ".k2")) base = base[0 .. base.len - 3];
+    if (std.mem.endsWith(u8, base, ".sk")) base = base[0 .. base.len - 3];
     return base;
 }
 

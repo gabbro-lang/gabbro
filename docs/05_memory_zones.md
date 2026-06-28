@@ -1,8 +1,8 @@
 # Memory & Zones
 
-Skarn does not have a Garbage Collector (GC), nor does it rely on hidden allocations.
-Instead, it uses a concept called **Zones** for safe, lexically-scoped memory
-management, and **Borrowing** to pass memory around without violating ownership rules.
+No garbage collector, no hidden allocations. Memory is managed with **zones** —
+lexically-scoped arenas — and **borrowing** moves it between scopes without breaking
+ownership.
 
 ## Zone Blocks
 

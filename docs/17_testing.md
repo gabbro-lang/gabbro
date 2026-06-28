@@ -114,10 +114,10 @@ parse → preludes → sema (Test injected if a #test exists)
   between the diagnostics check and the LLVM backend in both
   `compileWithLlvm` and `compileFileWithLlvm`.
 
-## 5. Roadmap
+## 5. Designed, not built yet
 
-The comptime lane is the spine. The remaining pieces (designed in
-[docs/15 §4](15_tooling.md)) build on it and on skarn's reflection:
+The comptime lane is the spine. The rest (designed in
+[docs/15 §4](15_tooling.md)) builds on it and on skarn's reflection:
 
 - **Runtime lane** — `#test` functions that touch the OS run as a built
   executable, each in its own `zone`/arena with leak accounting. This also lifts

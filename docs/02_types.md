@@ -124,7 +124,7 @@ log :: fn(msg: []const u8) -> void {
 }
 ```
 
-You never construct a `void` value directly. A function with a `void` return simply ends without a return expression, or uses a bare `return;`.
+You never construct a `void` value directly. A function with a `void` return ends without a return expression, or uses a bare `return;`.
 
 ## Composite Types
 

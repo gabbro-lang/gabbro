@@ -78,8 +78,8 @@ d := p.distance();      // auto-referenced to `&p`; same as distance(&p)
 ```
 
 A `*Self` method auto-references its receiver, so you call it with a plain value —
-no explicit `&`. This works on a **temporary** too (the value is spilled to a stack
-slot and pointed at), which means methods chain on returned values:
+no explicit `&`. It works on a **temporary** too: the value is spilled to a stack slot and pointed
+at. Methods chain on returned values:
 
 ```skarn
 n := make_point(3, 4).distance();        // call on a temporary

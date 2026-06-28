@@ -1,14 +1,15 @@
 # Linux / ELF / SysV backend
 
-> Status: **core implemented** — skarn cross-compiles from Windows to a **static,
-> freestanding Linux x86-64 ELF** (no libc) and runs it. Compute/CLI programs
-> work today: I/O, the heap allocator, `Vec`, strings, and formatting. File
-> system, time, process, net, and threads are not yet ported (they still call
-> Win32). The design sections below (§2 onward) are the original plan and remain
-> a useful reference; where the implementation diverges it is **freestanding +
-> direct syscalls**, not glibc/crt1.o — see the implementation notes next.
+Skarn cross-compiles from Windows to a static, freestanding Linux x86-64 ELF — no
+libc — and runs it. Compute and CLI programs work today: I/O, the heap allocator,
+`Vec`, strings, formatting. Filesystem, time, process, net, and threads still call
+Win32; they aren't ported yet.
 
-## 0. Implemented (current status)
+The design sections below (§2 on) are the original plan. The implementation went
+freestanding with direct syscalls, not glibc/crt1.o — the notes flag where it
+diverges.
+
+## 0. What works today
 
 Use `--target linux` to cross-compile from a Windows host:
 
@@ -118,7 +119,7 @@ pub const Target = enum { windows_x64, linux_x64 };
 This keeps the Windows path a literal `switch (target)` arm — no behavior change
 on Windows, and every Linux branch is visible and reviewable.
 
-## 4. Phase 1 — an ELF executable that runs (`exit 42`)
+## 4. An ELF executable that runs (`exit 42`)
 
 Goal: `main :: fn() -> i32 { return 42; }` builds to a running ELF binary on
 Linux. No aggregates, no FFI, no stdlib OS calls yet.
@@ -142,7 +143,7 @@ Test: a Linux CI job runs the existing exe fixtures that need no OS calls
 `exe_integration.zig` harness already shells out to the produced binary — it just
 needs the non-Windows branch enabled instead of `SkipZigTest`.
 
-## 5. Phase 2 — the System V AMD64 ABI
+## 5. The System V AMD64 ABI
 
 This is the one genuinely intricate piece. SysV classifies an aggregate into
 **eightbytes** (8-byte chunks), each independently INTEGER, SSE, or MEMORY:
@@ -182,7 +183,7 @@ Test: the C-ABI corpus (`tests/compiler/new_types_attrs.zig`) re-run against a
 small Linux C object that takes/returns `Color`/`Vector2`/`Rectangle` by value,
 asserting round-tripped field values (the Win64 suite already does this shape).
 
-## 6. Phase 3 — the stdlib OS layer
+## 6. The stdlib OS layer
 
 The pure-logic modules (`math`, `rand`, `color`, `bits`, `mem`, `serde`,
 `strings`, `vec`, `map`, `fmt`, `crypto`, `path`) are already portable. The
@@ -216,7 +217,7 @@ Build-time selection: pick the shim file by target. Simplest is a
 `std.os` facade that `#import`s the right submodule per the build's target —
 or, shorter-term, conditional injection in the pipeline keyed on `Target`.
 
-## 7. Phase 4 — comptime FFI, then loose ends
+## 7. Comptime FFI, then loose ends
 
 - **Comptime FFI** ([vm/ffi.zig](../src/backend/llvm/../vm/ffi.zig)) is gated
   `os.tag != .windows → error`. Add a `dlopen`/`dlsym` path (link the compiler

@@ -2,7 +2,7 @@
 
 Where the language and compiler are headed. For the design of the comptime VM and
 metaprogramming layer specifically, see
-[`docs/09_comptime_vm_roadmap.md`](docs/09_comptime_vm_roadmap.md); for the
+[`docs/09_comptime.md`](docs/09_comptime.md); for the
 component-by-component status, see the table in [README.md](README.md#project-status).
 
 The near-term goal is the **v0.1.0 release** — the first tagged, announced, public

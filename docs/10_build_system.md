@@ -12,7 +12,7 @@
 > splicing, **targets as values** for cross-compile matrices, and **`--watch`**
 > backed by the fast `skarnld` linker.
 
-This document is the design. See [09_comptime_vm_roadmap.md](09_comptime_vm_roadmap.md)
+This document is the design. See [09_comptime.md](09_comptime.md)
 for the VM/metaprogramming foundation it sits on.
 
 ## 1. The file and the execution model
@@ -379,7 +379,7 @@ What the build system needs, against what already exists:
 | `test_dir` step execution | ⏳ next |
 | Build graph: deps/steps DAG, topo order, parallel | later |
 | Content hashing + incremental + `--watch` | later |
-| Capabilities / `*Caps` sandbox + VM capability table | later (Phase 5 of the comptime roadmap) |
+| Capabilities / `*Caps` sandbox + VM capability table | not built yet |
 | `add_quote` typed codegen / `#provided` / `define` injection | later (extends `#quote`/`#insert`) |
 | Layer 2 (`workspace`/`Options`) + Layer 3 (intercept) surface | later |
 | Cross-compile targets | later (needs Linux/macOS codegen + entry) |
@@ -439,7 +439,7 @@ a static C library's own `/DEFAULTLIB` directives. **Usually you need none of
 these:** the build inspects each linked `.lib` and auto-copies an import library's
 DLL or auto-links the C runtime (and pulls in its system deps via its `/DEFAULTLIB`
 directives) for a static archive. See [docs/11 → Linking](11_c_interop.md) for the
-static-vs-dynamic workflow and the cross-platform roadmap.
+static-vs-dynamic workflow and cross-platform linking.
 
 **Executable settings**: `a.subsystem(.console|.windows)`, `a.console()`,
 `a.windowed()` (GUI — no console window), `a.entry(symbol)`, `a.stack_size(bytes)`.

@@ -220,7 +220,7 @@ resolved on your path turns out to be an *import* library, you get a clear warni
 (`requested static linking, but '…/raylib.lib' is an import library — the link will
 be DYNAMIC`) instead of silently shipping a dynamic build.
 
-### Cross-platform (roadmap)
+### Cross-platform
 
 That API is deliberately platform-agnostic, so the same `build.sk` will work
 unchanged once Skarn grows other targets. The intended mapping:

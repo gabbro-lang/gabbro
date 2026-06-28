@@ -201,7 +201,7 @@ main :: fn() -> i32 {
 ```
 
 The comptime VM exposes the AST as matchable `ast.*` values (see
-[09](09_comptime_vm_roadmap.md)). This path can construct *any* form (full
+[09](09_comptime.md)). This path can construct *any* form (full
 control flow, compound literals, declarations) and underpins reflection-driven
 code generation and `#compiler` hooks. Reflection helpers that pair well with it
 (`type_info`, `typeid_of`, `Any`, field navigation) are documented in
@@ -286,11 +286,10 @@ Built-in (parser-side) and user (hook-side) derives coexist on the same struct. 
 struct with several derives `Decl.derives` is `"A B C"`, so match the exact string for
 a single derive or substring-check for membership.
 
-Unlike Rust's `#[derive]` (proc-macros with full ambient power — the `build.rs`
-supply-chain surface), a skarn derive is a compiler-side generator driven by the type's
-structure; the roadmap (R2, [09](09_comptime_vm_roadmap.md)) scopes user-written
-generators to a pure `AstTransform` capability so a third-party derive **cannot**
-touch the filesystem, network, or FFI. *Derive without the build.rs risk.*
+A skarn derive is a compiler-side generator driven by the type's structure, not a
+proc-macro with ambient power. Planned: scoping user-written generators to a pure
+`AstTransform` capability ([09](09_comptime.md)), so a third-party derive can't
+reach the filesystem, network, or FFI.
 
 > Built-in derives: `Eq`, `Ord`, `Hash`, `Default`, `Clone`, `Add`, `Sub`, `Mul`,
 > `Neg`, `Min`, `Max`, `Clamp`, `Scale`, `Lerp`, `format`. `json`, `Builder`, and

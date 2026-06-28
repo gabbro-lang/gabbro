@@ -225,8 +225,7 @@ frontend is platform-independent.
 | Tooling | `check`/`ir`/`object`/`build`, `skarn lsp`, tree-sitter grammar + Zed extension, `skarn bindgen`. No formatter, doc gen, REPL, or package manager yet |
 | Platform | Windows x86-64. A Linux x86-64 ELF backend cross-compiles and runs compute/CLI programs; some OS modules aren't ported yet |
 
-See [ROADMAP.md](ROADMAP.md) for what's planned and the known blocking bugs, and
-[`docs/`](docs/) for the language reference.
+See [`docs/`](docs/) for the language reference.
 
 ## Contributing
 

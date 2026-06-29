@@ -3,6 +3,7 @@ const ast = @import("ast.zig");
 const freevars = @import("freevars.zig");
 const NodeId = ast.NodeId;
 const diag_mod = @import("diagnostic.zig");
+const style = @import("style.zig");
 const Diagnostic = diag_mod.Diagnostic;
 const DiagKind = diag_mod.DiagKind;
 const Span = @import("lexer/span.zig").Span;
@@ -998,9 +999,10 @@ fn flushDiagnostics(
     source: []const u8,
     file: []const u8,
 ) void {
+    const pal = style.forStderr();
     for (diags) |d| {
         const src: []const u8 = if (std.mem.eql(u8, d.file, file)) source else "";
-        const rendered = diag_mod.renderDiagnostic(allocator, d.file, src, d) catch continue;
+        const rendered = diag_mod.render(allocator, d.file, src, d, pal) catch continue;
         defer allocator.free(rendered);
         std.debug.print("{s}\n", .{rendered});
     }
@@ -1206,6 +1208,32 @@ const Checker = struct {
     fn emitError(self: *Checker, span: Span, comptime fmt: []const u8, args: anytype) void {
         const msg = std.fmt.allocPrint(self.allocator, fmt, args) catch return;
         self.diagnostics.append(self.allocator, Diagnostic.err(msg, span, self.file)) catch {};
+    }
+
+    /// Extra context for a richer diagnostic: a label printed under the caret, and
+    /// a `help:`/`note:` line. All optional — empty fields render nothing.
+    const RichOpts = struct {
+        code: ?[]const u8 = null,
+        primary_label: ?[]const u8 = null,
+        help: ?[]const u8 = null,
+        note: ?[]const u8 = null,
+    };
+
+    /// Like `emitError`, but attaches a caret label and/or a `help:`/`note:` line.
+    fn emitErrorRich(self: *Checker, span: Span, comptime fmt: []const u8, args: anytype, opts: RichOpts) void {
+        const msg = std.fmt.allocPrint(self.allocator, fmt, args) catch return;
+        var d = Diagnostic.err(msg, span, self.file);
+        d.code = opts.code;
+        d.primary_label = opts.primary_label;
+        if (opts.help) |h| if (self.allocator.alloc([]const u8, 1)) |a| {
+            a[0] = h;
+            d.helps = a;
+        } else |_| {};
+        if (opts.note) |n| if (self.allocator.alloc([]const u8, 1)) |a| {
+            a[0] = n;
+            d.notes = a;
+        } else |_| {};
+        self.diagnostics.append(self.allocator, d) catch {};
     }
 
     /// Format a Ty as a human-readable string (caller owns result).
@@ -4683,9 +4711,10 @@ const Checker = struct {
             return;
         }
         if (self.suggestTypeName(name)) |hint| {
-            self.emitError(span, "unknown type `{s}`; did you mean `{s}`?", .{ name, hint });
+            const help = std.fmt.allocPrint(self.allocator, "did you mean `{s}`?", .{hint}) catch null;
+            self.emitErrorRich(span, "unknown type `{s}`", .{name}, .{ .primary_label = "not a known type", .help = help });
         } else {
-            self.emitError(span, "unknown type `{s}`", .{name});
+            self.emitErrorRich(span, "unknown type `{s}`", .{name}, .{ .primary_label = "not a known type" });
         }
     }
 

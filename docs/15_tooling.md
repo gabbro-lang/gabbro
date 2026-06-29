@@ -230,3 +230,27 @@ the extension to WASM). VS Code support is a thin client wrapper (future).
 > Smoke-test the protocol without an editor: `python tests/lsp_smoke.py` drives a
 > full `initialize` → `didOpen` → `completion`/`hover`/`definition`/`documentSymbol`
 > exchange against the built binary and prints the results.
+
+## Diagnostics in the terminal
+
+A diagnostic is a header, a location, a source snippet with the offending span
+underlined, then any `note:`/`help:` lines:
+
+```text
+error: unknown type `Poin`
+  --> demo.sk:4:8
+  │
+4 │     p: Poin = .{ .x = 1, .y = 2 };
+  │        ^^^^ not a known type
+  = help: did you mean `Point`?
+```
+
+`src/diagnostic.zig` renders it. The `Diagnostic` carries the parts: a primary span
+plus label, secondary `labels` (other underlines, or the frames of a trace),
+`notes`, and `helps`. `sema` attaches them through `emitErrorRich` — the unknown-type
+"did you mean" is the first hint to ride a `help:` line (it was already computed; it
+just used to sit inside the message).
+
+Color is on when stderr is a console, off when it's a pipe or file, so captured
+output stays plain. `NO_COLOR` forces it off, `SKARN_COLOR=1` forces it on (handy
+when paging). `src/style.zig` makes the call and enables VT processing on Windows.

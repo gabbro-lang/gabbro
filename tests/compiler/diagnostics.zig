@@ -134,6 +134,28 @@ test "diagnostics: renderDiagnostic produces correct format" {
     try std.testing.expect(std.mem.indexOf(u8, rendered, "^^^") != null);
 }
 
+test "diagnostics: rich render carries caret label, help and note; color only when asked" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const src = "main :: fn() -> i32 { return x; }";
+    var d = skarn.Diagnostic.err("undefined name `x`", skarn.Span.new(28, 29), "t.sk");
+    d.primary_label = "not found in this scope";
+    d.helps = &.{"declare it first: `x := 0;`"};
+    d.notes = &.{"names are resolved top to bottom"};
+
+    const plain = try skarn.renderDiagnostic(a, "t.sk", src, d);
+    try std.testing.expect(std.mem.indexOf(u8, plain, "not found in this scope") != null);
+    try std.testing.expect(std.mem.indexOf(u8, plain, "help: declare it first") != null);
+    try std.testing.expect(std.mem.indexOf(u8, plain, "note: names are resolved") != null);
+    // A plain render must carry no escape codes (what tests and pipes see).
+    try std.testing.expect(std.mem.indexOfScalar(u8, plain, 0x1b) == null);
+
+    // An explicit colored palette does carry them.
+    const colored = try skarn.renderDiagnosticColored(a, "t.sk", src, d, .{ .on = true });
+    try std.testing.expect(std.mem.indexOfScalar(u8, colored, 0x1b) != null);
+}
+
 /// Return the first `error`-level diagnostic message for `src`, type-checking in
 /// tolerant mode so the diagnostics survive even though checking fails. Lets the
 /// tests below assert the *text* of an error, not just that one occurred.
@@ -142,7 +164,9 @@ fn firstError(arena: std.mem.Allocator, src: []const u8) !?[]const u8 {
     var syms = try skarn.sema_mod.collectSymbols(arena, mod);
     const env = try skarn.sema_mod.checkTypesTolerant(arena, mod, &syms, src, "t.sk");
     for (env.diagnostics.items) |d| {
-        if (d.kind == .err) return d.message;
+        // Render so the assertions see the whole diagnostic (message + caret label +
+        // `help:`/`note:` lines), matching what a user reads.
+        if (d.kind == .err) return try skarn.renderDiagnostic(arena, d.file, src, d);
     }
     return null;
 }

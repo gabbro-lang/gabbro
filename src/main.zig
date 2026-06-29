@@ -677,8 +677,9 @@ fn deriveOut(allocator: std.mem.Allocator, src: []const u8, ext: []const u8) []c
 }
 
 fn printDiags(allocator: std.mem.Allocator, diags: []const skarn.Diagnostic, path: []const u8, source: []const u8) void {
+    const pal = skarn.stderrPalette();
     for (diags) |d| {
-        const rendered = skarn.renderDiagnostic(allocator, path, source, d) catch continue;
+        const rendered = skarn.renderDiagnosticColored(allocator, path, source, d, pal) catch continue;
         defer allocator.free(rendered);
         std.debug.print("{s}\n", .{rendered});
     }

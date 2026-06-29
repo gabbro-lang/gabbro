@@ -7,5 +7,8 @@
 **/zig-out/
 *.o
 
+# Comptime #run cache (SKARN_CACHE=1)
+**/.skarn-cache/
+
 # Release archives (scripts/package.ps1)
 dist/

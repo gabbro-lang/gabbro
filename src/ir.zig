@@ -9,6 +9,7 @@ const vm_compiler = @import("vm/compiler.zig");
 const vm_engine = @import("vm/engine.zig");
 const vm_instructions = @import("vm/instructions.zig");
 const vm_value = @import("vm/value.zig");
+const vm_run_cache = @import("vm/run_cache.zig");
 
 pub const RegId = u32;
 pub const BlockId = u32;
@@ -5580,6 +5581,9 @@ pub const ComptimeVm = struct {
     /// accumulated across hook evaluations (each eval uses a fresh `Vm`, so the
     /// names are drained here). Allocated on `arena`.
     removals: std.ArrayList([]const u8) = .empty,
+    /// When set, pure scalar `#run` results are cached on disk under this dir
+    /// (enabled by the `SKARN_CACHE` env var). See `vm/run_cache.zig`.
+    run_cache_dir: ?[]const u8 = null,
 
     const Cache = struct {
         ir_module: IrModule,
@@ -5592,6 +5596,7 @@ pub const ComptimeVm = struct {
             .gpa = allocator,
             .arena = std.heap.ArenaAllocator.init(allocator),
             .front_end = front_end,
+            .run_cache_dir = if (vm_run_cache.enabledByEnv()) vm_run_cache.default_dir else null,
         };
     }
 
@@ -5628,6 +5633,17 @@ pub const ComptimeVm = struct {
         const a = self.arena.allocator();
         const irfn = lowerExprToFunction(a, self.front_end, expr, self.current_file) catch return null;
         const bc_fn = vm_compiler.compileFunction(a, irfn, &c.func_map, c.ir_module) catch return null;
+
+        // Persistent comptime cache: a pure `#run` thunk is a deterministic
+        // function of its bytecode closure, so a content key lets us skip the
+        // (possibly very slow) VM run. `keyFor` returns null for anything not
+        // safely cacheable; the store keeps only scalar results.
+        const cache_key: ?vm_run_cache.Key = if (self.run_cache_dir) |dir| blk: {
+            const k = vm_run_cache.keyFor(self.gpa, &bc_fn, &c.bc) orelse break :blk null;
+            if (vm_run_cache.loadResult(dir, k)) |hit| return hit;
+            break :blk k;
+        } else null;
+
         var vm = vm_engine.Vm.initModule(self.gpa, &c.bc);
         defer vm.deinit();
         // `execute` enters the implicit root zone so aggregate `#run` exprs
@@ -5641,6 +5657,7 @@ pub const ComptimeVm = struct {
             }
             return null;
         };
+        if (cache_key) |k| if (self.run_cache_dir) |dir| vm_run_cache.storeResult(dir, k, result);
         return result;
     }
 

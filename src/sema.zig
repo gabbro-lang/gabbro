@@ -2135,9 +2135,9 @@ const Checker = struct {
                 }
                 const value_ty = try self.inferExprExpecting(local.value, declared_ty);
                 if (!try self.compatible(value_ty, declared_ty)) {
-                    self.emitError(local.value.span, "type mismatch: expected `{s}`, found `{s}`", .{
+                    self.emitErrorRich(local.value.span, "type mismatch: expected `{s}`, found `{s}`", .{
                         self.formatTy(declared_ty), self.formatTy(value_ty),
-                    });
+                    }, .{ .primary_label = std.fmt.allocPrint(self.allocator, "expected `{s}`", .{self.formatTy(declared_ty)}) catch null });
                     return error.SemanticFailed;
                 }
                 try self.declareLocal(local.name, declared_ty);
@@ -2164,9 +2164,9 @@ const Checker = struct {
                 if (try self.coerceEnumLiteral(assign.value, target_ty)) return;
                 const value_ty = try self.inferExpr(assign.value);
                 if (!try self.compatible(value_ty, target_ty)) {
-                    self.emitError(assign.value.span, "type mismatch in assignment: expected `{s}`, found `{s}`", .{
+                    self.emitErrorRich(assign.value.span, "type mismatch in assignment: expected `{s}`, found `{s}`", .{
                         self.formatTy(target_ty), self.formatTy(value_ty),
-                    });
+                    }, .{ .primary_label = std.fmt.allocPrint(self.allocator, "expected `{s}`", .{self.formatTy(target_ty)}) catch null });
                     return error.SemanticFailed;
                 }
                 if (self.exprZoneOwner(assign.value)) |owner| {
@@ -2228,7 +2228,7 @@ const Checker = struct {
                     }
                 }
                 if (!try self.compatible(actual_ty, self.current_return_ty)) {
-                    self.emitError(ret.span, "return type mismatch: expected `{s}`, found `{s}`", .{ self.formatTy(self.current_return_ty), self.formatTy(actual_ty) });
+                    self.emitErrorRich(ret.span, "return type mismatch: expected `{s}`, found `{s}`", .{ self.formatTy(self.current_return_ty), self.formatTy(actual_ty) }, .{ .primary_label = std.fmt.allocPrint(self.allocator, "expected `{s}`", .{self.formatTy(self.current_return_ty)}) catch null });
                     return error.SemanticFailed;
                 }
             },
@@ -2462,7 +2462,10 @@ const Checker = struct {
                     return sym_ty;
                 }
                 if (fromBuiltinName(name)) |builtin_ty| return builtin_ty;
-                self.emitError(expr.span, "unknown name `{s}`", .{name});
+                self.emitErrorRich(expr.span, "unknown name `{s}`", .{name}, .{
+                    .primary_label = "not found in this scope",
+                    .help = if (self.suggestValueName(name)) |h| (std.fmt.allocPrint(self.allocator, "did you mean `{s}`?", .{h}) catch null) else null,
+                });
                 return error.SemanticFailed;
             },
             .unsafe_expr => |inner| blk: {
@@ -3309,7 +3312,10 @@ const Checker = struct {
                 }
                 return .void;
             }
-            self.emitError(call.callee.span, "unknown function `{s}`", .{name});
+            self.emitErrorRich(call.callee.span, "unknown function `{s}`", .{name}, .{
+                .primary_label = "no such function in scope",
+                .help = if (self.suggestValueName(name)) |h| (std.fmt.allocPrint(self.allocator, "did you mean `{s}`?", .{h}) catch null) else null,
+            });
             return error.SemanticFailed;
         };
         if (self.symbols.symbol(id).kind != .function) {
@@ -4694,6 +4700,35 @@ const Checker = struct {
         }
         // Reject suggestions that are a large fraction of the name (avoids
         // nonsense like suggesting `u8` for a 3-letter typo).
+        if (best) |b| if (best_dist * 2 > @max(name.len, b.len)) return null;
+        return best;
+    }
+
+    /// The closest value name (local, parameter, function, or const) to `name`,
+    /// within a small edit distance — the "did you mean `x`?" for an unknown
+    /// identifier. Null when nothing is close enough to be a likely typo.
+    fn suggestValueName(self: *Checker, name: []const u8) ?[]const u8 {
+        var best: ?[]const u8 = null;
+        var best_dist: usize = 3; // within 2 edits
+        const consider = struct {
+            fn f(cand: []const u8, target: []const u8, b: *?[]const u8, bd: *usize) void {
+                if (cand.len == 0 or cand[0] == '<') return; // skip synthetics
+                const d = levenshtein(target, cand);
+                if (d < bd.*) {
+                    bd.* = d;
+                    b.* = cand;
+                }
+            }
+        }.f;
+        // Locals and parameters live on the scope stack (name → type).
+        for (self.scope_stack.items) |m| {
+            var it = m.keyIterator();
+            while (it.next()) |k| consider(k.*, name, &best, &best_dist);
+        }
+        // Top-level values: functions and consts (skip types).
+        for (self.symbols.symbols.items) |sym| {
+            if (sym.kind != .type) consider(sym.name, name, &best, &best_dist);
+        }
         if (best) |b| if (best_dist * 2 > @max(name.len, b.len)) return null;
         return best;
     }

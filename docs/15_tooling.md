@@ -247,9 +247,10 @@ error: unknown type `Poin`
 
 `src/diagnostic.zig` renders it. The `Diagnostic` carries the parts: a primary span
 plus label, secondary `labels` (other underlines, or the frames of a trace),
-`notes`, and `helps`. `sema` attaches them through `emitErrorRich` — the unknown-type
-"did you mean" is the first hint to ride a `help:` line (it was already computed; it
-just used to sit inside the message).
+`notes`, and `helps`. `sema` attaches them through `emitErrorRich`: a type mismatch
+underlines the value and names the expected type; an unknown name, function, or type
+gets a `help: did you mean …?` (a Levenshtein search over the locals in scope,
+top-level functions and consts, and the type names).
 
 Color is on when stderr is a console, off when it's a pipe or file, so captured
 output stays plain. `NO_COLOR` forces it off, `SKARN_COLOR=1` forces it on (handy

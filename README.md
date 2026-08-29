@@ -158,8 +158,8 @@ skarn build  <file>    build an executable (Windows)
 ```
 
 Worked programs live in [`examples/`](examples/) — among them a Brainfuck interpreter,
-an ECS game, and `diskscan`, a WinDirStat-style disk analyzer with a Win32 GUI and
-threads.
+an ECS game, a path tracer that writes a BMP, and `diskscan`, a WinDirStat-style
+disk analyzer with a Win32 GUI and threads.
 
 ## Standard library
 

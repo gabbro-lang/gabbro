@@ -12,3 +12,6 @@
 
 # Release archives (scripts/package.ps1)
 dist/
+
+# raytracer example output
+examples/raytracer/render.*

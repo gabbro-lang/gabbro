@@ -1,0 +1,316 @@
+// raytracer — a path tracer that renders spheres into a 24-bit BMP.
+// Diffuse, metal, and glass materials; gamma-corrected; antialiased.
+// Pure compute: one arena holds the framebuffer, the hot loop touches no OS.
+
+#import std.fs;
+#import std.heap.{ Arena, make, alloc, alloc_bytes };
+#import std.io.{ Writer, print, print_u64 };
+#import std.math.{ Vec3, v3, v3_add, v3_sub, v3_scale, v3_dot, v3_cross, v3_normalize, deg2rad, tan };
+#import std.rand.{ Rng, seed, next_f32, range_f32 };
+#import std.time;
+
+W         :: 800;   // image width  (multiple of 4 keeps BMP rows unpadded)
+H         :: 450;   // image height
+SAMPLES   :: 32;    // rays per pixel
+MAX_DEPTH :: 12;    // bounces before a ray gives up
+
+STRIDE :: W * 3;    // bytes per row
+HDR    :: 54;       // 14-byte file header + 40-byte DIB header
+
+// ---------------------------------------------------------------- vectors
+
+v3_mul  :: fn(a: Vec3, b: Vec3) -> Vec3 { r: Vec3 = .{ a.x * b.x, a.y * b.y, a.z * b.z }; return r; }
+v3_neg  :: fn(a: Vec3) -> Vec3 { r: Vec3 = .{ -a.x, -a.y, -a.z }; return r; }
+v3_len2 :: fn(a: Vec3) -> f32 { return a.x * a.x + a.y * a.y + a.z * a.z; }
+
+reflect :: fn(v: Vec3, n: Vec3) -> Vec3 {
+    return v3_sub(v, v3_scale(n, 2.0f32 * v3_dot(v, n)));
+}
+
+refract :: fn(uv: Vec3, n: Vec3, ratio: f32) -> Vec3 {
+    ct := -v3_dot(uv, n);
+    if ct > 1.0f32 { ct = 1.0f32; }
+    perp := v3_scale(v3_add(uv, v3_scale(n, ct)), ratio);
+    k := 1.0f32 - v3_len2(perp);
+    if k < 0.0f32 { k = 0.0f32; }
+    return v3_add(perp, v3_scale(n, -core::sqrt(k)));
+}
+
+// Schlick approximation of Fresnel reflectance.
+reflectance :: fn(cosine: f32, ior: f32) -> f32 {
+    r0 := (1.0f32 - ior) / (1.0f32 + ior);
+    r0 = r0 * r0;
+    m := 1.0f32 - cosine;
+    m2 := m * m;
+    return r0 + (1.0f32 - r0) * m2 * m2 * m;
+}
+
+// A random direction on the unit sphere, by rejection sampling.
+random_unit :: fn(rng: *Rng) -> Vec3 {
+    i: i32 = 0;
+    while i < 64 {
+        p := v3(range_f32(rng, -1.0f32, 1.0f32),
+                range_f32(rng, -1.0f32, 1.0f32),
+                range_f32(rng, -1.0f32, 1.0f32));
+        l2 := v3_len2(p);
+        if l2 > 0.0000001f32 && l2 <= 1.0f32 { return v3_scale(p, 1.0f32 / core::sqrt(l2)); }
+        i += 1;
+    }
+    return v3(0.0f32, 1.0f32, 0.0f32);
+}
+
+// ---------------------------------------------------------------- scene
+
+Mat :: enum { lambert, metal, glass }
+
+Sphere :: struct {
+    center: Vec3,
+    radius: f32,
+    albedo: Vec3,
+    mat:    Mat,
+    fuzz:   f32,
+    ior:    f32,
+}
+
+Ray :: struct { o: Vec3, d: Vec3 }
+
+ray :: fn(o: Vec3, d: Vec3) -> Ray { r: Ray = .{ o, d }; return r; }
+
+Hit :: struct { t: f32, p: Vec3, n: Vec3, front: bool, idx: i32 }
+
+hit_none :: fn() -> Hit {
+    z := v3(0.0f32, 0.0f32, 0.0f32);
+    r: Hit = .{ 0.0f32, z, z, false, 0 };
+    return r;
+}
+
+// Quadratic ray-sphere intersection. A negative radius flips the normal,
+// which is how the hollow glass shell is built.
+sphere_hit :: fn(s: Sphere, r: Ray, tmin: f32, tmax: f32, h: *Hit) -> bool {
+    oc := v3_sub(r.o, s.center);
+    a := v3_len2(r.d);
+    half_b := v3_dot(oc, r.d);
+    c := v3_len2(oc) - s.radius * s.radius;
+    disc := half_b * half_b - a * c;
+    if disc < 0.0f32 { return false; }
+
+    sd := core::sqrt(disc);
+    root := (-half_b - sd) / a;
+    if root < tmin || root > tmax {
+        root = (-half_b + sd) / a;
+        if root < tmin || root > tmax { return false; }
+    }
+
+    h.t = root;
+    h.p = v3_add(r.o, v3_scale(r.d, root));
+    outward := v3_scale(v3_sub(h.p, s.center), 1.0f32 / s.radius);
+    h.front = v3_dot(r.d, outward) < 0.0f32;
+    if h.front { h.n = outward; } else { h.n = v3_neg(outward); }
+    return true;
+}
+
+world_hit :: fn(scene: []Sphere, r: Ray, tmin: f32, tmax: f32, h: *Hit) -> bool {
+    found := false;
+    closest := tmax;
+    tmp := hit_none();
+    i: usize = 0usize;
+    while i < scene.len {
+        if sphere_hit(scene[i], r, tmin, closest, &tmp) {
+            found = true;
+            closest = tmp.t;
+            h.t = tmp.t;
+            h.p = tmp.p;
+            h.n = tmp.n;
+            h.front = tmp.front;
+            h.idx = i as i32;
+        }
+        i += 1usize;
+    }
+    return found;
+}
+
+// ---------------------------------------------------------------- shading
+
+ray_color :: fn(r: Ray, scene: []Sphere, rng: *Rng, depth: i32) -> Vec3 {
+    black := v3(0.0f32, 0.0f32, 0.0f32);
+    if depth <= 0 { return black; }
+
+    h := hit_none();
+    if world_hit(scene, r, 0.001f32, 1000000.0f32, &h) {
+        s := scene[h.idx as usize];
+        atten := s.albedo;
+        scattered := ray(h.p, h.n);
+
+        match s.mat {
+            .lambert => {
+                dir := v3_add(h.n, random_unit(rng));
+                if v3_len2(dir) < 0.0000001f32 { dir = h.n; }
+                scattered = ray(h.p, dir);
+            }
+            .metal => {
+                refl := reflect(v3_normalize(r.d), h.n);
+                dir := v3_add(refl, v3_scale(random_unit(rng), s.fuzz));
+                if v3_dot(dir, h.n) <= 0.0f32 { return black; }
+                scattered = ray(h.p, dir);
+            }
+            .glass => {
+                ratio := s.ior;
+                if h.front { ratio = 1.0f32 / s.ior; }
+                ud := v3_normalize(r.d);
+                ct := -v3_dot(ud, h.n);
+                if ct > 1.0f32 { ct = 1.0f32; }
+                st := core::sqrt(1.0f32 - ct * ct);
+                dir := refract(ud, h.n, ratio);
+                if ratio * st > 1.0f32 || reflectance(ct, ratio) > next_f32(rng) {
+                    dir = reflect(ud, h.n);
+                }
+                scattered = ray(h.p, dir);
+                atten = v3(1.0f32, 1.0f32, 1.0f32);
+            }
+        }
+
+        return v3_mul(atten, ray_color(scattered, scene, rng, depth - 1));
+    }
+
+    // Sky: a vertical gradient from white to blue.
+    ud := v3_normalize(r.d);
+    t := 0.5f32 * (ud.y + 1.0f32);
+    white := v3(1.0f32, 1.0f32, 1.0f32);
+    blue := v3(0.5f32, 0.7f32, 1.0f32);
+    return v3_add(v3_scale(white, 1.0f32 - t), v3_scale(blue, t));
+}
+
+// ---------------------------------------------------------------- camera
+
+Camera :: struct { origin: Vec3, lower_left: Vec3, horizontal: Vec3, vertical: Vec3 }
+
+camera :: fn(lookfrom: Vec3, lookat: Vec3, vfov_deg: f32, aspect: f32) -> Camera {
+    hh := tan(deg2rad(vfov_deg) * 0.5f32);
+    vh := 2.0f32 * hh;
+    vw := aspect * vh;
+
+    up := v3(0.0f32, 1.0f32, 0.0f32);
+    w := v3_normalize(v3_sub(lookfrom, lookat));
+    u := v3_normalize(v3_cross(up, w));
+    v := v3_cross(w, u);
+
+    horiz := v3_scale(u, vw);
+    vert := v3_scale(v, vh);
+    ll := v3_sub(v3_sub(v3_sub(lookfrom, v3_scale(horiz, 0.5f32)), v3_scale(vert, 0.5f32)), w);
+
+    c: Camera = .{ lookfrom, ll, horiz, vert };
+    return c;
+}
+
+camera_ray :: fn(c: Camera, s: f32, t: f32) -> Ray {
+    p := v3_add(v3_add(c.lower_left, v3_scale(c.horizontal, s)), v3_scale(c.vertical, t));
+    return ray(c.origin, v3_sub(p, c.origin));
+}
+
+// ---------------------------------------------------------------- BMP
+
+put_u16 :: fn(b: []u8, off: usize, v: u16) {
+    b[off] = (v & 0x00FFu16) as u8;
+    b[off + 1usize] = ((v >> 8u16) & 0x00FFu16) as u8;
+}
+
+put_u32 :: fn(b: []u8, off: usize, v: u32) {
+    b[off] = (v & 0x000000FFu32) as u8;
+    b[off + 1usize] = ((v >> 8u32) & 0x000000FFu32) as u8;
+    b[off + 2usize] = ((v >> 16u32) & 0x000000FFu32) as u8;
+    b[off + 3usize] = ((v >> 24u32) & 0x000000FFu32) as u8;
+}
+
+bmp_header :: fn(b: []u8) {
+    b[0usize] = 66u8;   // B
+    b[1usize] = 77u8;   // M
+    put_u32(b, 2usize, (HDR + STRIDE * H) as u32);   // file size
+    put_u32(b, 10usize, HDR as u32);
+    put_u32(b, 14usize, 40u32);
+    put_u32(b, 18usize, W as u32);
+    put_u32(b, 22usize, H as u32);       // positive = rows stored bottom-up
+    put_u16(b, 26usize, 1u16);           // planes
+    put_u16(b, 28usize, 24u16);          // bits per pixel
+    put_u32(b, 34usize, (STRIDE * H) as u32);
+    put_u32(b, 38usize, 2835u32);        // 72 dpi
+    put_u32(b, 42usize, 2835u32);
+}
+
+// Gamma-correct (sqrt) and clamp one channel into a byte.
+to_byte :: fn(c: f32) -> u8 {
+    g := core::sqrt(c);
+    if g < 0.0f32 { g = 0.0f32; }
+    if g > 0.999f32 { g = 0.999f32; }
+    return (g * 256.0f32) as u8;
+}
+
+// ---------------------------------------------------------------- main
+
+#entry
+main :: fn() -> i32 {
+    a := make();
+
+    ZERO := v3(0.0f32, 0.0f32, 0.0f32);
+    scene := a.alloc(Sphere, 5usize);
+
+    // ground
+    scene[0usize] = .{ v3(0.0f32, -100.5f32, -1.0f32), 100.0f32, v3(0.75f32, 0.7f32, 0.3f32), .lambert, 0.0f32, 0.0f32 };
+    // centre diffuse
+    scene[1usize] = .{ v3(0.0f32, 0.0f32, -1.2f32), 0.5f32, v3(0.1f32, 0.2f32, 0.5f32), .lambert, 0.0f32, 0.0f32 };
+    // hollow glass: an outer shell and an inner sphere with a negative radius
+    scene[2usize] = .{ v3(-1.0f32, 0.0f32, -1.0f32), 0.5f32, ZERO, .glass, 0.0f32, 1.5f32 };
+    scene[3usize] = .{ v3(-1.0f32, 0.0f32, -1.0f32), -0.4f32, ZERO, .glass, 0.0f32, 1.5f32 };
+    // polished metal
+    scene[4usize] = .{ v3(1.0f32, 0.0f32, -1.0f32), 0.5f32, v3(0.8f32, 0.6f32, 0.2f32), .metal, 0.03f32, 0.0f32 };
+
+    cam := camera(v3(-2.0f32, 1.6f32, 1.6f32), v3(0.0f32, 0.0f32, -1.0f32),
+                  38.0f32, (W as f32) / (H as f32));
+
+    fb := a.alloc_bytes((HDR + STRIDE * H) as usize);
+    bmp_header(fb);
+
+    rng := seed(0x2545F4914F6CDD1Du64);
+    start := time::now();
+
+    print("rendering ");
+    print_u64(W as u64); print("x"); print_u64(H as u64);
+    print(" at "); print_u64(SAMPLES as u64); print(" spp\n");
+
+    y: i32 = 0;
+    while y < H {
+        x: i32 = 0;
+        while x < W {
+            col := v3(0.0f32, 0.0f32, 0.0f32);
+            s: i32 = 0;
+            while s < SAMPLES {
+                u := ((x as f32) + next_f32(&rng)) / ((W - 1) as f32);
+                v := 1.0f32 - (((y as f32) + next_f32(&rng)) / ((H - 1) as f32));
+                col = v3_add(col, ray_color(camera_ray(cam, u, v), scene, &rng, MAX_DEPTH));
+                s += 1;
+            }
+            col = v3_scale(col, 1.0f32 / (SAMPLES as f32));
+
+            o := (HDR as usize) + ((H - 1 - y) as usize) * (STRIDE as usize) + (x as usize) * 3usize;
+            fb[o] = to_byte(col.z);              // BMP stores BGR
+            fb[o + 1usize] = to_byte(col.y);
+            fb[o + 2usize] = to_byte(col.x);
+            x += 1;
+        }
+        if y % 16 == 0 { print("."); }
+        y += 1;
+    }
+
+    ms := time::since_millis(start);
+    print("\ndone in "); print_u64(ms as u64); print(" ms\n");
+
+    f := fs::create("render.bmp") catch e {
+        print("could not open render.bmp\n");
+        return 1;
+    };
+    w: *Writer = &f;
+    w.write_all(fb) catch e {};
+    (&f).close();
+
+    print("wrote render.bmp\n");
+    return 0;
+}

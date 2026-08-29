@@ -676,6 +676,12 @@ fn lowerModuleInner(allocator: std.mem.Allocator, front_end: pipeline.FrontEnd, 
     errdefer vtables.deinit(allocator);
     errdefer extern_libs.deinit(allocator);
 
+    // Constants can reference constants at any depth (`B :: A * 3; C :: B;`),
+    // so fold them all up front. Needed most when `cvm` is null: that is
+    // `buildCache` building the module the VM itself reads constants from.
+    var folded_consts = try foldModuleConsts(allocator, front_end);
+    defer folded_consts.deinit();
+
     for (front_end.module.items) |item| {
         switch (item) {
             .import => {},
@@ -689,7 +695,7 @@ fn lowerModuleInner(allocator: std.mem.Allocator, front_end: pipeline.FrontEnd, 
             },
             .const_decl => |decl| {
                 // #run expr on the right-hand side → evaluate at compile time.
-                const effective_imm = try effectiveConstImm(decl.value, cvm, decl.file_name, decl.source);
+                const effective_imm = try effectiveConstImm(decl.value, cvm, decl.file_name, decl.source, front_end.symbols, &folded_consts);
                 // A mutable global (`name: T = init;`) takes its explicit type;
                 // an immutable constant derives it from the folded initializer
                 // (`X :: #run f()` has no literal to infer from).
@@ -6840,7 +6846,164 @@ fn isDirectLiteral(expr: ast.Expr) bool {
     };
 }
 
-fn effectiveConstImm(expr: ast.Expr, cvm: ?*ComptimeVm, file: []const u8, source: []const u8) LowerError!Imm {
+/// Constants already folded, keyed by symbol id (not name: two modules may each
+/// declare a `MAX`, and they are different constants).
+const FoldedConsts = std.AutoHashMap(sema.SymbolId, Imm);
+
+fn immInt(v: Imm) ?i128 {
+    return switch (v) {
+        .int => |i| i,
+        .uint => |u| if (u <= @as(u128, std.math.maxInt(i128))) @intCast(u) else null,
+        else => null,
+    };
+}
+
+fn immFloat(v: Imm) ?f64 {
+    return switch (v) {
+        .float => |f| f,
+        .int => |i| @floatFromInt(i),
+        .uint => |u| @floatFromInt(u),
+        else => null,
+    };
+}
+
+/// Fold a numeric/boolean constant initializer using only the AST plus the
+/// constants folded before it.
+///
+/// This is the no-evaluator path. `buildCache` lowers the module with
+/// `cvm = null` to break the recursion back into the VM, so without folding
+/// here a constant whose initializer is an expression stays zero *inside the
+/// VM's own view of the module* — which is why `B :: A * 3; C :: B;` read `C`
+/// as 0 even though the one-level `B` was fine.
+///
+/// Returns null for anything it cannot fold (a call, a string, an unknown
+/// name), leaving those to the VM.
+fn foldConstExpr(
+    expr: ast.Expr,
+    file: []const u8,
+    symbols: sema.SymbolTable,
+    known: *const FoldedConsts,
+) ?Imm {
+    return switch (expr.kind) {
+        .int, .float, .bool => switch (lowerImm(expr)) {
+            .null => null,
+            else => |imm| imm,
+        },
+        .ident => |name| known.get(resolveTopLevel(symbols, file, name) orelse return null),
+        .unary => |u| switch (u.op) {
+            .neg => switch (foldConstExpr(u.expr.*, file, symbols, known) orelse return null) {
+                .int => |v| Imm{ .int = -v },
+                .float => |v| Imm{ .float = -v },
+                else => null,
+            },
+            .not => switch (foldConstExpr(u.expr.*, file, symbols, known) orelse return null) {
+                .bool => |v| Imm{ .bool = !v },
+                else => null,
+            },
+            else => null,
+        },
+        .binary => |b| foldConstBinary(b, file, symbols, known),
+        else => null,
+    };
+}
+
+fn foldConstBinary(
+    b: ast.BinaryExpr,
+    file: []const u8,
+    symbols: sema.SymbolTable,
+    known: *const FoldedConsts,
+) ?Imm {
+    const l = foldConstExpr(b.left.*, file, symbols, known) orelse return null;
+    const r = foldConstExpr(b.right.*, file, symbols, known) orelse return null;
+
+    if (l == .bool and r == .bool) return switch (b.op) {
+        .and_and => Imm{ .bool = l.bool and r.bool },
+        .or_or => Imm{ .bool = l.bool or r.bool },
+        .equal => Imm{ .bool = l.bool == r.bool },
+        .not_equal => Imm{ .bool = l.bool != r.bool },
+        else => null,
+    };
+
+    // A float on either side promotes the whole expression.
+    if (l == .float or r == .float) {
+        const lf = immFloat(l) orelse return null;
+        const rf = immFloat(r) orelse return null;
+        return switch (b.op) {
+            .add => Imm{ .float = lf + rf },
+            .sub => Imm{ .float = lf - rf },
+            .mul => Imm{ .float = lf * rf },
+            .div => if (rf == 0.0) null else Imm{ .float = lf / rf },
+            .equal => Imm{ .bool = lf == rf },
+            .not_equal => Imm{ .bool = lf != rf },
+            .less => Imm{ .bool = lf < rf },
+            .le => Imm{ .bool = lf <= rf },
+            .gt => Imm{ .bool = lf > rf },
+            .ge => Imm{ .bool = lf >= rf },
+            else => null,
+        };
+    }
+
+    const li = immInt(l) orelse return null;
+    const ri = immInt(r) orelse return null;
+    return switch (b.op) {
+        // Folded at i128, then narrowed by the global's own type. Wrapping ops
+        // fold identically here; the width they wrap at is the declared type's.
+        .add, .wrap_add => Imm{ .int = li +% ri },
+        .sub, .wrap_sub => Imm{ .int = li -% ri },
+        .mul, .wrap_mul => Imm{ .int = li *% ri },
+        .div => if (ri == 0) null else Imm{ .int = @divTrunc(li, ri) },
+        .rem => if (ri == 0) null else Imm{ .int = @rem(li, ri) },
+        .bit_and => Imm{ .int = li & ri },
+        .bit_or => Imm{ .int = li | ri },
+        .bit_xor => Imm{ .int = li ^ ri },
+        .shl => if (ri < 0 or ri > 127) null else Imm{ .int = li << @as(u7, @intCast(ri)) },
+        .shr => if (ri < 0 or ri > 127) null else Imm{ .int = li >> @as(u7, @intCast(ri)) },
+        .equal => Imm{ .bool = li == ri },
+        .not_equal => Imm{ .bool = li != ri },
+        .less => Imm{ .bool = li < ri },
+        .le => Imm{ .bool = li <= ri },
+        .gt => Imm{ .bool = li > ri },
+        .ge => Imm{ .bool = li >= ri },
+        else => null,
+    };
+}
+
+/// Fold every immutable top-level constant to a fixpoint, so a constant that
+/// references another constant carries a real value regardless of declaration
+/// order or chain depth.
+fn foldModuleConsts(allocator: std.mem.Allocator, front_end: pipeline.FrontEnd) LowerError!FoldedConsts {
+    var known = FoldedConsts.init(allocator);
+    errdefer known.deinit();
+    var pass: usize = 0;
+    while (pass < 16) : (pass += 1) {
+        var changed = false;
+        for (front_end.module.items) |item| switch (item) {
+            .const_decl => |decl| {
+                // A mutable global is not a constant: its value can change at
+                // runtime, so nothing may fold through it.
+                if (decl.is_mutable) continue;
+                const id = resolveTopLevel(front_end.symbols, decl.file_name, decl.name) orelse continue;
+                if (known.contains(id)) continue;
+                if (foldConstExpr(decl.value, decl.file_name, front_end.symbols, &known)) |imm| {
+                    try known.put(id, imm);
+                    changed = true;
+                }
+            },
+            else => {},
+        };
+        if (!changed) break;
+    }
+    return known;
+}
+
+fn effectiveConstImm(
+    expr: ast.Expr,
+    cvm: ?*ComptimeVm,
+    file: []const u8,
+    source: []const u8,
+    symbols: sema.SymbolTable,
+    known: *const FoldedConsts,
+) LowerError!Imm {
     // A direct literal takes the fast path. Everything else folds on the
     // comptime VM, because there is no runtime to compute a top-level const
     // later. That covers a `#run` (the whole RHS `X :: #run f()`, or nested as
@@ -6854,9 +7017,13 @@ fn effectiveConstImm(expr: ast.Expr, cvm: ?*ComptimeVm, file: []const u8, source
         else => expr,
     };
 
-    // If the VM can't fold it, fail loudly rather than silently substituting a
-    // best-effort (usually wrong) literal.
-    const c = cvm orelse return lowerImm(inner);
+    // No evaluator: this is `buildCache` lowering the module to run the VM on,
+    // so falling back to `lowerImm` here would bake a zero into the very module
+    // the VM then reads constants out of. Fold from the AST instead.
+    const c = cvm orelse {
+        if (!is_run) if (foldConstExpr(inner, file, symbols, known)) |imm| return imm;
+        return lowerImm(inner);
+    };
     c.hook_error = null;
     const v = c.evalRaw(inner) orelse {
         // A comptime `@panic("…")` recorded its message — show it verbatim.
@@ -6864,6 +7031,8 @@ fn effectiveConstImm(expr: ast.Expr, cvm: ?*ComptimeVm, file: []const u8, source
             diag_mod.printErrorAt(msg, file, source, expr.span);
             return error.LoweringFailed;
         }
+        // Plain constant arithmetic the VM declined: fold it directly.
+        if (!is_run) if (foldConstExpr(inner, file, symbols, known)) |imm| return imm;
         const msg: []const u8 = if (is_run)
             "`#run` expression could not be evaluated at compile time " ++
                 "(the comptime VM cannot execute it — e.g. an unsupported construct or a call into runtime-only code)"

@@ -2850,3 +2850,38 @@ test "exe: a const with an expression initializer folds to its value" {
     , "exe_const_expr_init");
     try std.testing.expectEqual(@as(u32, 0), code);
 }
+
+test "exe: constants fold through a chain of constants" {
+    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    // Regression: `buildCache` lowers the module with `cvm = null` to break the
+    // recursion back into the VM, and that path fell back to `lowerImm` — so a
+    // const whose initializer was an expression was zero *inside the module the
+    // VM reads constants from*. One level survived (the outer VM folded it),
+    // but two or more read the stale zero: `B :: A * 3; C :: B;` gave 0, and in
+    // arithmetic it was a `ptr` ICE rather than a value.
+    const code = try compileAndRun(arena.allocator(),
+        \\A     :: 8;
+        \\B     :: A * 3;
+        \\C     :: B;
+        \\D     :: C * 2;
+        \\E     :: D + A;
+        \\FL    :: 1.5;
+        \\FL2   :: FL * 4.0;
+        \\FLAG  :: A > 4;
+        \\BITS  :: (A >> 1) | 1;
+        \\main :: fn() -> i32 {
+        \\    if C != 24 { return 10; }         // depth 2
+        \\    if D != 48 { return 20; }         // depth 3
+        \\    if E != 56 { return 30; }         // depth 4
+        \\    if C - 24 != 0 { return 40; }     // and in arithmetic, not just ==
+        \\    if FL2 != 6.0 { return 50; }      // floats fold too
+        \\    if FLAG == false { return 60; }   // and comparisons
+        \\    if BITS != 5 { return 70; }       // and bitwise
+        \\    return 0;
+        \\}
+    , "exe_const_chain");
+    try std.testing.expectEqual(@as(u32, 0), code);
+}

@@ -346,12 +346,15 @@ GREETING :: "hello";
 ```
 
 The initializer does not have to be a literal. Arithmetic over constants already
-declared is folded to a value at build time:
+declared is folded to a value at build time, and constants compose to any depth:
 
 ```skarn
 W      :: 800;
-STRIDE :: W * 3;    // 2400, folded during the build
+STRIDE :: W * 3;         // 2400, folded during the build
+SIZE   :: STRIDE * 450;  // 1080000, folded through STRIDE
 ```
+
+A constant must be declared before the constants that use it.
 
 A string constant is a real `[]const u8` slice, so slice operations work on it
 directly — `GREETING.len` is `5`, `GREETING[0]` is the first byte. (More generally,

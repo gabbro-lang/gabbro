@@ -2133,6 +2133,7 @@ const Checker = struct {
                     try self.declareLocal(local.name, declared_ty);
                     return;
                 }
+                try self.coerceLiteralFields(local.value, declared_ty);
                 const value_ty = try self.inferExprExpecting(local.value, declared_ty);
                 if (!try self.compatible(value_ty, declared_ty)) {
                     self.emitErrorRich(local.value.span, "type mismatch: expected `{s}`, found `{s}`", .{
@@ -2162,6 +2163,7 @@ const Checker = struct {
                 try self.checkAssignTarget(assign.target);
                 const target_ty = try self.inferExpr(assign.target);
                 if (try self.coerceEnumLiteral(assign.value, target_ty)) return;
+                try self.coerceLiteralFields(assign.value, target_ty);
                 const value_ty = try self.inferExpr(assign.value);
                 if (!try self.compatible(value_ty, target_ty)) {
                     self.emitErrorRich(assign.value.span, "type mismatch in assignment: expected `{s}`, found `{s}`", .{
@@ -2203,6 +2205,14 @@ const Checker = struct {
                 }
             },
             .return_stmt => |ret| {
+                // The declared return type is a coercion target, the same as a
+                // typed local, an assignment, or a call argument: a bare
+                // `.variant` resolves against it, and a literal's fields take
+                // their declared field types.
+                if (ret.value) |value| {
+                    if (try self.coerceEnumLiteral(value, self.current_return_ty)) return;
+                    try self.coerceLiteralFields(value, self.current_return_ty);
+                }
                 const actual_ty: Ty = if (ret.value) |value| try self.inferExprExpecting(value, self.current_return_ty) else .void;
                 if (ret.value) |value| if (self.exprZoneOwner(value)) |owner| {
                     const source = if (owner.kind == .borrow) "borrowed value" else "zone-owned value";
@@ -3528,6 +3538,7 @@ const Checker = struct {
                 arg_i += 1;
                 continue;
             }
+            try self.coerceLiteralFields(arg_expr, param.ty);
             const arg_ty = try self.inferExpr(arg_expr);
             // UFCS auto-ref: a value receiver passed to a `*Self` method.
             if (is_method and arg_i == 0 and self.receiverNeedsAddress(arg_ty, param.ty, arg_expr)) {
@@ -3587,6 +3598,43 @@ const Checker = struct {
         return false;
     }
 
+    /// Push an expected type down into an aggregate literal's field values.
+    ///
+    /// A struct literal is validated against the struct's declared field types
+    /// during lowering, not here, so a bare `.variant` sitting in a field
+    /// position never reached `coerceEnumLiteral` and lowered as variant 0 with
+    /// no diagnostic. Give each field value its declared type as a coercion
+    /// target, recursing so nested literals get the same treatment.
+    fn coerceLiteralFields(self: *Checker, expr: ast.Expr, expected: Ty) SemanticError!void {
+        const type_id = switch (expected) {
+            .named => |id| id,
+            else => return,
+        };
+        const layout = self.env.layouts.get(type_id) orelse return;
+        const fields = switch (layout.kind) {
+            .struct_type => |f| f,
+            else => return,
+        };
+        switch (expr.kind) {
+            // `.{ a, b, c }` — positional, matched to fields in declaration order.
+            .compound_literal => |values| for (values, 0..) |value, i| {
+                if (i >= fields.len) break;
+                _ = try self.coerceEnumLiteral(value, fields[i].ty);
+                try self.coerceLiteralFields(value, fields[i].ty);
+            },
+            // `.{ .x = a, .y = b }` — named, matched by field name.
+            .struct_literal => |inits| for (inits) |fi| {
+                for (fields) |field| {
+                    if (!std.mem.eql(u8, field.name, fi.name)) continue;
+                    _ = try self.coerceEnumLiteral(fi.value, field.ty);
+                    try self.coerceLiteralFields(fi.value, field.ty);
+                    break;
+                }
+            },
+            else => {},
+        }
+    }
+
     /// `EnumType.variant(payload)` — construct an enum value carrying a payload
     /// (the inverse of a `match … |v|` arm). Type-checks the payload against the
     /// variant's declared type and records the construction (keyed on the callee
@@ -3622,6 +3670,7 @@ const Checker = struct {
                 .named => |n| n.value,
             };
             if (!try self.coerceEnumLiteral(arg_expr, pty)) {
+                try self.coerceLiteralFields(arg_expr, pty);
                 const arg_ty = try self.inferExpr(arg_expr);
                 if (!try self.compatible(arg_ty, pty)) {
                     self.emitError(arg_expr.span, "variant `.{s}` payload: expected `{s}`, found `{s}`", .{ fld.name, self.formatTy(pty), self.formatTy(arg_ty) });

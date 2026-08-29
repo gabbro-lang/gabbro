@@ -316,6 +316,19 @@ move :: fn(dir: Direction) -> void { /* ... */ }
 move(.east);
 ```
 
+The context can be a typed local, an assignment, a call argument, the declared
+return type, or a field of a struct literal (positional or named):
+
+```skarn
+Robot :: struct { id: i32, facing: Direction }
+
+heading :: fn() -> Direction { return .south; }
+
+r1: Robot = .{ 1, .north };                   // positional field
+r2: Robot = .{ .id = 2, .facing = .east };    // named field
+spawn :: fn() -> Robot { return .{ 3, .west }; }
+```
+
 #### Enums with Payloads
 
 Enum variants can carry associated data:

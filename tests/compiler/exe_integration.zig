@@ -2885,3 +2885,39 @@ test "exe: constants fold through a chain of constants" {
     , "exe_const_chain");
     try std.testing.expectEqual(@as(u32, 0), code);
 }
+
+test "exe: a bare `.variant` in a struct literal keeps its variant" {
+    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    // Regression: the expected type was pushed into a bare `.variant` for a
+    // typed local, an assignment and a call argument, but never into a struct
+    // literal's field positions — so `.glass` in a field silently lowered as
+    // variant 0 (`.lambert`) with no diagnostic.
+    const code = try compileAndRun(arena.allocator(),
+        \\Mat :: enum { lambert, metal, glass }
+        \\S :: struct { r: i32, mat: Mat }
+        \\rank :: fn(s: S) -> i32 {
+        \\    match s.mat {
+        \\        .lambert => { return 1; }
+        \\        .metal   => { return 2; }
+        \\        .glass   => { return 3; }
+        \\    }
+        \\}
+        \\mk :: fn() -> S { return .{ 7, .glass }; }
+        \\main :: fn() -> i32 {
+        \\    pos: S = .{ 1, .metal };
+        \\    if rank(pos) != 2 { return 10; }              // positional literal
+        \\    named: S = .{ .r = 1, .mat = .glass };
+        \\    if rank(named) != 3 { return 20; }            // named-field literal
+        \\    if rank(mk()) != 3 { return 30; }             // return position
+        \\    if rank(.{ 1, .glass }) != 3 { return 40; }   // argument position
+        \\    slot: S = .{ 1, .lambert };
+        \\    slot = .{ 1, .metal };
+        \\    if rank(slot) != 2 { return 50; }             // assignment position
+        \\    return 0;
+        \\}
+    , "exe_enum_in_struct_literal");
+    try std.testing.expectEqual(@as(u32, 0), code);
+}

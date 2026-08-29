@@ -2824,3 +2824,29 @@ test "exe: chained comparison is rejected, not silently misparsed" {
         \\main :: fn() -> i32 { b := 1 < 2 < 3; if b { return 1; } return 0; }
     , "exe_chained_cmp"));
 }
+
+test "exe: a const with an expression initializer folds to its value" {
+    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    // Regression: `lowerImm` only produced an `Imm` for a direct literal and
+    // mapped everything else to `.null`, so a const whose initializer was any
+    // expression (`W * 3`, or even a plain alias `:: W`) was emitted with a
+    // zero initializer and silently read back as 0 at runtime. Each mismatch
+    // returns its own code so a failure says which form broke.
+    const code = try compileAndRun(arena.allocator(),
+        \\W      :: 8;
+        \\STRIDE :: W * 3;
+        \\ALIAS  :: STRIDE;
+        \\FOLDED :: 5 * 4;
+        \\main :: fn() -> i32 {
+        \\    if STRIDE != 24 { return 10; }        // const over another const
+        \\    if ALIAS != 24 { return 20; }         // const aliasing a const
+        \\    if FOLDED != 20 { return 30; }        // const over two literals
+        \\    if STRIDE * 2 != 48 { return 40; }    // and usable in arithmetic
+        \\    return 0;
+        \\}
+    , "exe_const_expr_init");
+    try std.testing.expectEqual(@as(u32, 0), code);
+}

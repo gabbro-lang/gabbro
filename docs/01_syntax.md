@@ -345,6 +345,14 @@ PI :: 3.14159;
 GREETING :: "hello";
 ```
 
+The initializer does not have to be a literal. Arithmetic over constants already
+declared is folded to a value at build time:
+
+```skarn
+W      :: 800;
+STRIDE :: W * 3;    // 2400, folded during the build
+```
+
 A string constant is a real `[]const u8` slice, so slice operations work on it
 directly — `GREETING.len` is `5`, `GREETING[0]` is the first byte. (More generally,
 field and index access work on any top-level constant, not just locals.)

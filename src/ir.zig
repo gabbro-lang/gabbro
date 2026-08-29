@@ -6829,12 +6829,26 @@ fn exprHasRun(expr: ast.Expr) bool {
     };
 }
 
+/// The expression kinds `lowerImm` can turn into a real `Imm` on its own.
+/// Everything else it maps to `.null`, which as a global initializer reads
+/// back as zero — so anything not on this list has to be folded first.
+fn isDirectLiteral(expr: ast.Expr) bool {
+    return switch (expr.kind) {
+        .int, .float, .bool, .string, .null => true,
+        .unary => |u| u.op == .neg and u.expr.kind == .int,
+        else => false,
+    };
+}
+
 fn effectiveConstImm(expr: ast.Expr, cvm: ?*ComptimeVm, file: []const u8, source: []const u8) LowerError!Imm {
-    // A plain literal expression takes the fast path. Anything containing a
-    // `#run` — whether the whole RHS (`X :: #run f()`) or nested inside a bigger
-    // expression (`X :: 10 + #run f()`) — must fold on the comptime VM, since
-    // there is no runtime to compute a top-level const later.
-    if (expr.kind != .run_expr and !exprHasRun(expr)) return lowerImm(expr);
+    // A direct literal takes the fast path. Everything else folds on the
+    // comptime VM, because there is no runtime to compute a top-level const
+    // later. That covers a `#run` (the whole RHS `X :: #run f()`, or nested as
+    // in `X :: 10 + #run f()`) and equally any other expression: `STRIDE :: W * 3`
+    // is not a literal, so without folding `lowerImm` yields `.null`, the global
+    // is emitted zero-initialized, and the constant silently reads back as 0.
+    const is_run = expr.kind == .run_expr or exprHasRun(expr);
+    if (!is_run and isDirectLiteral(expr)) return lowerImm(expr);
     const inner = switch (expr.kind) {
         .run_expr => |e| e.*,
         else => expr,
@@ -6850,23 +6864,24 @@ fn effectiveConstImm(expr: ast.Expr, cvm: ?*ComptimeVm, file: []const u8, source
             diag_mod.printErrorAt(msg, file, source, expr.span);
             return error.LoweringFailed;
         }
-        diag_mod.printErrorAt(
+        const msg: []const u8 = if (is_run)
             "`#run` expression could not be evaluated at compile time " ++
-                "(the comptime VM cannot execute it — e.g. an unsupported construct or a call into runtime-only code)",
-            file,
-            source,
-            expr.span,
-        );
+                "(the comptime VM cannot execute it — e.g. an unsupported construct or a call into runtime-only code)"
+        else
+            "constant initializer could not be folded at compile time " ++
+                "(a top-level `X :: expr` has no runtime to compute it later; " ++
+                "the comptime VM cannot evaluate this expression)";
+        diag_mod.printErrorAt(msg, file, source, expr.span);
         return error.LoweringFailed;
     };
     return v.toImm() orelse {
-        diag_mod.printErrorAt(
+        const msg: []const u8 = if (is_run)
             "a `#run` constant must evaluate to a scalar value; " ++
-                "aggregate (struct/slice/enum) results are not yet supported as top-level constants",
-            file,
-            source,
-            expr.span,
-        );
+                "aggregate (struct/slice/enum) results are not yet supported as top-level constants"
+        else
+            "a constant must evaluate to a scalar value; " ++
+                "aggregate (struct/slice/enum) results are not yet supported as top-level constants";
+        diag_mod.printErrorAt(msg, file, source, expr.span);
         return error.LoweringFailed;
     };
 }

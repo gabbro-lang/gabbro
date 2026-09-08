@@ -119,7 +119,17 @@ pub fn main(init: std.process.Init) u8 {
         const is_direct = arg2 != null and
             std.mem.endsWith(u8, arg2.?, ".gab") and
             fileExists(io, arg2.?);
-        if (!is_direct) return cmdBuildDir(allocator, io, args[2..]);
+        if (!is_direct) {
+            // The build system returns from here, ahead of the relocatable path
+            // resolution further down, so resolve the stdlib root now. Without it
+            // `std.build` is looked up at the path this compiler was *built* at, so
+            // `gabbro build` only works on the machine that produced the binary.
+            const ra = init.arena.allocator();
+            const exe_dir: ?[]const u8 = std.process.executableDirPathAlloc(io, ra) catch null;
+            if (resolveStdRoot(ra, io, init.environ_map, "", exe_dir)) |root|
+                gabbro.pipeline_mod.stdlib_root_override = root;
+            return cmdBuildDir(allocator, io, args[2..]);
+        }
     }
 
     // `gabbro bindgen <header.h>` generates Gabbro FFI bindings from a C header.

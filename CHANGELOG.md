@@ -39,9 +39,12 @@ repository, `skarn-lang/skarn`, is superseded by `gabbro-lang/gabbro`.
 - `#compiler` hooks with `compiler_decls()` introspection, and `#derive`.
 - Reflection: `sizeof`, `type_name`, `type_info(T)`, `typeid` and `Any`, driving
   `std.serde` with no per-type code.
-- A bare `#run` is capability-pure: it cannot call host DLLs at compile time. Only
-  `build.gab` is granted the `ffi` capability. This closes the comptime side of the
-  `build.rs` supply-chain surface.
+- A bare `#run` is capability-pure: it cannot call host DLLs at compile time, which
+  closes the comptime side of the `build.rs` supply-chain surface. The grant is
+  per-library rather than all-or-nothing — a run holds `.none`, an allowlist of
+  libraries, or `.all` — and capabilities handed to a nested run can only narrow,
+  failing closed when two allowlists are disjoint. The comptime heap's page
+  primitives stay available to a pure run, so allocation still works.
 - Content-addressed caching for pure `#run` results, behind `GABBRO_CACHE`.
 
 ### Toolchain

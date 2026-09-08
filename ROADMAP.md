@@ -48,14 +48,23 @@ ordinary toolchain work and this is not.
 
 Slice 1 closed the comptime side of the `build.rs` supply-chain hole: a dependency's
 compile-time code physically cannot reach the host unless the capability was granted.
-What remains is the rest of the system.
+Slice 2 made the grant expressive instead of all-or-nothing. A run now holds `.none`,
+`.libs` (an allowlist, matched the way `#extern` spells library names) or `.all`, and
+`Caps.narrow` hands capabilities to a nested run with no way to widen them, failing
+closed when two allowlists are disjoint. Both live in
+[`src/vm/engine.zig`](src/vm/engine.zig).
 
-- The `*Caps` sandbox surface in `build.gab`, so a build script declares what it needs.
-- The VM capability table — capabilities beyond `ffi` (filesystem, network, environment,
-  process spawn), each gated at its call site.
+What remains:
+
+- The `*Caps` surface in `build.gab`, so a build script declares the libraries it
+  needs and the driver grants exactly those instead of `.all`. This is the first
+  slice that changes the Gabbro-side API rather than compiler internals.
+- Capabilities beyond FFI — filesystem, network, environment, process spawn — each
+  gated at its call site. Comptime code reaches the host only through FFI today, so
+  these arrive alongside the operations that need them.
 - The capability-bounded, content-hashed package manager designed in
-  [`docs/16`](docs/16_packages.md). A dependency's build hook receives only what it was
-  granted. This is the payoff the first two slices exist for.
+  [`docs/16`](docs/16_packages.md). A dependency's build hook receives only what it
+  was granted. This is the payoff the earlier slices exist for.
 
 ### Tooling
 

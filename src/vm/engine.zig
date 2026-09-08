@@ -45,14 +45,92 @@ pub const BuildHost = struct {
     call: *const fn (ctx: *anyopaque, op: u32, args: []const Value) Value,
 };
 
-/// What a comptime run is allowed to do. A bare `#run` gets none of these — it is
-/// pure — and the build driver grants `ffi` to `build.gab`. Capabilities only narrow
-/// as the call stack descends; they can't be forged or widened. This is the
-/// structural fix for the `build.rs` surface: a dependency's compile-time code
-/// can't reach the host unless it was handed the capability to.
+/// What a comptime run is allowed to do. A bare `#run` gets nothing — it is pure —
+/// and the build driver grants host access to `build.gab`. Capabilities only narrow
+/// as the call stack descends: `narrow` computes a conservative intersection and has
+/// no way to widen. This is the structural fix for the `build.rs` surface: a
+/// dependency's compile-time code can't reach the host unless it was handed the
+/// capability to.
 pub const Caps = struct {
-    /// May call arbitrary host (DLL / C) functions while compiling.
-    ffi: bool = false,
+    /// Which host (DLL / C) libraries this run may call into.
+    ffi: Ffi = .none,
+
+    /// A host-call grant. `.libs` is the point of the exercise: a build hook can be
+    /// handed exactly the libraries it needs instead of the whole host.
+    pub const Ffi = union(enum) {
+        /// No host calls beyond `heap_primitives`.
+        none,
+        /// Host calls only into these libraries, spelled the way `#extern("lib", …)`
+        /// spells them. Matched case-insensitively, because Windows DLL names are.
+        /// Borrowed: the slice must outlive the run.
+        libs: []const []const u8,
+        /// Any host call. The privileged root (`build.gab`) only.
+        all,
+    };
+
+    /// The comptime heap reserves, commits and releases pages through these. Gating
+    /// them would stop a pure `#run` from allocating at all, and they do nothing
+    /// beyond memory, so they belong to the model rather than behind a capability.
+    pub const heap_primitives = [_][]const u8{ "VirtualAlloc", "VirtualFree" };
+
+    pub fn allowsFfi(self: Caps, lib: []const u8, symbol: []const u8) bool {
+        for (heap_primitives) |p| {
+            if (std.mem.eql(u8, symbol, p)) return true;
+        }
+        return switch (self.ffi) {
+            .none => false,
+            .all => true,
+            .libs => |allowed| blk: {
+                for (allowed) |l| {
+                    if (std.ascii.eqlIgnoreCase(l, lib)) break :blk true;
+                }
+                break :blk false;
+            },
+        };
+    }
+
+    /// The clause `callExtern` splices into its diagnostic, so a denial says which
+    /// grant refused rather than only that something did.
+    pub fn denialReason(self: Caps) []const u8 {
+        return switch (self.ffi) {
+            .none => "this ran as a pure `#run`, which has no host access — only `build.gab` is granted it",
+            .libs => "this run's capability grant does not list that library",
+            // `.all` allows every call, so it never reaches a denial.
+            .all => "this run's capability grant refused it",
+        };
+    }
+
+    /// Hand capabilities to a nested run. The result is never broader than either
+    /// side, so a callee cannot widen what it was given. Two allowlists intersect to
+    /// whichever is a subset of the other; when neither contains the other the result
+    /// is `.none`, because a true intersection would have to allocate and failing
+    /// closed is the safe direction.
+    pub fn narrow(self: Caps, request: Caps) Caps {
+        return .{ .ffi = switch (self.ffi) {
+            .none => .none,
+            .all => request.ffi,
+            .libs => |mine| switch (request.ffi) {
+                .none => .none,
+                .all => self.ffi,
+                .libs => |theirs| if (isSubset(theirs, mine))
+                    request.ffi
+                else if (isSubset(mine, theirs))
+                    self.ffi
+                else
+                    .none,
+            },
+        } };
+    }
+
+    fn isSubset(inner: []const []const u8, outer: []const []const u8) bool {
+        next: for (inner) |i| {
+            for (outer) |o| {
+                if (std.ascii.eqlIgnoreCase(i, o)) continue :next;
+            }
+            return false;
+        }
+        return true;
+    }
 };
 
 pub const Vm = struct {
@@ -64,7 +142,7 @@ pub const Vm = struct {
     /// Optional host bridge for `host_call` (the build driver). Null → trap.
     host: ?BuildHost = null,
     /// What this run may do. Default: nothing privileged (a pure `#run`). The build
-    /// driver sets `caps.ffi = true` for `build.gab`. See `Caps`.
+    /// driver sets `caps.ffi = .all` for `build.gab`. See `Caps`.
     caps: Caps = .{},
     call_depth: usize = 0,
     max_call_depth: usize = 512,
@@ -95,24 +173,16 @@ pub const Vm = struct {
         };
     }
 
-    /// FFI to these benign memory primitives is always allowed: the comptime heap
-    /// (`std.heap`) reserves and frees pages through them, so gating them would
-    /// break allocation inside a pure `#run`. They do nothing beyond memory.
-    fn ffiAlwaysAllowed(ec: ffi.ExternCall) bool {
-        return std.mem.eql(u8, ec.symbol, "VirtualAlloc") or
-            std.mem.eql(u8, ec.symbol, "VirtualFree");
-    }
-
-    /// Call a host function, gated by the `ffi` capability. A pure `#run` may only
-    /// reach the benign memory primitives above; anything else halts the build with
-    /// a diagnostic. `build.gab` runs with `ffi` granted, so it reaches everything.
+    /// Call a host function, gated by this run's FFI grant. A pure `#run` reaches
+    /// only `Caps.heap_primitives`; anything else halts the build with a diagnostic
+    /// that names both the symbol and which grant refused it.
     fn callExtern(self: *Vm, ec: ffi.ExternCall, args: []const Value) error{Trap}!Value {
-        if (!self.caps.ffi and !ffiAlwaysAllowed(ec)) {
+        if (!self.caps.allowsFfi(ec.lib, ec.symbol)) {
             self.compiler_error_msg = std.fmt.allocPrint(
                 self.allocator,
-                "comptime FFI to `{s}` (in `{s}`) is not allowed here: this ran as a pure `#run`, which has no `ffi` capability. Only `build.gab` is granted FFI.",
-                .{ ec.symbol, ec.lib },
-            ) catch "comptime FFI requires the `ffi` capability (only `build.gab` has it)";
+                "comptime FFI to `{s}` (in `{s}`) is not allowed here: {s}.",
+                .{ ec.symbol, ec.lib, self.caps.denialReason() },
+            ) catch "comptime FFI is not permitted by this run's capabilities";
             return error.Trap;
         }
         return ffi.call(self.allocator, ec, args) catch error.Trap;
@@ -712,4 +782,64 @@ fn printValue(v: Value) void {
         .string => |x| std.debug.print("{s}\n", .{x}),
         else => std.debug.print("{any}\n", .{v}),
     }
+}
+
+// -- Caps ------------------------------------------------------------------
+//
+// The capability gate is the structural answer to the `build.rs` surface, so it
+// is worth testing directly rather than only through a compile that must fail.
+
+test "a pure run denies host calls but can still allocate" {
+    const pure = Caps{};
+    try std.testing.expect(!pure.allowsFfi("kernel32", "MulDiv"));
+    try std.testing.expect(!pure.allowsFfi("user32", "MessageBoxA"));
+    // The comptime heap has to keep working inside a pure `#run`.
+    for (Caps.heap_primitives) |p| {
+        try std.testing.expect(pure.allowsFfi("kernel32", p));
+    }
+}
+
+test "an allowlist grant admits only the libraries it names" {
+    const caps = Caps{ .ffi = .{ .libs = &.{"kernel32"} } };
+    try std.testing.expect(caps.allowsFfi("kernel32", "MulDiv"));
+    // Windows DLL names are case-insensitive, so the match must be too.
+    try std.testing.expect(caps.allowsFfi("KERNEL32", "MulDiv"));
+    try std.testing.expect(caps.allowsFfi("Kernel32", "MulDiv"));
+    try std.testing.expect(!caps.allowsFfi("user32", "MessageBoxA"));
+}
+
+test "the privileged root admits everything" {
+    const root = Caps{ .ffi = .all };
+    try std.testing.expect(root.allowsFfi("kernel32", "MulDiv"));
+    try std.testing.expect(root.allowsFfi("anything", "at_all"));
+}
+
+test "narrowing can never widen a grant" {
+    const none = Caps{};
+    const all = Caps{ .ffi = .all };
+    const k32 = Caps{ .ffi = .{ .libs = &.{"kernel32"} } };
+    const both = Caps{ .ffi = .{ .libs = &.{ "kernel32", "user32" } } };
+    const u32_only = Caps{ .ffi = .{ .libs = &.{"user32"} } };
+
+    // Nothing a callee asks for can escape a pure caller.
+    try std.testing.expect(!none.narrow(all).allowsFfi("kernel32", "MulDiv"));
+    try std.testing.expect(!none.narrow(k32).allowsFfi("kernel32", "MulDiv"));
+
+    // The root hands over exactly what was requested, no more.
+    try std.testing.expect(all.narrow(k32).allowsFfi("kernel32", "MulDiv"));
+    try std.testing.expect(!all.narrow(k32).allowsFfi("user32", "MessageBoxA"));
+    try std.testing.expect(!all.narrow(none).allowsFfi("kernel32", "MulDiv"));
+
+    // A subset request narrows; asking for more than you hold does not widen.
+    try std.testing.expect(!both.narrow(k32).allowsFfi("user32", "MessageBoxA"));
+    try std.testing.expect(both.narrow(k32).allowsFfi("kernel32", "MulDiv"));
+    try std.testing.expect(!k32.narrow(both).allowsFfi("user32", "MessageBoxA"));
+    try std.testing.expect(!k32.narrow(all).allowsFfi("user32", "MessageBoxA"));
+
+    // Disjoint allowlists fail closed rather than guessing an intersection.
+    try std.testing.expect(!k32.narrow(u32_only).allowsFfi("kernel32", "MulDiv"));
+    try std.testing.expect(!k32.narrow(u32_only).allowsFfi("user32", "MessageBoxA"));
+
+    // Narrowing never disturbs the heap primitives.
+    try std.testing.expect(none.narrow(none).allowsFfi("kernel32", "VirtualAlloc"));
 }

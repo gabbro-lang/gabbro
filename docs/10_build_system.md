@@ -374,7 +374,7 @@ What the build system needs, against what already exists:
 | `test_dir` step execution | ✅ done |
 | Build graph: deps/steps DAG, topo order, parallel | later |
 | Content hashing + incremental + `--watch` | later |
-| Capabilities / `*Caps` sandbox + VM capability table | ⏳ slice 1 done — comptime FFI is gated in `src/vm/engine.zig`; the `*Caps` surface and the wider capability table are open |
+| Capabilities / `*Caps` sandbox + VM capability table | ⏳ slices 1–2 done — comptime FFI is gated in `src/vm/engine.zig`, and the grant is per-library with conservative narrowing; the `*Caps` surface in `build.gab` is open |
 | `add_quote` typed codegen / `#provided` / `define` injection | later (extends `#quote`/`#insert`) |
 | Layer 2 (`workspace`/`Options`) + Layer 3 (intercept) surface | later |
 | Cross-compile targets | later (needs Linux/macOS codegen + entry) |

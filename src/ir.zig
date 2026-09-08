@@ -6352,7 +6352,7 @@ pub fn runBuildHook(allocator: std.mem.Allocator, front_end: pipeline.FrontEnd, 
     const c = cvm.ensureCache() orelse return error.SemanticFailed;
     var vm = vm_engine.Vm.initModule(cvm.gpa, &c.bc);
     vm.host = host;
-    vm.caps.ffi = true; // build.gab is the privileged root — it may call host FFI.
+    vm.caps.ffi = .all; // build.gab is the privileged root — it may call host FFI.
     defer vm.deinit();
 
     // The `Build` argument: a single zone cell holding `id = 0`, addressed as a

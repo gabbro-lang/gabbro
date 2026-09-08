@@ -635,9 +635,13 @@ const FnCompiler = struct {
                         else => {},
                     }
                 }
-                // `slice.ptr` — the base pointer (a host pointer for a host buffer,
-                // a cell pointer otherwise). Like `.len`, not an ordinary field.
-                if (std.mem.eql(u8, f.name, "ptr") and base_ty == .slice) {
+                // `slice.ptr` — the base pointer (a host pointer for a host buffer
+                // or a string constant, a cell pointer otherwise). Like `.len`, not
+                // an ordinary field. `.text` belongs here for the same reason it
+                // belongs on `.len` above: without it `s.ptr` on a string fell
+                // through to `load_cell` and trapped, which is what kept every
+                // `#extern` taking a string pointer from running at comptime.
+                if (std.mem.eql(u8, f.name, "ptr") and (base_ty == .slice or base_ty == .text)) {
                     const base = try self.resolveReg(f.base);
                     try self.emit(Instr.r_r_imm(.slice_ptr, target, base, 0));
                     return;

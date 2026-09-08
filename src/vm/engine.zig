@@ -185,9 +185,38 @@ pub const Vm = struct {
             ) catch "comptime FFI is not permitted by this run's capabilities";
             return error.Trap;
         }
-        return ffi.call(self.allocator, ec, args) catch |err| {
+
+        // A `*T` argument pointing into compile-time memory has no address the host
+        // can use. Give each one a scratch word holding the cell's current value,
+        // pass that address, and copy the word back afterwards. That is what makes
+        // an out-parameter — WriteFile's `lpNumberOfBytesWritten`, say — work from a
+        // build script, and with it `println` at compile time.
+        if (args.len > ffi.max_args) return error.Trap;
+        var scratch: [ffi.max_args]u64 = .{0} ** ffi.max_args;
+        var patched: [ffi.max_args]Value = undefined;
+        var out: [ffi.max_args]?Value.Ptr = .{null} ** ffi.max_args;
+        for (args, 0..) |a, i| {
+            switch (a) {
+                .ptr => |p| {
+                    const cur = self.zone_stack.getCell(p.zone, p.offset) catch return error.Trap;
+                    scratch[i] = switch (cur) {
+                        .int => |x| @truncate(@as(u128, @bitCast(x))),
+                        .uint => |x| @truncate(x),
+                        .bool => |b| @intFromBool(b),
+                        // Only scalar cells have a meaningful machine word. An
+                        // aggregate would need a layout the VM does not have.
+                        else => return error.Trap,
+                    };
+                    out[i] = p;
+                    patched[i] = .{ .host_ptr = .{ .addr = @intFromPtr(&scratch[i]), .size = 8 } };
+                },
+                else => patched[i] = a,
+            }
+        }
+
+        const result = ffi.call(self.allocator, ec, patched[0..args.len]) catch |err| {
             const detail: []const u8 = switch (err) {
-                error.UnsupportedArgument => "an argument lives in compile-time memory and has no address the host can read. Integers, booleans, string literals and buffers allocated through `std.heap` can cross; a pointer into a comptime local cannot",
+                error.UnsupportedArgument => "an argument lives in compile-time memory and has no address the host can read. Integers, booleans, string literals, `std.heap` buffers and pointers to scalar locals can cross; an aggregate cannot",
                 error.LibNotFound => "the library could not be loaded",
                 error.SymbolNotFound => "the symbol was not found in that library",
                 error.UnsupportedArity => "too many arguments",
@@ -200,6 +229,23 @@ pub const Vm = struct {
             ) catch "a comptime FFI call failed";
             return error.Trap;
         };
+
+        // Copy anything the callee wrote back into its cell, keeping the kind the
+        // cell already had.
+        for (args, 0..) |a, i| {
+            const p = out[i] orelse continue;
+            const back: Value = switch (a) {
+                .ptr => switch (self.zone_stack.getCell(p.zone, p.offset) catch return error.Trap) {
+                    .int => .{ .int = @as(i128, @as(i64, @bitCast(scratch[i]))) },
+                    .uint => .{ .uint = @as(u128, scratch[i]) },
+                    .bool => .{ .bool = scratch[i] != 0 },
+                    else => continue,
+                },
+                else => continue,
+            };
+            self.zone_stack.setCell(p.zone, p.offset, back) catch return error.Trap;
+        }
+        return result;
     }
 
     pub fn deinit(self: *Vm) void {
@@ -596,6 +642,12 @@ pub const Vm = struct {
                     frame.regs[inst.a] = switch (frame.regs[inst.b]) {
                         .host_buf => |hb| .{ .host_ptr = .{ .addr = hb.addr, .size = hb.stride } },
                         .slice => |s| .{ .ptr = .{ .zone = s.zone, .offset = s.offset } },
+                        // A `[]const u8` constant already lives in the compiler's own
+                        // memory, so its address is a real one the host can read.
+                        // `slice_len` has always accepted `.string`; this is the other
+                        // half. Without it `s.ptr` traps, which is what stopped any
+                        // `#extern` taking a string pointer at comptime.
+                        .string => |s| .{ .host_ptr = .{ .addr = @intFromPtr(s.ptr), .size = 1 } },
                         else => return error.TypeMismatch,
                     };
                 },

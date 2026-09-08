@@ -6364,16 +6364,15 @@ pub fn runBuildHook(allocator: std.mem.Allocator, front_end: pipeline.FrontEnd, 
 
     // Surface why the hook stopped. Without this every failure reads as "your
     // build.gab has no `build`", even when the function was found and ran.
-    _ = vm.call("build", &.{build_arg}) catch {
+    _ = vm.call("build", &.{build_arg}) catch |err| {
         if (vm.compiler_error_msg) |m| {
             std.debug.print("build.gab: {s}\n", .{m});
         } else {
             std.debug.print(
-                "build.gab: the comptime VM stopped without a reason. This usually " ++
-                    "means the script reached something the VM cannot do at compile " ++
-                    "time — writing to stdout is the common one, so a build script " ++
-                    "cannot print yet.\n",
-                .{},
+                "build.gab: the comptime VM stopped ({s}). This means the script " ++
+                    "reached something the VM cannot do at compile time — writing to " ++
+                    "stdout is the common one, so a build script cannot print yet.\n",
+                .{@errorName(err)},
             );
         }
         return error.SemanticFailed;

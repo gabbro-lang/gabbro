@@ -25,7 +25,7 @@ pub const FfiError = error{
     OutOfMemory,
 };
 
-const max_args = 6;
+pub const max_args = 6;
 
 /// Resolve `ec.symbol` in `ec.lib`, marshal `args`, call it, and return the
 /// result as a VM value. Allocations made for marshaling (null-terminated

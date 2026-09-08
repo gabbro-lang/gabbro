@@ -149,13 +149,14 @@ rejects on purpose. Each needs a fix-or-document decision before v0.1.0.
 - **`bindgen` v1** maps the common scalar/pointer/struct/enum/array shapes; the rest is
   unhandled ([`src/bindgen.zig`](src/bindgen.zig)).
 - **No external packages** — projects are single-tree until the package manager lands.
-- **A build script cannot print.** Calling `println` from a `build.gab` fails: the
-  comptime VM has no way to hand a host function the address of compile-time memory,
-  and `write_stdout` needs exactly that for its buffer. The failure is now reported
-  instead of appearing as `NoBuildFn`, but the capability itself is missing. Fixing
-  it means materialising comptime buffers into host memory across an FFI boundary
-  and copying back out-parameters, which also unblocks any `#extern` taking a
-  pointer.
+- **A build script cannot print.** `println` in a `build.gab` still stops the hook,
+  but only one piece is left: `core::narrow` lowers to the `truncate_to` builtin,
+  and the comptime VM does not implement it (nor the other type-first builtins
+  `ptr_from_int`, `unaligned_read`, `slice_from_raw_parts`). `write_stdout` calls it
+  on the buffer length. Everything underneath now works — a build script can call
+  `WriteFile` directly, string pointers and scalar out-parameters both cross the FFI
+  boundary — so implementing `truncate_to` in `src/vm/compiler.zig` is the whole
+  remaining distance.
 - **The comptime VM's step limit surfaces as the wrong error.** Exhausting
   `step_limit` inside a `#run` feeding `#parse` reports "`#parse` operand did not
   evaluate to a string at compile time", which points at the metaprogram instead of

@@ -137,6 +137,14 @@ rejects on purpose. Each needs a fix-or-document decision before v0.1.0.
   `.variant` comparison, and every other `==` work.
 - **Struct/aggregate equality** is not lowered ([`src/ast_prelude.zig`](src/ast_prelude.zig)).
   Reflection-driven structural diffs would unlock it.
+- **No constant aggregates in static storage.** A top-level global may only hold a
+  scalar. A struct, an array or a function pointer is rejected with "constant
+  initializer could not be folded at compile time", and there is no uninitialised
+  form either. The same shapes all work as locals, so it is storage that is missing,
+  not the types. This is the same gap as a top-level `#run` producing an aggregate,
+  and it blocks any exported data symbol — which is how CLAP and VST3 both define
+  their entry point (`extern const clap_plugin_entry_t clap_entry;`). See
+  [`examples/dll`](examples/dll/README.md).
 - **Aggregate top-level constants** — a `#run` producing a struct, slice or enum cannot
   become a top-level constant ([`src/ir.zig`](src/ir.zig)).
 - **Returning a capturing closure** needs an `*Arena` parameter, because the captured

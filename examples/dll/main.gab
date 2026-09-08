@@ -1,0 +1,12 @@
+// The smallest shared library Gabbro can produce. No `#entry`, no `main` — a DLL
+// is a bag of exported symbols, and a host resolves them by name.
+//
+// This exists to prove the plumbing a plugin needs: `b.shared` emits a real DLL,
+// `#export` puts the symbol in its export table, and a host process can find and
+// call it. Everything else (CLAP, audio, DSP) sits on top of exactly this.
+
+#export("gab_add")
+gab_add :: fn(a: i32, b: i32) -> i32 { return a + b; }
+
+#export("gab_version")
+gab_version :: fn() -> u32 { return 101u32; }

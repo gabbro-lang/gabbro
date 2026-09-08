@@ -371,10 +371,10 @@ What the build system needs, against what already exists:
 | **Plan executor**: per-artifact `compileFileWithLlvm`, wired outputs/libs/opt | ✅ done |
 | Layer 1 surface: `executable`/`shared`/`static`/`object`, `link`/`lib_path`/`output`/`optimize`/`define`, `require_*`/`depend`, `run_step`/`test_dir`/`default` | ✅ done |
 | CLI: `gabbro build` / `run` / `<name>` / `--list` / `--release` / `-q` | ✅ done |
-| `test_dir` step execution | ⏳ next |
+| `test_dir` step execution | ✅ done |
 | Build graph: deps/steps DAG, topo order, parallel | later |
 | Content hashing + incremental + `--watch` | later |
-| Capabilities / `*Caps` sandbox + VM capability table | not built yet |
+| Capabilities / `*Caps` sandbox + VM capability table | ⏳ slice 1 done — comptime FFI is gated in `src/vm/engine.zig`; the `*Caps` surface and the wider capability table are open |
 | `add_quote` typed codegen / `#provided` / `define` injection | later (extends `#quote`/`#insert`) |
 | Layer 2 (`workspace`/`Options`) + Layer 3 (intercept) surface | later |
 | Cross-compile targets | later (needs Linux/macOS codegen + entry) |
@@ -387,8 +387,8 @@ captured imperatively as the script runs — robust, no fragile offset math, and
 the model Jai itself uses). `Build`/`Artifact` are tiny value handles carrying an
 id; all state lives in the driver.
 
-**Build order from here:** `test_dir` execution → dependency/build graph +
-incremental → capabilities → Layers 2–3 surface → cross-compile.
+**Build order from here:** dependency/build graph + incremental → the rest of the
+capability system → Layers 2–3 surface → cross-compile.
 
 ## 10. Minimal end-to-end (the target for v1)
 

@@ -202,7 +202,7 @@ frontend is platform-independent.
 | --- | --- |
 | Lexer, parser, AST, diagnostics | done |
 | Semantic analysis + typed IR (const-fold, branch, DCE) | done |
-| LLVM object/executable generation | Windows end-to-end; Linux/macOS incomplete |
+| LLVM object/executable generation | Windows and Linux end-to-end; no macOS backend |
 | Structs, packed structs, enums (payloads + `match`) | done |
 | Integers `i8`–`i128`/`u1`–`u128`, floats `f32`/`f64` | done |
 | Pointers, arrays, slices, optionals (with debug checks) | done |
@@ -223,7 +223,7 @@ frontend is platform-independent.
 | Atomics + concurrency | done |
 | Testing | `#test` comptime lane (a failed assertion fails the build); runtime lane planned |
 | Tooling | `check`/`ir`/`object`/`build`, `gabbro lsp`, tree-sitter grammar + Zed extension, `gabbro bindgen`. No formatter, doc gen, REPL, or package manager yet |
-| Platform | Windows x86-64. A Linux x86-64 ELF backend cross-compiles and runs compute/CLI programs; some OS modules aren't ported yet |
+| Platform | Windows x86-64 and Linux x86-64, both end-to-end with the full standard library. Linux cross-compiles from Windows, static by default and glibc via `--libc`. No macOS backend. |
 
 See [`docs/`](docs/) for the language reference.
 

@@ -44,9 +44,10 @@ What works end-to-end (verified under WSL):
 | `Vec`, strings, fmt | ✅ | fall out of the allocator + I/O above |
 | `__chkstk`, `_fltused`, Windows entry | ✅ gated off | `context.applyTargetStubs` and `llvm.lower` emit them only when `target_os == .windows` |
 
-Not yet ported (still Win32-only): `std.fs`, `std.time`, `std.process`,
-`std.net`, `std.thread`. These need the corresponding Linux syscalls behind the
-same kind of runtime/stdlib seam the allocator now uses.
+All of `std` is ported. `std.fs`, `std.time`, `std.process`, `std.net` and
+`std.thread` sit behind the same runtime/stdlib seam the allocator uses, backed by
+the syscall wrappers in [`src/runtime/linux.gab`](../src/runtime/linux.gab). The
+per-module table is in [18_targets_and_tiers.md](18_targets_and_tiers.md) §6.
 
 Key implementation notes / gotchas:
 

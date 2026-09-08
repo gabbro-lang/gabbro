@@ -157,9 +157,10 @@ gabbro object <file>    emit an object file
 gabbro build  <file>    build an executable (Windows)
 ```
 
-Worked programs live in [`examples/`](examples/) — among them a Brainfuck interpreter,
-an ECS game, a path tracer that writes a BMP, and `diskscan`, a WinDirStat-style
-disk analyzer with a Win32 GUI and threads.
+Worked programs live in [`examples/`](examples/) — among them `mandel`, a Mandelbrot
+set drawn entirely by the comptime VM, `raycaster`, a 3D maze walked in the terminal,
+a Brainfuck interpreter, an ECS game, a path tracer that writes a BMP, and `diskscan`,
+a WinDirStat-style disk analyzer with a Win32 GUI and threads.
 
 ## Standard library
 

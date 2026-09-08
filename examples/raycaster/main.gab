@@ -1,0 +1,107 @@
+// ray.gab — the world is twelve lines of text. The camera walks it in 3D.
+
+#import std.heap.{ Arena, make };
+#import std.io.{ print };
+#import std.math.{ sin, cos };
+#import std.strings;
+#import std.time.{ sleep_ms };
+
+SW :: 100;        // screen columns
+SH :: 30;         // screen rows
+MW :: 16;         // map width
+MH :: 12;         // map height
+FOV :: 1.05f32;   // ~60 degrees
+FRAMES :: 600;   // ~27 s at 22 fps; raise it for a longer demo
+
+// Far to near. A wall gets denser as it gets closer.
+RAMP :: "..::--==++**##%%@@";
+
+row :: fn(y: i32) -> []const u8 {
+    match y {
+        0  => { return "################"; }
+        1  => { return "#..............#"; }
+        2  => { return "#..####...##...#"; }
+        3  => { return "#..#..........##"; }
+        4  => { return "#..#..####.....#"; }
+        5  => { return "#.....#..#..##.#"; }
+        6  => { return "#..##.#..#..##.#"; }
+        7  => { return "#..##.####.....#"; }
+        8  => { return "#..............#"; }
+        9  => { return "#.###.....####.#"; }
+        10 => { return "#..............#"; }
+        else => { return "################"; }
+    }
+}
+
+wall :: fn(x: i32, y: i32) -> bool {
+    if x < 0 { return true; }
+    if y < 0 { return true; }
+    if x >= MW { return true; }
+    if y >= MH { return true; }
+    return row(y)[x as usize] == 35u8;
+}
+
+// March a ray until it hits something. Returns the distance it travelled.
+march :: fn(px: f32, py: f32, ang: f32) -> f32 {
+    d: f32 = 0.0f32;
+    dx := cos(ang);
+    dy := sin(ang);
+    while d < 20.0f32 {
+        d += 0.02f32;
+        if wall((px + dx * d) as i32, (py + dy * d) as i32) { return d; }
+    }
+    return 20.0f32;
+}
+
+#entry
+main :: fn() -> i32 {
+    a := make();
+    sb := strings::builder(&a);
+    px: f32 = 2.5f32;
+    py: f32 = 8.5f32;
+    ang: f32 = 0.0f32;
+    hits: [SW]f32 = .{};
+
+    frame: i32 = 0;
+    while frame < FRAMES {
+        // One ray per column, with the fisheye taken back out.
+        c: i32 = 0;
+        while c < SW {
+            off := FOV * ((c as f32) / (SW as f32) - 0.5f32);
+            hits[c as usize] = march(px, py, ang + off) * cos(off);
+            c += 1;
+        }
+
+        strings::clear(&sb);
+        strings::append_byte(&sb, 27u8);      // ESC [ H — home, no clear, no flicker
+        strings::append(&sb, "[H");
+        y: i32 = 0;
+        while y < SH {
+            x: i32 = 0;
+            while x < SW {
+                d := hits[x as usize];
+                h := (((SH as f32) / d) as i32);          // wall height in rows
+                top := (SH - h) / 2;
+                if y < top      { strings::append_byte(&sb, 32u8); }        // sky
+                else { if y >= top + h { strings::append_byte(&sb, 46u8); } // floor
+                else {
+                    i := 17 - ((d * 1.4f32) as i32);
+                    if i < 0 { i = 0; }
+                    if i > 17 { i = 17; }
+                    strings::append_byte(&sb, RAMP[i as usize]);
+                } }
+                x += 1;
+            }
+            strings::append_byte(&sb, 10u8);
+            y += 1;
+        }
+        print(strings::str(&sb));
+
+        // Autopilot: walk forward, turn when the wall gets close.
+        if march(px, py, ang) < 0.8f32 { ang += 0.22f32; }
+        else { px += cos(ang) * 0.06f32; py += sin(ang) * 0.06f32; }
+        sleep_ms(33u32);
+        frame += 1;
+    }
+    return 0;
+}

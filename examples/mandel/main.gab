@@ -1,0 +1,67 @@
+// mandel.gab — a Mandelbrot set that is finished before the program starts.
+//
+// `render` never runs in the built binary. It runs on the comptime VM, and what
+// it returns is Gabbro source: one `println` per row. `#insert #parse` splices
+// that back in, so `main` ends up holding the picture, not the maths.
+
+#import std.heap.{ Arena, make };
+#import std.io.{ println };
+#import std.strings;
+
+W :: 120;
+H :: 48;
+ITER :: 120;
+
+// Darkest to lightest. No quote and no backslash, so the source we generate
+// needs no escaping.
+RAMP :: " .,:-=+*#%@";
+
+// Iterations until the orbit at (cx, cy) escapes. 0 means it never did.
+escape :: fn(cx: f64, cy: f64) -> i32 {
+    zx: f64 = 0.0f64;
+    zy: f64 = 0.0f64;
+    i: i32 = 0;
+    while i < ITER {
+        x2 := zx * zx;
+        y2 := zy * zy;
+        if x2 + y2 > 4.0f64 { return i; }
+        zy = 2.0f64 * zx * zy + cy;
+        zx = x2 - y2 + cx;
+        i += 1;
+    }
+    return 0;
+}
+
+// Runs on the comptime VM. Returns Gabbro source code, not a picture.
+render :: fn() -> []const u8 {
+    a := make();
+    sb := strings::builder(&a);
+    y: i32 = 0;
+    while y < H {
+        strings::append(&sb, "println(");
+        strings::append_byte(&sb, 34u8);
+        x: i32 = 0;
+        while x < W {
+            cx := -2.2f64 + (x as f64) * 3.0f64 / (W as f64);
+            cy := -1.2f64 + (y as f64) * 2.4f64 / (H as f64);
+            n := escape(cx, cy);
+            idx: i32 = 10;               // never escaped: inside the set
+            if n != 0 {                  // escaped: the slower it went, the denser
+                idx = (n * 10) / 18;     // most points flee fast, so spread those
+                if idx > 9 { idx = 9; }
+            }
+            strings::append_byte(&sb, RAMP[idx as usize]);
+            x += 1;
+        }
+        strings::append_byte(&sb, 34u8);
+        strings::append(&sb, ");");
+        y += 1;
+    }
+    return strings::str(&sb);
+}
+
+#entry
+main :: fn() -> i32 {
+    #insert #parse(render());
+    return 0;
+}

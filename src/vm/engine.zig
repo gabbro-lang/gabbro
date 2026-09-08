@@ -185,7 +185,21 @@ pub const Vm = struct {
             ) catch "comptime FFI is not permitted by this run's capabilities";
             return error.Trap;
         }
-        return ffi.call(self.allocator, ec, args) catch error.Trap;
+        return ffi.call(self.allocator, ec, args) catch |err| {
+            const detail: []const u8 = switch (err) {
+                error.UnsupportedArgument => "an argument lives in compile-time memory and has no address the host can read. Integers, booleans, string literals and buffers allocated through `std.heap` can cross; a pointer into a comptime local cannot",
+                error.LibNotFound => "the library could not be loaded",
+                error.SymbolNotFound => "the symbol was not found in that library",
+                error.UnsupportedArity => "too many arguments",
+                error.OutOfMemory => "out of memory",
+            };
+            self.compiler_error_msg = std.fmt.allocPrint(
+                self.allocator,
+                "comptime FFI to `{s}` (in `{s}`) failed: {s}.",
+                .{ ec.symbol, ec.lib, detail },
+            ) catch "a comptime FFI call failed";
+            return error.Trap;
+        };
     }
 
     pub fn deinit(self: *Vm) void {

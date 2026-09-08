@@ -6362,7 +6362,22 @@ pub fn runBuildHook(allocator: std.mem.Allocator, front_end: pipeline.FrontEnd, 
     vm.zone_stack.setCell(cell.ptr.zone, cell.ptr.offset, .{ .int = 0 }) catch return error.SemanticFailed;
     const build_arg = vm_value.Value{ .struct_ref = .{ .zone = cell.ptr.zone, .offset = cell.ptr.offset } };
 
-    _ = vm.call("build", &.{build_arg}) catch return error.SemanticFailed;
+    // Surface why the hook stopped. Without this every failure reads as "your
+    // build.gab has no `build`", even when the function was found and ran.
+    _ = vm.call("build", &.{build_arg}) catch {
+        if (vm.compiler_error_msg) |m| {
+            std.debug.print("build.gab: {s}\n", .{m});
+        } else {
+            std.debug.print(
+                "build.gab: the comptime VM stopped without a reason. This usually " ++
+                    "means the script reached something the VM cannot do at compile " ++
+                    "time — writing to stdout is the common one, so a build script " ++
+                    "cannot print yet.\n",
+                .{},
+            );
+        }
+        return error.SemanticFailed;
+    };
 }
 
 // Comptime test lane

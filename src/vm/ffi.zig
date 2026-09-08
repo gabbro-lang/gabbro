@@ -21,6 +21,7 @@ pub const FfiError = error{
     LibNotFound,
     SymbolNotFound,
     UnsupportedArity,
+    UnsupportedArgument,
     OutOfMemory,
 };
 
@@ -69,7 +70,15 @@ fn marshal(allocator: std.mem.Allocator, v: Value) FfiError!usize {
         // C expects a NUL-terminated string; copy and terminate.
         .string => |s| @intFromPtr((try allocator.dupeZ(u8, s)).ptr),
         .null_ptr => 0,
-        else => 0,
+        // Real host memory — `std.heap` VirtualAllocs it, so the address is one the
+        // callee can actually read and write.
+        .host_ptr => |p| p.addr,
+        .host_buf => |b| b.addr,
+        // Everything else lives in the VM's own memory and has no address the host
+        // can reach. This used to answer 0, which turned an unsupported argument
+        // into a null dereference *inside the callee* — a segfault attributed to
+        // the compiler rather than to the call.
+        else => error.UnsupportedArgument,
     };
 }
 

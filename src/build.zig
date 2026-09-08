@@ -25,6 +25,7 @@ pub const BuildError = error{
     CompileFailed,
     NoBuildScript,
     NoBuildFn,
+    BuildHookFailed,
     NoArtifacts,
     UnknownTarget,
     RunFailed,
@@ -376,7 +377,17 @@ pub fn run(gpa: std.mem.Allocator, io: std.Io, build_path: []const u8, opts: Run
 
     // 2. Run `build(b)` on the comptime VM, recording into `plan`.
     const host = vm_engine.BuildHost{ .ctx = &plan, .call = hostCall };
-    ir.runBuildHook(gpa, fe, host) catch return error.NoBuildFn;
+    ir.runBuildHook(gpa, fe, host) catch {
+        // Every failure inside the hook used to surface as `NoBuildFn`, which reads
+        // as "your build.gab has no `build`" even when the function was found and
+        // ran partway. The VM prints its own reason above when it has one.
+        std.debug.print(
+            "gabbro build: `build.gab` did not finish. Check that it declares " ++
+                "`build :: fn(b: Build)`, and see any error reported above.\n",
+            .{},
+        );
+        return error.BuildHookFailed;
+    };
     if (plan.oom) return error.OutOfMemory;
     if (plan.artifacts.items.len == 0) return error.NoArtifacts;
 

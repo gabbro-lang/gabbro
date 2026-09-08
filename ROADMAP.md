@@ -30,11 +30,11 @@ The first tagged, announced, public build. None of this is language work.
 
 | Item | State |
 | --- | --- |
-| Version number | `build.zig.zon` says `0.1.0-dev` |
+| Version number | `0.1.0` in `build.zig.zon` |
 | Git tags | none exist |
-| `CHANGELOG.md` | not written |
-| Tagged GitHub release + prebuilt Windows binaries | `.github/workflows/release.yml` is wired; never run |
-| Repository visibility | `gabbro-lang/gabbro` is private |
+| `CHANGELOG.md` | written |
+| Tagged GitHub release + prebuilt Windows binaries | blocked: `release.yml` needs the repo variable `LLVM_AVAILABLE=true` and the secret `LLVM_URL`, neither of which is set. Packaging locally needs a full LLVM install with the LLVM-C headers; the usual Windows LLVM builds ship only `Remarks.h` and `lto.h`. |
+| Repository description + topics | the repo is public but has neither |
 | Build-from-source path | Zig + LLVM, needs a clean pass and an examples sweep |
 
 ---

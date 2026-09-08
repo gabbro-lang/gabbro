@@ -852,8 +852,8 @@ test "exe: runtime write reports bytes written" {
     const code = try compileAndRun(arena.allocator(),
         \\main :: fn() -> i32 { return write_stdout("Gabbro") as i32; }
     , "exe_runtime_write");
-    // "Gabbro" is 5 bytes (was "K2" = 2 pre-rename); write_stdout returns the count.
-    try std.testing.expectEqual(@as(u32, 5), code);
+    // "Gabbro" is 6 bytes; write_stdout returns the count written.
+    try std.testing.expectEqual(@as(u32, 6), code);
 }
 
 test "exe: runtime exit terminates with requested status" {

@@ -24,22 +24,22 @@ privileged root.
 
 ---
 
-## Toward v0.1.0
+## Releasing
 
-The first tagged, announced, public build. None of this is language work.
+0.1.0 and 0.1.1 are tagged and published, built locally from a full LLVM install.
+What is still not automated or done:
 
 | Item | State |
 | --- | --- |
-| Version number | `0.1.0` in `build.zig.zon` |
-| Git tags | none exist |
-| `CHANGELOG.md` | written |
-| Tagged GitHub release + prebuilt Windows binaries | blocked: `release.yml` needs the repo variable `LLVM_AVAILABLE=true` and the secret `LLVM_URL`, neither of which is set. Packaging locally needs a full LLVM install with the LLVM-C headers; the usual Windows LLVM builds ship only `Remarks.h` and `lto.h`. |
-| Repository description + topics | the repo is public but has neither |
+| CI release workflow | `release.yml` never runs: it is gated on the repo variable `LLVM_AVAILABLE=true` and needs the secret `LLVM_URL`. Neither is set, so a version tag publishes nothing and releases are cut by hand. |
+| Packaging prerequisites | `scripts/package.ps1` needs an LLVM install carrying the LLVM-C headers and the static `LLVM*`/`lld*` libraries. The usual Windows LLVM distributions ship only `Remarks.h` and `lto.h`; the `clang+llvm-*-x86_64-pc-windows-msvc` archive is the one that works. |
+| Repository description + topics | the repo is public but has neither, so it is close to unfindable in search |
 | Build-from-source path | Zig + LLVM, needs a clean pass and an examples sweep |
+| Release testing | 0.1.0 shipped with a broken build system because only `gabbro build <file>.gab` was tested, not `gabbro build`. Any release check must extract the archive somewhere neutral and run both. |
 
 ---
 
-## After v0.1.0
+## Open work
 
 ### Capabilities and packages
 

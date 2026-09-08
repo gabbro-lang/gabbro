@@ -3,6 +3,29 @@
 Notable changes, newest first. Versions follow [SemVer](https://semver.org/): while
 the major version is `0`, any minor bump may break source compatibility.
 
+## 0.1.1 — 2026-09-08
+
+A bug-fix release. **If you have 0.1.0, replace it:** its build system does not work
+outside the machine that built it.
+
+### Fixed
+
+- **`gabbro build` could not find the standard library.** Running it in an extracted
+  0.1.0 release failed with `cannot read imported module: FileNotFound` naming a path
+  from the build machine. `gabbro build` with no source file dispatches to the build
+  system early in `main` and returned before the relocatable path resolution ran, so
+  `std.build` was looked up at the absolute path the compiler was built at. A direct
+  `gabbro build <file>.gab` was unaffected, which is why it survived release testing.
+  Setting `GABBRO_HOME` was the only way through on 0.1.0.
+
+### Added
+
+- `examples/mandel` — a Mandelbrot set drawn entirely by the comptime VM. `render`
+  runs at compile time and returns Gabbro source, which `#insert #parse` splices into
+  `main`; raising the resolution slows the build and leaves the run flat.
+- `examples/raycaster` — a twelve-line text map walked in 3D in the terminal at
+  roughly 22 fps.
+
 ## 0.1.0 — 2026-09-08
 
 First tagged release. Gabbro compiles end-to-end on two targets, ships a standard

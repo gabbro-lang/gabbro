@@ -1,0 +1,27 @@
+// A dependency's code, in your project. It wants to run on your machine while you
+// build — read an environment variable, phone home, drop a file. This is the
+// `build.rs` surface, and it is how supply-chain attacks actually land.
+//
+// In Gabbro it cannot. A bare `#run` is pure: it holds no capabilities, so the
+// compiler refuses to let it reach the host at all.
+//
+// Uncomment the `PID` line below and run `gabbro build` again:
+//
+//   error: comptime FFI to `GetCurrentProcessId` (in `kernel32`) is not allowed
+//   here: this ran as a pure `#run`, which has no host access — only `build.gab`
+//   is granted it.
+//
+// Then look at build.gab, which makes the same call and is allowed to.
+
+#import std.io.{ println };
+
+#extern("kernel32", "GetCurrentProcessId")
+current_pid :: fn() -> u32;
+
+// PID :: #run current_pid();
+
+#entry
+main :: fn() -> i32 {
+    println("built — and nothing in this file touched your machine to get here");
+    return 0;
+}

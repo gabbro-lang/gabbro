@@ -149,6 +149,18 @@ rejects on purpose. Each needs a fix-or-document decision before v0.1.0.
 - **`bindgen` v1** maps the common scalar/pointer/struct/enum/array shapes; the rest is
   unhandled ([`src/bindgen.zig`](src/bindgen.zig)).
 - **No external packages** — projects are single-tree until the package manager lands.
+- **A build script cannot print.** `#import std.io` in a `build.gab` makes the driver
+  fail to find the build entry at all: it reports `NoBuildFn` and stops, with no
+  diagnostic pointing at the import. Reproduces with nothing but the import and a
+  three-line `build`.
+- **Comptime FFI segfaults on a pointer into comptime memory.** Passing `&buf[0]`
+  from a `build.gab` to a host function crashes the compiler with a null dereference
+  rather than reporting that comptime addresses are not host addresses. Scalar and
+  string-literal arguments marshal correctly.
+- **The comptime VM's step limit surfaces as the wrong error.** Exhausting
+  `step_limit` inside a `#run` feeding `#parse` reports "`#parse` operand did not
+  evaluate to a string at compile time", which points at the metaprogram instead of
+  the budget. Around ten million loop iterations is where this starts.
 
 ---
 

@@ -1,0 +1,15 @@
+#import std.build.{ Build, executable, default };
+
+// The same host call main.gab is refused. This one runs.
+//
+// build.gab is the privileged root: it is the one file granted the `ffi`
+// capability, and it is the one file you wrote yourself. Everything a dependency
+// contributes runs pure unless your build script hands it something.
+#extern("kernel32", "GetCurrentProcessId")
+current_pid :: fn() -> u32;
+
+build :: fn(b: Build) {
+    pid := current_pid();          // allowed here, refused in main.gab
+    app := b.executable("capability", "main.gab");
+    b.default(app);
+}

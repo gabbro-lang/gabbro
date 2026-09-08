@@ -1,0 +1,39 @@
+// sha — file checksum utility (SHA-256 + CRC-32).
+//
+//   sha [file]      print digests of `file` (default: build.gab)
+
+#import std.fs;
+#import std.heap.{ Arena, make };
+#import std.crypto;
+#import std.strings.{ StringBuilder, builder, str, append, append_u64, append_hex };
+#import std.io.{ print };
+#import std.process;
+
+first_arg :: fn(line: []const u8, def: []const u8) -> []const u8 {
+    i: usize = 0usize;
+    if line.len > 0usize {
+        if line[0] == 34u8 { i = 1usize; while i < line.len { q: bool = line[i] == 34u8; i += 1usize; if q { break; } } }
+        else { while i < line.len { if line[i] == 32u8 { break; } i += 1usize; } }
+    }
+    while i < line.len { if line[i] != 32u8 { break; } i += 1usize; }
+    if i >= line.len { return def; }
+    start: usize = i;
+    while i < line.len { if line[i] == 32u8 { break; } i += 1usize; }
+    return line[start..i];
+}
+
+#entry
+main :: fn() -> i32 {
+    a := make();
+    line_buf: [1024]u8 = .{};
+    path := first_arg(process::command_line(line_buf[:]), "build.gab");
+
+    bytes := fs::read_all(path, &a) catch err { print("sha: cannot read "); print(path); print("\n"); return 1; };
+
+    sb := builder(&a);
+    append(&sb, path); append(&sb, "  ("); append_u64(&sb, bytes.len as u64); append(&sb, " bytes)\n");
+    append(&sb, "  sha256: "); append(&sb, crypto::to_hex(&a, crypto::sha256(bytes))); append(&sb, "\n");
+    append(&sb, "  crc32:  "); append_hex(&sb, crypto::crc32(bytes) as u64); append(&sb, "\n");
+    print(str(&sb));
+    return 0;
+}

@@ -7,8 +7,8 @@
 **/zig-out/
 *.o
 
-# Comptime #run cache (SKARN_CACHE=1)
-**/.skarn-cache/
+# Comptime #run cache (GABBRO_CACHE=1)
+**/.gabbro-cache/
 
 # Release archives (scripts/package.ps1)
 dist/

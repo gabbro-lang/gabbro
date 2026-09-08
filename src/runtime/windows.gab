@@ -1,0 +1,473 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Gabbro Windows runtime — compiled automatically into every Windows Gabbro program.
+/// Provides: @panic, assert, write_stdout, write_stderr
+/// No libc. Uses kernel32.dll only (always available on Windows).
+
+// kernel32 imports
+
+#extern("kernel32", "GetStdHandle")
+GetStdHandle :: fn(id: i32) -> usize;
+
+#extern("kernel32", "WriteFile")
+WriteFile :: fn(
+    handle:     usize,
+    buf:        *const u8,
+    len:        u32,
+    written:    *u32,
+    overlapped: ?*void,
+) -> bool;
+
+#extern("kernel32", "ExitProcess")
+ExitProcess :: fn(code: u32);
+
+// Closes an open object handle (files, processes, threads, ...). Declared
+// here — rather than in std.fs / std.process — because gabbro's symbol table is
+// flat and global; multiple stdlib modules need this primitive, and `#extern`
+// functions must keep their real Win32 export name (it doubles as the link
+// symbol), so there's no way to give each module its own private copy.
+#extern("kernel32", "CloseHandle")
+CloseHandle :: fn(handle: usize) -> bool;
+
+#extern("kernel32", "VirtualAlloc")
+VirtualAlloc :: fn(addr: usize, size: usize, alloc_type: u32, protect: u32) -> usize;
+
+#extern("kernel32", "VirtualFree")
+VirtualFree :: fn(addr: usize, size: usize, free_type: u32) -> bool;
+
+// OS page memory (backs std.heap)
+// MEM_RESERVE=0x2000, MEM_COMMIT=0x1000, MEM_RELEASE=0x8000, PAGE_READWRITE=0x4.
+
+os_reserve :: fn(size: usize) -> usize {
+    return VirtualAlloc(0usize, size, 0x2000u32, 0x4u32);
+}
+os_commit :: fn(addr: usize, size: usize) -> bool {
+    return VirtualAlloc(addr, size, 0x1000u32, 0x4u32) != 0usize;
+}
+os_alloc :: fn(size: usize) -> usize {
+    return VirtualAlloc(0usize, size, 0x3000u32, 0x4u32); // MEM_COMMIT|MEM_RESERVE
+}
+os_release :: fn(addr: usize, size: usize) {
+    ignored := VirtualFree(addr, 0usize, 0x8000u32); // MEM_RELEASE frees the whole region; size unused
+}
+
+// OS time (backs std.time)
+// `Sleep` is a shared runtime primitive (std.thread reuses it, like CloseHandle).
+
+#extern("kernel32", "GetSystemTimePreciseAsFileTime")
+GetSystemTimePreciseAsFileTime :: fn(out: *u64);
+#extern("kernel32", "QueryPerformanceCounter")
+QueryPerformanceCounter :: fn(out: *i64) -> bool;
+#extern("kernel32", "QueryPerformanceFrequency")
+QueryPerformanceFrequency :: fn(out: *i64) -> bool;
+#extern("kernel32", "Sleep")
+Sleep :: fn(ms: u32);
+
+// 100 ns ticks between the FILETIME epoch (1601) and the Unix epoch (1970).
+TIME_EPOCH_DIFF_100NS :: 116444736000000000u64;
+
+// Nanoseconds since 1970-01-01 00:00:00 UTC.
+os_wall_nanos :: fn() -> i64 {
+    ft: u64 = 0u64;
+    GetSystemTimePreciseAsFileTime(&ft);
+    return ((ft - TIME_EPOCH_DIFF_100NS) as i64) * 100i64;
+}
+
+// Monotonic nanoseconds (arbitrary origin). Split the tick delta into whole
+// seconds + remainder so `* 1e9` never overflows.
+os_monotonic_nanos :: fn() -> i64 {
+    t: i64 = 0i64;
+    f: i64 = 1i64;
+    QueryPerformanceCounter(&t);
+    QueryPerformanceFrequency(&f);
+    return (t / f) * 1000000000i64 + ((t % f) * 1000000000i64) / f;
+}
+
+// Sleep at least `ns` nanoseconds (Windows `Sleep` has ms granularity).
+os_sleep_nanos :: fn(ns: i64) {
+    if ns <= 0i64 { return; }
+    Sleep((ns / 1000000i64) as u32);
+}
+
+// OS file system (backs std.fs)
+// A handle is the Win32 HANDLE as i64 (INVALID_HANDLE_VALUE → -1, matching the
+// seam contract). Paths arrive NUL-terminated for the `*A` APIs.
+
+#extern("kernel32", "CreateFileA")
+CreateFileA :: fn(name: *const u8, access: u32, share: u32, sec: ?*void, disp: u32, flags: u32, tmpl: usize) -> usize;
+#extern("kernel32", "ReadFile")
+ReadFile :: fn(h: usize, buf: *u8, len: u32, read: *u32, ov: ?*void) -> bool;
+#extern("kernel32", "GetFileAttributesA")
+GetFileAttributesA :: fn(name: *const u8) -> u32;
+#extern("kernel32", "DeleteFileA")
+DeleteFileA :: fn(name: *const u8) -> bool;
+#extern("kernel32", "SetFilePointerEx")
+SetFilePointerEx :: fn(h: usize, dist: i64, newp: ?*i64, method: u32) -> bool;
+#extern("kernel32", "FindFirstFileExA")
+FindFirstFileExA :: fn(name: *const u8, level: u32, data: *WIN32_FIND_DATAA, op: u32, filt: ?*void, flags: u32) -> usize;
+#extern("kernel32", "FindNextFileA")
+FindNextFileA :: fn(h: usize, data: *WIN32_FIND_DATAA) -> bool;
+#extern("kernel32", "FindClose")
+FindClose :: fn(h: usize) -> bool;
+
+WIN32_INVALID_HANDLE :: 18446744073709551615usize;   // (HANDLE)-1
+
+WIN32_FIND_DATAA :: struct {
+    attrs:     u32,
+    ctime_lo:  u32, ctime_hi:  u32,
+    atime_lo:  u32, atime_hi:  u32,
+    wtime_lo:  u32, wtime_hi:  u32,
+    size_hi:   u32, size_lo:   u32,
+    reserved0: u32, reserved1: u32,
+    name:      [260]u8,
+    alt_name:  [14]u8,
+}
+
+// mode: 0 = read existing, 1 = create/truncate write, 2 = open/create append.
+os_file_open :: fn(path: *const u8, mode: i32) -> i64 {
+    h: usize = WIN32_INVALID_HANDLE;
+    if mode == 0 {
+        h = CreateFileA(path, 0x80000000u32, 0x3u32, null, 3u32, 0x80u32, 0usize); // GENERIC_READ, SHARE RW, OPEN_EXISTING
+    } else if mode == 1 {
+        h = CreateFileA(path, 0x40000000u32, 0x1u32, null, 2u32, 0x80u32, 0usize); // GENERIC_WRITE, SHARE_READ, CREATE_ALWAYS
+    } else {
+        h = CreateFileA(path, 0x40000000u32, 0x1u32, null, 4u32, 0x80u32, 0usize); // OPEN_ALWAYS
+        if h != WIN32_INVALID_HANDLE {
+            moved: i64 = 0i64;
+            ignored := SetFilePointerEx(h, 0i64, &moved, 2u32);  // seek to FILE_END
+        }
+    }
+    if h == WIN32_INVALID_HANDLE { return -1i64; }
+    return h as i64;
+}
+os_file_read :: fn(h: i64, buf: *u8, len: usize) -> i64 {
+    got: u32 = 0u32;
+    if !ReadFile(h as usize, buf, len as u32, &got, null) { return -1i64; }
+    return got as i64;
+}
+os_file_write :: fn(h: i64, buf: *const u8, len: usize) -> i64 {
+    put: u32 = 0u32;
+    if !WriteFile(h as usize, buf, len as u32, &put, null) { return -1i64; }
+    return put as i64;
+}
+os_file_close :: fn(h: i64) { ignored := CloseHandle(h as usize); }
+os_file_seek :: fn(h: i64, off: i64, whence: i32) -> i64 {
+    newp: i64 = 0i64;
+    if !SetFilePointerEx(h as usize, off, &newp, whence as u32) { return -1i64; } // 0/1/2 = BEGIN/CURRENT/END
+    return newp;
+}
+os_path_kind :: fn(path: *const u8) -> i32 {
+    attrs := GetFileAttributesA(path);
+    if attrs == 4294967295u32 { return 0; }          // INVALID_FILE_ATTRIBUTES
+    if (attrs & 0x10u32) != 0u32 { return 2; }       // FILE_ATTRIBUTE_DIRECTORY
+    return 1;
+}
+os_unlink :: fn(path: *const u8) -> i32 {
+    if !DeleteFileA(path) { return -1; }
+    return 0;
+}
+
+// Directory iteration over Find*FileA. The runtime owns the iterator state (the
+// search handle + the in-flight FIND_DATA + a first-entry flag); std.fs sees an
+// opaque i64 handle.
+WinDirState :: struct {
+    handle: usize,
+    first:  bool,
+    data:   WIN32_FIND_DATAA,
+}
+
+os_dir_open :: fn(path: *const u8) -> i64 {
+    raw := os_alloc(384usize);
+    if raw == 0usize { return -1i64; }
+    st := unsafe core::ptr_from_int(*WinDirState, raw);
+    // Build the glob `path\*` the Find API wants from the directory path.
+    pat: [320]u8 = .{};
+    i: usize = 0usize;
+    while i < 316usize {
+        c := unsafe *core::ptr_from_int(*u8, (path as usize) + i);
+        if c == 0u8 { break; }
+        pat[i] = c;
+        i += 1usize;
+    }
+    // Accept an already-globbed path (e.g. "dir\*"); otherwise append "\*".
+    if i > 0usize && pat[i - 1usize] == 42u8 {
+        pat[i] = 0u8;
+    } else {
+        pat[i] = 92u8;            // '\'
+        pat[i + 1usize] = 42u8;   // '*'
+        pat[i + 2usize] = 0u8;
+    }
+    // FindExInfoBasic (1), FIND_FIRST_EX_LARGE_FETCH (2).
+    st.handle = FindFirstFileExA(&pat[0], 1u32, &st.data, 0u32, null, 2u32);
+    if st.handle == WIN32_INVALID_HANDLE { os_release(raw, 384usize); return -1i64; }
+    st.first = true;
+    return raw as i64;
+}
+os_dir_next :: fn(h: i64, name: []u8) -> i64 {
+    st := unsafe core::ptr_from_int(*WinDirState, h as usize);
+    if st.first {
+        st.first = false;
+    } else {
+        if !FindNextFileA(st.handle, &st.data) { return -1i64; }
+    }
+    i: usize = 0usize;
+    while i + 1usize < name.len {
+        c := st.data.name[i];
+        if c == 0u8 { break; }
+        name[i] = c;
+        i += 1usize;
+    }
+    return i as i64;
+}
+os_dir_is_dir :: fn(h: i64) -> bool {
+    st := unsafe core::ptr_from_int(*WinDirState, h as usize);
+    return (st.data.attrs & 0x10u32) != 0u32;
+}
+os_dir_size :: fn(h: i64) -> u64 {
+    st := unsafe core::ptr_from_int(*WinDirState, h as usize);
+    return ((st.data.size_hi as u64) << 32u64) | (st.data.size_lo as u64);
+}
+os_dir_is_reparse :: fn(h: i64) -> bool {
+    st := unsafe core::ptr_from_int(*WinDirState, h as usize);
+    return (st.data.attrs & 0x400u32) != 0u32;   // FILE_ATTRIBUTE_REPARSE_POINT
+}
+os_dir_close :: fn(h: i64) {
+    st := unsafe core::ptr_from_int(*WinDirState, h as usize);
+    ignored := FindClose(st.handle);
+    os_release(h as usize, 384usize);
+}
+
+// OS process (backs std.process)
+// A child token is a heap ProcState holding the process + thread handles.
+
+#extern("kernel32", "GetCurrentProcessId")
+GetCurrentProcessId :: fn() -> u32;
+#extern("kernel32", "GetCommandLineA")
+GetCommandLineA :: fn() -> [*]const u8;
+#extern("kernel32", "GetEnvironmentVariableA")
+GetEnvironmentVariableA :: fn(name: *const u8, buffer: *u8, size: u32) -> u32;
+#extern("kernel32", "SetEnvironmentVariableA")
+SetEnvironmentVariableA :: fn(name: *const u8, value: ?*const u8) -> bool;
+#extern("kernel32", "WaitForSingleObject")
+WaitForSingleObject :: fn(handle: usize, ms: u32) -> u32;
+#extern("kernel32", "GetExitCodeProcess")
+GetExitCodeProcess :: fn(handle: usize, code: *u32) -> bool;
+#extern("kernel32", "TerminateProcess")
+TerminateProcess :: fn(handle: usize, code: u32) -> bool;
+#extern("kernel32", "CreateProcessA")
+CreateProcessA :: fn(
+    app: ?*const u8, cmd: ?*u8, proc_attr: ?*void, thread_attr: ?*void,
+    inherit: u32, flags: u32, env: ?*void, cwd: ?*const u8,
+    startup: *StartupInfoA, info: *ProcessInformation) -> bool;
+
+StartupInfoA :: struct {
+    cb: u32, reserved1: usize, desktop: usize, title: usize,
+    x: u32, y: u32, x_size: u32, y_size: u32, x_count: u32, y_count: u32,
+    fill: u32, flags: u32, show: u16, reserved2_count: u16,
+    reserved2: usize, std_input: usize, std_output: usize, std_error: usize,
+}
+ProcessInformation :: struct { process: usize, thread: usize, pid: u32, tid: u32 }
+ProcState :: struct { process: usize, thread: usize }
+
+os_pid :: fn() -> i64 { return GetCurrentProcessId() as i64; }
+
+os_cmdline :: fn(out: []u8) -> i64 {
+    raw := GetCommandLineA();
+    i: usize = 0usize;
+    while i < out.len {
+        c := raw[i];
+        if c == 0u8 { break; }
+        out[i] = c;
+        i += 1usize;
+    }
+    return i as i64;
+}
+os_get_env :: fn(name: *const u8, out: []u8) -> i64 {
+    n := GetEnvironmentVariableA(name, out.ptr, out.len as u32);
+    if n == 0u32 { return -1i64; }
+    if (n as usize) > out.len { return -1i64; }
+    return n as i64;
+}
+os_set_env :: fn(name: *const u8, value: *const u8) -> bool {
+    return SetEnvironmentVariableA(name, value);
+}
+os_unset_env :: fn(name: *const u8) -> bool {
+    return SetEnvironmentVariableA(name, null);
+}
+
+os_spawn :: fn(cmd: *const u8) -> i64 {
+    cmdbuf: [1024]u8 = .{};
+    i: usize = 0usize;
+    while i + 1usize < 1024usize {
+        c := unsafe *core::ptr_from_int(*u8, (cmd as usize) + i);
+        if c == 0u8 { break; }
+        cmdbuf[i] = c;
+        i += 1usize;
+    }
+    cmdbuf[i] = 0u8;
+    startup: StartupInfoA = .{
+        core::sizeof(StartupInfoA) as u32, 0usize, 0usize, 0usize,
+        0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u16, 0u16,
+        0usize, 0usize, 0usize, 0usize,
+    };
+    info: ProcessInformation = .{ 0usize, 0usize, 0u32, 0u32 };
+    if !CreateProcessA(null, &cmdbuf[0], null, null, 0u32, 0u32, null, null, &startup, &info) {
+        return -1i64;
+    }
+    raw := os_alloc(32usize);
+    if raw == 0usize {
+        ignored := CloseHandle(info.process); ignored2 := CloseHandle(info.thread);
+        return -1i64;
+    }
+    st := unsafe core::ptr_from_int(*ProcState, raw);
+    st.process = info.process;
+    st.thread = info.thread;
+    return raw as i64;
+}
+os_wait :: fn(token: i64, block: bool) -> i64 {
+    st := unsafe core::ptr_from_int(*ProcState, token as usize);
+    ms: u32 = if block { 4294967295u32 } else { 0u32 };   // INFINITE : 0
+    r := WaitForSingleObject(st.process, ms);
+    if r == 258u32 { return -2i64; }     // WAIT_TIMEOUT
+    if r != 0u32 { return -1i64; }       // not WAIT_OBJECT_0
+    code: u32 = 0u32;
+    if !GetExitCodeProcess(st.process, &code) { return -1i64; }
+    return code as i64;
+}
+os_kill :: fn(token: i64) -> bool {
+    st := unsafe core::ptr_from_int(*ProcState, token as usize);
+    return TerminateProcess(st.process, 1u32);
+}
+os_proc_release :: fn(token: i64) {
+    st := unsafe core::ptr_from_int(*ProcState, token as usize);
+    ignored := CloseHandle(st.process);
+    ignored2 := CloseHandle(st.thread);
+    os_release(token as usize, 32usize);
+}
+
+// OS sockets (backs std.net)
+// Winsock2 passthrough — std.net already passes Windows level/option constants.
+
+#extern("ws2_32", "WSAStartup") ws_startup :: fn(version: u16, data: *u8) -> i32;
+#extern("ws2_32", "WSACleanup") ws_cleanup :: fn() -> i32;
+#extern("ws2_32", "WSAGetLastError") ws_lasterr :: fn() -> i32;
+#extern("ws2_32", "socket") ws_socket :: fn(af: i32, kind: i32, proto: i32) -> usize;
+#extern("ws2_32", "closesocket") ws_close :: fn(s: usize) -> i32;
+#extern("ws2_32", "connect") ws_connect :: fn(s: usize, name: *const u8, namelen: i32) -> i32;
+#extern("ws2_32", "bind") ws_bind :: fn(s: usize, name: *const u8, namelen: i32) -> i32;
+#extern("ws2_32", "listen") ws_listen :: fn(s: usize, backlog: i32) -> i32;
+#extern("ws2_32", "accept") ws_accept :: fn(s: usize, name: ?*u8, namelen: ?*i32) -> usize;
+#extern("ws2_32", "send") ws_send :: fn(s: usize, buf: *const u8, len: i32, flags: i32) -> i32;
+#extern("ws2_32", "recv") ws_recv :: fn(s: usize, buf: *u8, len: i32, flags: i32) -> i32;
+#extern("ws2_32", "sendto") ws_sendto :: fn(s: usize, buf: *const u8, len: i32, flags: i32, to: *const u8, tolen: i32) -> i32;
+#extern("ws2_32", "recvfrom") ws_recvfrom :: fn(s: usize, buf: *u8, len: i32, flags: i32, from: *u8, fromlen: *i32) -> i32;
+#extern("ws2_32", "setsockopt") ws_setsockopt :: fn(s: usize, level: i32, opt: i32, val: *const u8, len: i32) -> i32;
+#extern("ws2_32", "getsockname") ws_getsockname :: fn(s: usize, name: *u8, namelen: *i32) -> i32;
+#extern("ws2_32", "ioctlsocket") ws_ioctlsocket :: fn(s: usize, cmd: u32, argp: *u32) -> i32;
+#extern("ws2_32", "shutdown") ws_shutdown :: fn(s: usize, how: i32) -> i32;
+
+os_net_init :: fn() -> i32 { data: [512]u8 = .{}; return ws_startup(0x0202u16, &data[0]); }
+os_net_cleanup :: fn() -> i32 { return ws_cleanup(); }
+os_net_lasterr :: fn() -> i32 { return ws_lasterr(); }
+os_net_socket :: fn(af: i32, kind: i32, proto: i32) -> usize { return ws_socket(af, kind, proto); }
+os_net_close :: fn(s: usize) -> i32 { return ws_close(s); }
+os_net_connect :: fn(s: usize, name: *const u8, namelen: i32) -> i32 { return ws_connect(s, name, namelen); }
+os_net_bind :: fn(s: usize, name: *const u8, namelen: i32) -> i32 { return ws_bind(s, name, namelen); }
+os_net_listen :: fn(s: usize, backlog: i32) -> i32 { return ws_listen(s, backlog); }
+os_net_accept :: fn(s: usize, name: ?*u8, namelen: ?*i32) -> usize { return ws_accept(s, name, namelen); }
+os_net_send :: fn(s: usize, buf: *const u8, len: i32, flags: i32) -> i32 { return ws_send(s, buf, len, flags); }
+os_net_recv :: fn(s: usize, buf: *u8, len: i32, flags: i32) -> i32 { return ws_recv(s, buf, len, flags); }
+os_net_sendto :: fn(s: usize, buf: *const u8, len: i32, flags: i32, to: *const u8, tolen: i32) -> i32 { return ws_sendto(s, buf, len, flags, to, tolen); }
+os_net_recvfrom :: fn(s: usize, buf: *u8, len: i32, flags: i32, from: *u8, fromlen: *i32) -> i32 { return ws_recvfrom(s, buf, len, flags, from, fromlen); }
+os_net_setsockopt :: fn(s: usize, level: i32, opt: i32, val: *const u8, len: i32) -> i32 { return ws_setsockopt(s, level, opt, val, len); }
+os_net_getsockname :: fn(s: usize, name: *u8, namelen: *i32) -> i32 { return ws_getsockname(s, name, namelen); }
+os_net_ioctlsocket :: fn(s: usize, cmd: u32, argp: *u32) -> i32 { return ws_ioctlsocket(s, cmd, argp); }
+os_net_shutdown :: fn(s: usize, how: i32) -> i32 { return ws_shutdown(s, how); }
+
+// OS threads (backs std.thread)
+// The thread token is the Win32 thread HANDLE; join/running reuse the shared
+// WaitForSingleObject / CloseHandle runtime primitives.
+
+#extern("kernel32", "CreateThread") k_create_thread :: fn(attrs: ?*void, stack: usize, start: *void, param: *void, flags: u32, id: ?*u32) -> usize;
+#extern("kernel32", "GetExitCodeThread") k_thread_exit :: fn(h: usize, code: *u32) -> bool;
+#extern("kernel32", "GetCurrentThreadId") k_thread_id :: fn() -> u32;
+#extern("kernel32", "SwitchToThread") k_switch :: fn() -> bool;
+#extern("kernel32", "GetActiveProcessorCount") k_cpus :: fn(group: u16) -> u32;
+
+os_thread_spawn :: fn(entry: *void, arg: *void) -> i64 {
+    tid: u32 = 0u32;
+    h := k_create_thread(null, 0usize, entry, arg, 0u32, &tid);
+    if h == 0usize { return -1i64; }
+    return h as i64;
+}
+os_thread_join :: fn(token: i64) -> u32 {
+    h := token as usize;
+    ig := WaitForSingleObject(h, 4294967295u32);   // INFINITE
+    code: u32 = 0u32;
+    ig2 := k_thread_exit(h, &code);
+    ig3 := CloseHandle(h);
+    return code;
+}
+os_thread_detach :: fn(token: i64) { ignored := CloseHandle(token as usize); }
+os_thread_running :: fn(token: i64) -> bool { return WaitForSingleObject(token as usize, 0u32) == 258u32; } // WAIT_TIMEOUT
+os_thread_id :: fn() -> u32 { return k_thread_id(); }
+os_thread_yield :: fn() { ignored := k_switch(); }
+os_cpu_count :: fn() -> u32 { return k_cpus(0xFFFFu16); }
+
+// Handle constants
+
+STD_OUTPUT_HANDLE :: -11;
+STD_ERROR_HANDLE  :: -12;
+PANIC_EXIT_CODE   :: 0xDEAD_BEEF;
+
+// Low-level I/O
+
+write_stdout :: fn(data: []const u8) -> usize {
+    if data.len == 0 { return 0; }
+    handle  := GetStdHandle(STD_OUTPUT_HANDLE);
+    written := 0u32;
+    ok := WriteFile(handle, data.ptr, core::narrow(u32, data.len), &written, null);
+    if !ok { return 0; }
+    return written as usize;
+}
+
+write_stderr :: fn(data: []const u8) -> usize {
+    if data.len == 0 { return 0; }
+    handle  := GetStdHandle(STD_ERROR_HANDLE);
+    written := 0u32;
+    ok := WriteFile(handle, data.ptr, core::narrow(u32, data.len), &written, null);
+    if !ok { return 0; }
+    return written as usize;
+}
+
+// Core runtime functions
+
+/// Exit with an application-defined status.
+#noreturn
+exit :: fn(code: u32) {
+    ExitProcess(code);
+}
+
+/// Terminate after an unrecoverable runtime failure.
+#noreturn
+abort :: fn() {
+    ExitProcess(PANIC_EXIT_CODE);
+}
+
+/// Abort with a message. Never returns.
+#noreturn
+@panic :: fn(msg: []const u8) {
+    write_stderr("panic: ");
+    write_stderr(msg);
+    write_stderr("\n");
+    abort();
+}
+
+/// Assert a condition is true; panic with a default message if not.
+assert :: fn(cond: bool) {
+    if !cond { core::panic("assertion failed"); }
+}
+
+/// Assert with a custom message.
+assert_msg :: fn(cond: bool, msg: []const u8) {
+    if !cond { core::panic(msg); }
+}

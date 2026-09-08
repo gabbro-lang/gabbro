@@ -62,8 +62,8 @@ pub const CompileError = error{
 
 /// Runtime override for the standard-library root (the directory containing
 /// `std/`). `null` → use the build-baked `build_options.stdlib_root`. The CLI
-/// resolves this from an installed/dev layout (`--std-path`, `$SKARN_STD`,
-/// `$SKARN_HOME/lib`, or exe-relative) so one binary finds its stdlib wherever it
+/// resolves this from an installed/dev layout (`--std-path`, `$GABBRO_STD`,
+/// `$GABBRO_HOME/lib`, or exe-relative) so one binary finds its stdlib wherever it
 /// lands. Set once at startup; the compiler is single-threaded per build.
 pub var stdlib_root_override: ?[]const u8 = null;
 
@@ -170,7 +170,7 @@ pub fn compileMulti(allocator: std.mem.Allocator, files: []const SourceFile) Com
     return runPipelineWithSource(fe_allocator, .{ .file_name = modules.items[root].file_name, .items = items }, files[root].source, modules.items[root].file_name, arena);
 }
 
-/// Compile a .sk file from disk, resolving `#import` declarations recursively.
+/// Compile a .gab file from disk, resolving `#import` declarations recursively.
 /// Requires an `std.Io` instance (Zig 0.16 explicit I/O).
 pub fn compileFile(
     allocator: std.mem.Allocator,
@@ -180,7 +180,7 @@ pub fn compileFile(
     return compileFileInternal(allocator, io, path, false, @import("builtin").os.tag, false);
 }
 
-/// Compile a .sk file and its imports with the embedded platform runtime.
+/// Compile a .gab file and its imports with the embedded platform runtime.
 pub fn compileFileWithRuntime(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -264,8 +264,8 @@ fn loadFile(
         // A missing `std/...` module almost always means the compiler can't find
         // its standard library — point the user at the relocation knobs.
         if (std.mem.indexOf(u8, path, "std") != null) {
-            std.debug.print("  hint: the skarn standard library wasn't found at this path. " ++
-                "Set SKARN_HOME to your skarn install dir, or pass --std-path <dir-containing-std>.\n", .{});
+            std.debug.print("  hint: the gabbro standard library wasn't found at this path. " ++
+                "Set GABBRO_HOME to your gabbro install dir, or pass --std-path <dir-containing-std>.\n", .{});
         }
         return err;
     };
@@ -302,7 +302,7 @@ fn moduleImportsStdHeap(items: []const ast.Item) bool {
     return false;
 }
 
-/// Turn an import path like ["utils", "math"] into "utils/math.sk"
+/// Turn an import path like ["utils", "math"] into "utils/math.gab"
 /// relative to `base_dir`.
 fn resolveImportPath(
     allocator: std.mem.Allocator,
@@ -325,7 +325,7 @@ fn resolveImportPath(
         if (i > 0) try buf.append(allocator, std.fs.path.sep);
         try buf.appendSlice(allocator, part);
     }
-    try buf.appendSlice(allocator, ".sk");
+    try buf.appendSlice(allocator, ".gab");
     return buf.toOwnedSlice(allocator);
 }
 
@@ -350,7 +350,7 @@ fn runPipelineWithSource(
     arena: *std.heap.ArenaAllocator,
 ) CompileError!FrontEnd {
     // Phase 3 message loop: run `#compiler` hooks (compile-time functions that
-    // return Skarn source for top-level declarations) and add the generated
+    // return Gabbro source for top-level declarations) and add the generated
     // declarations to the module before the rest of the pipeline sees it.
     const base_module = if (ir_mod.hasCompilerHook(raw_module))
         try runCompilerHookPass(allocator, raw_module, source, file, arena)
@@ -380,7 +380,7 @@ fn runPipelineWithSource(
     else
         with_prelude;
 
-    // `Any` (type-erased value + safe downcast) is mostly ordinary generic Skarn —
+    // `Any` (type-erased value + safe downcast) is mostly ordinary generic Gabbro —
     // inject it when the module uses `Any`/`any(`/`any_*` (and doesn't define its
     // own `Any`). Detected over the combined AST (not the source string, which in
     // a multi-module compile is only the first file). The wrap `any(x)` is the
@@ -617,7 +617,7 @@ fn applyHookOutput(
 }
 
 /// Inject the `std.compiler` `Decl` type so `#compiler` hooks can call
-/// `compiler_decls()`. Parsed under the user's file name (Skarn symbols are
+/// `compiler_decls()`. Parsed under the user's file name (Gabbro symbols are
 /// file-private — a separate name would hide `Decl` from the hook), with a
 /// distinct high id base so its nodes never collide with the user's.
 fn prependCompilerPrelude(allocator: std.mem.Allocator, user: ast.Module) !ast.Module {
@@ -630,7 +630,7 @@ fn prependCompilerPrelude(allocator: std.mem.Allocator, user: ast.Module) !ast.M
 
 /// Prepend the embedded std.heap bump arena (and std.ptr, which it uses) to the
 /// user's module so a `zone` block's `Arena` handle and allocator are in scope.
-/// Parsed under the USER's file name (Skarn symbols are file-private) with a high
+/// Parsed under the USER's file name (Gabbro symbols are file-private) with a high
 /// id base; `ptr` is parsed first and `heap` chains off its next id. The
 /// embedded `heap` imports `std.ptr` — stripped here, since ptr is inlined.
 fn prependHeapPrelude(allocator: std.mem.Allocator, user: ast.Module) !ast.Module {
@@ -639,7 +639,7 @@ fn prependHeapPrelude(allocator: std.mem.Allocator, user: ast.Module) !ast.Modul
 
     var items: std.ArrayList(ast.Item) = .empty;
 
-    // heap.sk calls the platform runtime's page primitives (`os_reserve`, …).
+    // heap.gab calls the platform runtime's page primitives (`os_reserve`, …).
     // The runtime-free `compile` path has no runtime, so supply a host shim
     // (VirtualAlloc-backed) — but only when no runtime already defines them, so
     // real builds (which prepend a runtime) don't see a duplicate declaration.
@@ -673,7 +673,7 @@ fn moduleDeclaresFunction(module: ast.Module, name: []const u8) bool {
 }
 
 /// Host (Windows) page-memory shim for the runtime-free `compile` path. Mirrors
-/// the `os_*` surface that windows.sk provides at runtime; injected by
+/// the `os_*` surface that windows.gab provides at runtime; injected by
 /// `prependHeapPrelude` only when no runtime is present (so it never collides).
 const os_host_shim_src =
     \\#extern("kernel32", "VirtualAlloc")
@@ -1264,7 +1264,7 @@ fn exprUsesMeta(expr: ast.Expr) bool {
 /// the user's. The prelude is pure type declarations, so it carries no imports.
 fn prependAstPrelude(allocator: std.mem.Allocator, user: ast.Module) !ast.Module {
     // Parse under the USER's file name so the prelude types share the user's
-    // module — Skarn symbols are file-private, so a separate file name would make
+    // module — Gabbro symbols are file-private, so a separate file name would make
     // the ast.* types invisible to user code.
     const parsed = try parser.parseSourceFrom(allocator, user.file_name, ast_prelude.source, prelude_id_base);
     var items: std.ArrayList(ast.Item) = .empty;

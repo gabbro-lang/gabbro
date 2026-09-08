@@ -1,0 +1,111 @@
+// SPDX-License-Identifier: Apache-2.0
+// std.thread — native OS threads. Thread calls go through the platform runtime
+// (windows.gab → CreateThread; linux.gab → clone with a child stack), so this file
+// stays OS-agnostic.
+//
+// Real OS threads, not async/await — a thread is a stack plus an entry point. The
+// entry is `fn(*void) -> u32` and its return value is the thread's exit code. A
+// normal gabbro function is a fat closure a C ABI can't call, so pass the entry as
+// a thin pointer with core::fn_ptr, and keep the context pointer alive:
+//
+//     worker :: fn(p: *void) -> u32 {
+//         data := unsafe (p as *MyData);
+//         return 0u32;
+//     }
+//     t := thread::spawn(core::fn_ptr(worker), unsafe ((&data) as *void));
+//     code := t.join();   // blocks; returns worker's exit code
+//
+// Linux note: an exit code is only 8 bits, so return 0..255 if you read it via join.
+
+// The thread seam, provided by the platform runtime:
+//   os_thread_spawn(entry, arg) -> i64   opaque token, -1 on failure
+//   os_thread_join(token) -> u32         block, return exit code
+//   os_thread_detach(token) / os_thread_running(token) -> bool
+//   os_thread_id() -> u32 / os_thread_yield() / os_cpu_count() -> u32
+
+THREAD_INVALID :: -1i64;
+MAX_GROUP :: 64;
+
+// A thread entry has the shape `fn(*void) -> u32`. Spawn it with
+// `core::fn_ptr(an_entry)`.
+
+// Thread
+pub Thread :: struct {
+    token: i64
+
+    // Did the thread start successfully?
+    pub ok :: fn(self: *Self) -> bool { return self.token != THREAD_INVALID; }
+
+    // Block until the thread finishes, returning its exit code. A joined Thread
+    // must not be reused.
+    pub join :: fn(self: *Self) -> u32 {
+        if self.token == THREAD_INVALID { return 0u32; }
+        code := os_thread_join(self.token);
+        self.token = THREAD_INVALID;
+        return code;
+    }
+
+    // Release the thread without waiting; it runs to completion on its own.
+    pub detach :: fn(self: *Self) {
+        if self.token == THREAD_INVALID { return; }
+        os_thread_detach(self.token);
+        self.token = THREAD_INVALID;
+    }
+
+    // True while the thread is still executing (a non-blocking poll).
+    pub is_running :: fn(self: *Self) -> bool {
+        if self.token == THREAD_INVALID { return false; }
+        return os_thread_running(self.token);
+    }
+}
+
+// Spawn a thread that runs `entry(arg)`. `entry` is a raw thread-entry pointer
+// (`core::fn_ptr(worker)`); `arg` is the single context pointer it receives.
+pub spawn :: fn(entry: *void, arg: *void) -> Thread {
+    return .{ os_thread_spawn(entry, arg) };
+}
+
+// Free helpers ───────────────────────────────────────────────────────────--
+
+// The calling thread's OS id.
+pub current_id :: fn() -> u32 { return os_thread_id(); }
+
+// Suspend the calling thread for at least `ms` milliseconds.
+pub sleep :: fn(ms: u32) { os_sleep_nanos((ms as i64) * 1000000i64); }
+
+// Hint the scheduler to run another ready thread now (cooperative back-off).
+pub yield_now :: fn() { os_thread_yield(); }
+
+// Number of logical processors available — a sensible default thread count.
+pub cpu_count :: fn() -> u32 { return os_cpu_count(); }
+
+// ThreadGroup: fan out, then join the whole batch (structured) ─────────────-
+// Spawn several threads as a unit and wait for all of them. The group owns its
+// tokens; `join_all` blocks until every thread has finished. The batch cannot
+// outlive the `join_all` call site.
+pub ThreadGroup :: struct {
+    tokens: [64]i64 // MAX_GROUP slots
+    count: usize
+
+    // Add a thread running `entry(arg)` to the group. Silently ignored past
+    // MAX_GROUP threads.
+    pub spawn :: fn(self: *Self, entry: *void, arg: *void) {
+        if self.count >= 64usize { return; }
+        self.tokens[self.count] = os_thread_spawn(entry, arg);
+        self.count += 1usize;
+    }
+
+    // Block until every thread in the group has finished, then reset the group
+    // so it can be reused.
+    pub join_all :: fn(self: *Self) {
+        i: usize = 0usize;
+        while i < self.count {
+            if self.tokens[i] != THREAD_INVALID { ig := os_thread_join(self.tokens[i]); }
+            i += 1usize;
+        }
+        self.count = 0usize;
+    }
+}
+
+// A fresh, empty thread group: `g := thread::group();`.
+pub group :: fn() -> ThreadGroup { return .{ }; }

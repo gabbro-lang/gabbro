@@ -1,0 +1,32 @@
+// Example project build script. Run with `gabbro build` (once dir-mode lands).
+// See docs/10_build_system.md for the full design.
+
+#import std.build.{ Build, executable, shared, release, debug, link, lib_path,
+                    output, define, require_path, depend, run_step, test_dir, default };
+
+build :: fn(b: Build) {
+    // The main executable.
+    game := b.executable("game", "src/main.gab");
+    game.release();
+    game.link("raylib");
+    game.link("user32");
+    game.lib_path("vendor/raylib/lib");
+    game.output("bin/game.exe");
+    game.define("MAX_ENTITIES", "4096");
+
+    // A build-time dependency (its own build.gab runs sandboxed).
+    rl := b.require_path("raylib", "vendor/raylib");
+    game.depend(rl);
+
+    // A second artifact: a hot-reloadable gameplay DLL.
+    logic := b.shared("logic", "src/logic.gab");
+    logic.debug();
+    logic.output("bin/logic.dll");
+
+    // Steps: `gabbro build run`, `gabbro build test`.
+    b.run_step("run", game);
+    b.test_dir("test", "tests/");
+
+    // What bare `gabbro build` produces.
+    b.default(game);
+}

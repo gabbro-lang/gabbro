@@ -1,0 +1,64 @@
+// derive — a metaprogramming showcase:
+//   1. `#run` runs ordinary Gabbro in the comptime VM and bakes the result as a
+//      constant (Jai-style compile-time execution).
+//   2. `core::type_info` reflects a struct's schema at runtime with no codegen.
+
+#import std.heap.{ Arena, make };
+#import std.io.{ print, print_i64, print_u64 };
+
+// 1. Compile-time execution
+fib :: fn(n: i32) -> i64 {
+    if n < 2 { return n as i64; }
+    return fib(n - 1) + fib(n - 2);
+}
+FIB30 :: #run fib(30);            // 832040 — computed by the compiler, not at runtime
+
+// A comptime-built table: the first 8 triangular numbers, baked into .rodata.
+tri :: fn(n: i64) -> i64 { return n * (n + 1) / 2; }
+TRI7 :: #run tri(7);              // 28
+
+// 2. Runtime reflection
+Point  :: struct { x: i32, y: i32 }
+Person :: struct { name: []const u8, age: u8, height: f64, home: Point, tags: []const u8 }
+
+kind_name :: fn(ti: TypeInfo) -> []const u8 {
+    match ti {
+        .int |i|     => { if i.signed { return "int"; } return "uint"; }
+        .float |f|   => return "float";
+        .boolean     => return "bool";
+        .slice |e|   => return "slice";
+        .pointer |p| => return "pointer";
+        .struct_ |s| => return s.name;
+        .enum_ |en|  => return en.name;
+        else         => return "?";
+    }
+}
+
+print_schema :: fn($T: type) {
+    match core::type_info(T) {
+        .struct_ |s| => {
+            print(s.name); print(" {\n");
+            i: usize = 0usize;
+            while i < s.fields.len {
+                print("  "); print(s.fields[i].name); print(": ");
+                ft: TypeInfo = *s.fields[i].ty;
+                print(kind_name(ft)); print("\n");
+                i += 1usize;
+            }
+            print("}\n");
+        }
+        else => print("(not a struct)\n");
+    }
+}
+
+#entry
+main :: fn() -> i32 {
+    print("compile-time #run:\n");
+    print("  fib(30) = "); print_i64(FIB30); print("\n");
+    print("  tri(7)  = "); print_i64(TRI7); print("\n\n");
+
+    print("reflected schemas (runtime, zero codegen):\n");
+    print_schema(Person);
+    print_schema(Point);
+    return 0;
+}

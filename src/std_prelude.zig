@@ -10,8 +10,8 @@
 //! keeps a single source of truth. `ptr` is pulled in too because `heap`
 //! depends on `std.ptr.align_up`.
 
-/// `lib/std/heap.sk` — the bump arena (Arena, make/reserve/fixed, alloc*, new*).
-pub const heap_src = @embedFile("std_heap_skarn");
+/// `lib/std/heap.gab` — the bump arena (Arena, make/reserve/fixed, alloc*, new*).
+pub const heap_src = @embedFile("std_heap_gabbro");
 
-/// `lib/std/ptr.sk` — pointer helpers; `heap` uses `align_up`.
-pub const ptr_src = @embedFile("std_ptr_skarn");
+/// `lib/std/ptr.gab` — pointer helpers; `heap` uses `align_up`.
+pub const ptr_src = @embedFile("std_ptr_gabbro");

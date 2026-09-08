@@ -1,6 +1,6 @@
 # ecs_game — a headless ECS asteroids simulation
 
-A bigger, multi-module Skarn program that exercises the language end to end: local
+A bigger, multi-module Gabbro program that exercises the language end to end: local
 modules, a struct-of-arrays ECS, generics-free data-oriented systems, enums,
 fixed-capacity arrays sized by constants, float math, and a deterministic RNG.
 
@@ -12,29 +12,29 @@ renders an ASCII snapshot every 30 ticks, and prints a final report.
 ## Run it
 
 ```
-skarn build            # build into ./ecs_game.exe
-skarn build run        # build and run
+gabbro build            # build into ./ecs_game.exe
+gabbro build run        # build and run
 ```
 
 ## Layout
 
 ```
-build.sk            the build script (std.build)
+build.gab            the build script (std.build)
 src/
-  main.sk           game setup + the tick loop + the report
-  vec.sk            Vec2 and 2D math (add/sub/scale/len/dist2/norm)
-  components.sk     entity Kind enum + field/world dimensions
-  world.sk          the ECS core: struct-of-arrays component store
-  systems.sk        movement, lifetime, fire, collisions, spawner
-  render.sk         ASCII rasterizer
+  main.gab           game setup + the tick loop + the report
+  vec.gab            Vec2 and 2D math (add/sub/scale/len/dist2/norm)
+  components.gab     entity Kind enum + field/world dimensions
+  world.gab          the ECS core: struct-of-arrays component store
+  systems.gab        movement, lifetime, fire, collisions, spawner
+  render.gab         ASCII rasterizer
 ```
 
 ## The ECS
 
-`world.sk` defines a single `World` with **parallel component arrays** indexed by
+`world.gab` defines a single `World` with **parallel component arrays** indexed by
 entity id:
 
-```skarn
+```gabbro
 World :: struct {
     pos:    [MAX_ENTITIES]Vec2,
     vel:    [MAX_ENTITIES]Vec2,

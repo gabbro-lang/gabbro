@@ -1,0 +1,42 @@
+// Build script for diskscan — a fast, multithreaded disk-usage analyzer with a
+// native Win32 GUI. Two artifacts share one scanner:
+//
+//   gabbro build              build both (CLI + GUI) into ./out, release
+//   gabbro build run          build + run the CLI on the current directory
+//   gabbro build gui          build + launch the GUI
+//   gabbro build -Ddebug      unoptimized build with safety checks
+//
+#import std.build.{ Build, Optimize, executable, optimize, release, debug,
+                    subsystem, console, windowed, version, description,
+                    install, out_dir, run_step, option, summary };
+
+VERSION :: "0.1.0";
+
+build :: fn(b: Build) {
+    dev: bool = b.option("debug");
+
+    // CLI: console subsystem
+    cli := b.executable("diskscan", "src/cli.gab");
+    cli.description("Fast multithreaded disk-usage analyzer (CLI)");
+    cli.version(VERSION);
+    cli.console();
+    cli.out_dir("out");
+    if dev { cli.debug(); } else { cli.release(); }
+    cli.install();
+
+    // GUI: windowed subsystem (no console window)
+    gui := b.executable("diskscan-gui", "src/gui.gab");
+    gui.description("Disk-usage analyzer with a native browser GUI");
+    gui.version(VERSION);
+    gui.windowed();
+    gui.out_dir("out");
+    if dev { gui.debug(); } else { gui.release(); }
+    gui.install();
+
+    // steps
+    // No `default` is set, so a bare `gabbro build` builds *both* artifacts; the
+    // named steps build-and-run one of them.
+    b.run_step("run", cli);     // gabbro build run   → CLI on the current dir
+    b.run_step("gui", gui);     // gabbro build gui   → launch the GUI
+    b.summary();
+}

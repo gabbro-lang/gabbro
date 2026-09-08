@@ -161,7 +161,7 @@ pub const FallibleType = struct {
 pub const FnPtrType = struct {
     params: []const IrType,
     ret: *const IrType,
-    /// A THIN function pointer (a bare address, not skarn's fat `{fn, env}` closure).
+    /// A THIN function pointer (a bare address, not gabbro's fat `{fn, env}` closure).
     /// Produced by reinterpreting a raw pointer/address as `fn(...)`; callable as a
     /// direct indirect call. This is what makes a dynamically-loaded function
     /// (`wglGetProcAddress`, `GetProcAddress`, a COM vtable slot) callable.
@@ -333,7 +333,7 @@ pub const CallIndirectInstr = struct {
     /// no tracked type and lowers to a zero-width `i0`). Empty = fall back to
     /// each arg's tracked type.
     param_tys: []const IrType = &.{},
-    /// True when `callee` is a fat closure value `{ fn, env }` (a skarn function
+    /// True when `callee` is a fat closure value `{ fn, env }` (a gabbro function
     /// value) rather than a raw function pointer (an interface method). The
     /// backend extracts the `fn` field before calling.
     is_closure: bool = false,
@@ -3407,7 +3407,7 @@ const FunctionLowerer = struct {
                 }
                 // core::fn_ptr(f) — the RAW thin function pointer of a top-level
                 // function, as a `*void` usable as a C callback / thread entry.
-                // Bypasses skarn's fat `{fn, env}` closure (which a C ABI can't call):
+                // Bypasses gabbro's fat `{fn, env}` closure (which a C ABI can't call):
                 // reuses the same raw-function-arg lowering as a direct extern call.
                 if (call.callee.kind == .scope_access and isCoreNs(call.callee.kind.scope_access) and
                     std.mem.eql(u8, callee_name, "fn_ptr") and call.args.len == 1)
@@ -3644,7 +3644,7 @@ const FunctionLowerer = struct {
                         }
                         break :cv .{ .local = callee_name };
                     };
-                    // Only a genuine skarn function VALUE (a fat `{ fn, env }` closure)
+                    // Only a genuine gabbro function VALUE (a fat `{ fn, env }` closure)
                     // is called through its env. A THIN `extern fn(...)` pointer and
                     // other raw callees (`@`-prefixed runtime fns) are called by
                     // their bare pointer — a direct indirect call.
@@ -4271,7 +4271,7 @@ const FunctionLowerer = struct {
 
     /// Compare a `[]const u8` subject to a string literal, byte by byte. The
     /// literal's bytes are read only inside a block guarded by a length match, so
-    /// a shorter subject is never read out of bounds (Skarn's `&&` is eager).
+    /// a shorter subject is never read out of bounds (Gabbro's `&&` is eager).
     fn lowerStringEq(self: *FunctionLowerer, subject_in: Value, literal_raw: []const u8) LowerError!Value {
         const subject = try self.materializeStrOperand(subject_in);
         const lit = trimQuotes(literal_raw);
@@ -4687,7 +4687,7 @@ const FunctionLowerer = struct {
     }
 
     /// Lower a `fn(...)` argument passed to an `#extern` C function as a THIN raw
-    /// function pointer (C cannot call skarn's fat `{fn, env}` closure). Only a plain
+    /// function pointer (C cannot call gabbro's fat `{fn, env}` closure). Only a plain
     /// top-level function works — its signature matches C; a lambda/closure carries
     /// an environment, so it is rejected.
     fn lowerRawFnArg(self: *FunctionLowerer, value: ast.Expr) LowerError!Value {
@@ -5460,11 +5460,11 @@ fn isCoreNs(sa: ast.ScopeAccess) bool {
 }
 
 /// Derive a module name from a file path for `core::module`: the basename with a
-/// trailing `.sk` stripped (e.g. `lib/std/heap.sk` → `heap`).
+/// trailing `.gab` stripped (e.g. `lib/std/heap.gab` → `heap`).
 fn moduleNameOf(file: []const u8) []const u8 {
     var base = file;
     if (std.mem.lastIndexOfAny(u8, base, "/\\")) |i| base = base[i + 1 ..];
-    if (std.mem.endsWith(u8, base, ".sk")) base = base[0 .. base.len - 3];
+    if (std.mem.endsWith(u8, base, ".gab")) base = base[0 .. base.len - ".gab".len];
     return base;
 }
 
@@ -5588,7 +5588,7 @@ pub const ComptimeVm = struct {
     /// names are drained here). Allocated on `arena`.
     removals: std.ArrayList([]const u8) = .empty,
     /// When set, pure scalar `#run` results are cached on disk under this dir
-    /// (enabled by the `SKARN_CACHE` env var). See `vm/run_cache.zig`.
+    /// (enabled by the `GABBRO_CACHE` env var). See `vm/run_cache.zig`.
     run_cache_dir: ?[]const u8 = null,
 
     const Cache = struct {
@@ -6283,7 +6283,7 @@ pub fn hasFinalHook(module: ast.Module) bool {
 const compiler_hook_id_base: ast.NodeId = 500_000;
 
 /// Run every `#compiler` hook on the VM. Each hook is a `fn() -> []const u8`
-/// returning Skarn source for top-level declarations; the concatenation of all
+/// returning Gabbro source for top-level declarations; the concatenation of all
 /// their outputs is returned (or null if there are no hooks). The pipeline then
 /// parses that source and adds the declarations to the module — this is how
 /// compile-time code GENERATES new top-level declarations (which `#insert`, a
@@ -6341,7 +6341,7 @@ pub fn runCompilerHooks(allocator: std.mem.Allocator, front_end: pipeline.FrontE
     };
 }
 
-/// Run a `build.sk`'s `build :: fn(b: Build)` entry on the comptime VM, with
+/// Run a `build.gab`'s `build :: fn(b: Build)` entry on the comptime VM, with
 /// `host` installed so its `std.build` `__build_*` intrinsics record into the
 /// driver's BuildPlan. Constructs the `Build` handle (a 1-cell `{ id: i32 } = {0}`)
 /// and passes it in. The build system's entry point (the Phase-3 message loop in
@@ -6352,7 +6352,7 @@ pub fn runBuildHook(allocator: std.mem.Allocator, front_end: pipeline.FrontEnd, 
     const c = cvm.ensureCache() orelse return error.SemanticFailed;
     var vm = vm_engine.Vm.initModule(cvm.gpa, &c.bc);
     vm.host = host;
-    vm.caps.ffi = true; // build.sk is the privileged root — it may call host FFI.
+    vm.caps.ffi = true; // build.gab is the privileged root — it may call host FFI.
     defer vm.deinit();
 
     // The `Build` argument: a single zone cell holding `id = 0`, addressed as a

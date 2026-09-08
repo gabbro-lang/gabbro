@@ -4,7 +4,7 @@
 
 Functions are declared with `::` and `fn`:
 
-```skarn
+```gabbro
 // Named function
 add :: fn(a: i32, b: i32) -> i32 {
     return a + b;
@@ -31,7 +31,7 @@ process :: fn(data: []const u8) -> void {
 
 ## Parameters
 
-```skarn
+```gabbro
 // Value parameters
 add :: fn(a: i32, b: i32) -> i32 { ... }
 
@@ -68,8 +68,8 @@ pub doubled :: fn(self: i32) -> i32 {
 
 Any top-level function whose first parameter is named `self` can be called using **dot-call syntax**:
 
-```skarn
-// In module point.sk:
+```gabbro
+// In module point.gab:
 pub distance :: fn(self: *Point) -> f64 { ... }
 
 // Calling:
@@ -81,7 +81,7 @@ A `*Self` method auto-references its receiver, so you call it with a plain value
 no explicit `&`. It works on a **temporary** too: the value is spilled to a stack slot and pointed
 at. Methods chain on returned values:
 
-```skarn
+```gabbro
 n := make_point(3, 4).distance();        // call on a temporary
 q := origin().translate(1, 2).scaled(3); // chain method calls
 ```
@@ -92,9 +92,9 @@ q := origin().translate(1, 2).scaled(3); // chain method calls
 
 ## Generic Functions
 
-Skarn uses the `$` prefix to introduce type parameters. The first occurrence of `$T` binds the type; subsequent uses of `T` refer to the bound type.
+Gabbro uses the `$` prefix to introduce type parameters. The first occurrence of `$T` binds the type; subsequent uses of `T` refer to the bound type.
 
-```skarn
+```gabbro
 // Type parameter with $
 identity :: fn(value: $T) -> T {
     return value;
@@ -125,7 +125,7 @@ An expression of the form `fn(params) -> Ret { body }` is a **lambda** — an
 anonymous function you can pass directly to a higher-order function or store in
 a variable. The return type is optional (defaults to `void`).
 
-```skarn
+```gabbro
 // As an argument — no need to declare a named predicate.
 n := slice::count_where(i32, xs, fn(x: i32) -> bool { return x < 0; });
 
@@ -141,7 +141,7 @@ z := sq(8);
 Functions are first-class values: a function name (or a lambda) has a
 **function-pointer type** `fn(Params) -> Ret`, which you can name explicitly:
 
-```skarn
+```gabbro
 op: fn(i32, i32) -> i32 = add;
 r := op(2, 3);
 ```
@@ -151,7 +151,7 @@ r := op(2, 3);
 A lambda may reference variables from the enclosing scope; they are **captured by
 value** when the closure is created:
 
-```skarn
+```gabbro
 mul :: fn(f: fn(i32) -> i32, v: i32) -> i32 { return f(v); }
 
 main :: fn() -> i32 {
@@ -166,13 +166,13 @@ pointer to its captured environment. A plain (non-capturing) function or lambda
 has an empty environment, so it costs no more than a bare pointer; a capturing
 lambda copies the captured values into a small environment when it is created.
 
-**Where the environment lives** follows skarn's region model:
+**Where the environment lives** follows gabbro's region model:
 
 - Inside a `zone`, a capturing closure's environment is allocated on the **zone's
   Arena**, so the closure is valid for the whole zone — it can be stored and
   handed around freely within that scope:
 
-  ```skarn
+  ```gabbro
   zone scratch: Arena {
       base: i32 = 100;
       f := fn(x: i32) -> i32 { return base + x; }; // env on `scratch`
@@ -184,7 +184,7 @@ lambda copies the captured values into a small environment when it is created.
   **caller-supplied region** — so a factory can *return* an escaping closure that
   stays valid for as long as the caller's arena (region passing):
 
-  ```skarn
+  ```gabbro
   make_adder :: fn(into: *Arena, n: i32) -> fn(i32) -> i32 {
       return fn(x: i32) -> i32 { return x + n; }; // env allocated in `into`
   }
@@ -227,7 +227,7 @@ lambda copies the captured values into a small environment when it is created.
 
 Functions that can fail use `!` after the return type to declare an error channel:
 
-```skarn
+```gabbro
 // Named error type
 read :: fn(buf: []u8) -> usize ! IoError { ... }
 
@@ -245,7 +245,7 @@ combine :: fn() -> i32 ! { ... }
 
 FFI declarations for calling C or system functions use the `#extern` attribute:
 
-```skarn
+```gabbro
 #extern("kernel32", "GetStdHandle")
 GetStdHandle :: fn(id: i32) -> usize;
 
@@ -266,7 +266,7 @@ WriteFile :: fn(
 
 Attributes are placed before the function declaration to modify compilation behavior:
 
-```skarn
+```gabbro
 #inline
 pub fast_add :: fn(a: i32, b: i32) -> i32 { return a + b; }
 
@@ -299,7 +299,7 @@ exported_fn :: fn() { ... }
 
 ### If / Else
 
-```skarn
+```gabbro
 if x > 0 {
     println("positive");
 } else {
@@ -326,7 +326,7 @@ if result := try_parse(input) |err| {
 
 `else if` chains are supported and desugar to a nested `if` inside the `else`:
 
-```skarn
+```gabbro
 if x > 0 {
     // positive
 } else if x == 0 {
@@ -341,7 +341,7 @@ if x > 0 {
 In value position, `if` produces a value. Each branch is a single expression in
 braces, and an `else` is mandatory (an expression must always yield something):
 
-```skarn
+```gabbro
 sign := if n > 0 { 1 } else if n < 0 { -1 } else { 0 };
 
 mode: u32 = if enabled { 1u32 } else { 0u32 };   // branch literal takes the type
@@ -356,7 +356,7 @@ unchanged; the expression form only applies where a value is required.)
 
 ### While Loop
 
-```skarn
+```gabbro
 i := 0;
 while i < 10 {
     println("loop");
@@ -366,7 +366,7 @@ while i < 10 {
 
 An infinite loop uses `while true`:
 
-```skarn
+```gabbro
 while true {
     // runs forever until break
     if should_stop() { break; }
@@ -377,7 +377,7 @@ while true {
 binds the unwrapped payload to `x`, and exits when it is null. This is the clean
 way to walk a linked structure or drain an iterator:
 
-```skarn
+```gabbro
 cur: ?*Node = head;
 while cur |n| {
     visit(n.val);
@@ -390,7 +390,7 @@ The condition may be any optional; the `|x|` binding is optional itself
 
 ### For Range Loop
 
-```skarn
+```gabbro
 // Exclusive range: 0, 1, 2, ..., 9
 for i in 0..10 {
     print_u64(i as u64);
@@ -409,7 +409,7 @@ for i in 0..=10 {
 
 ### For Slice Loop
 
-```skarn
+```gabbro
 data: [4]i32 = .{ 10, 20, 30, 40 };
 
 // By value
@@ -438,7 +438,7 @@ for &val in data[:] {
 unwrapped payload and stops when `next` returns `null` — exactly like
 `while it.next() |x| { … }`, but without exposing the loop plumbing.
 
-```skarn
+```gabbro
 Range :: struct { cur: i32, end: i32 }
 
 // The iterator protocol: advance and yield, or return null when exhausted.
@@ -465,7 +465,7 @@ yields values, not addresses.
 
 Pattern matching on enums and integers:
 
-```skarn
+```gabbro
 // Enum matching
 match direction {
     .north => { println("going north"); }
@@ -553,7 +553,7 @@ return match code { 0 => 200, 1, 2, 3 => 400, else => 500 };
 
 `break` exits the innermost loop. `continue` skips to the next iteration:
 
-```skarn
+```gabbro
 while true {
     if done() { break; }
     if skip() { continue; }
@@ -565,7 +565,7 @@ while true {
 
 `defer` schedules code to execute when the current scope exits. This guarantees cleanup regardless of how the scope is exited (normal return, error, break, etc.):
 
-```skarn
+```gabbro
 // Always defer
 defer { cleanup(); }
 
@@ -582,7 +582,7 @@ defer.err { rollback(); }
 > [!NOTE]
 > Multiple defers execute in **reverse order** (LIFO). The last defer registered runs first.
 
-```skarn
+```gabbro
 // Example: LIFO order
 defer { println("first registered, last to run"); }
 defer { println("second registered, first to run"); }
@@ -595,7 +595,7 @@ defer { println("second registered, first to run"); }
 
 `unsafe` blocks disable certain safety checks. They are required for raw pointer operations, inline assembly, and other low-level operations:
 
-```skarn
+```gabbro
 unsafe {
     raw_ptr := 0x1000 as *u8;
     *raw_ptr = 0;
@@ -610,9 +610,9 @@ val := unsafe core::unaligned_read(u64, &x);
 
 ### Compile-time Directives
 
-Skarn supports compile-time evaluation through special directives:
+Gabbro supports compile-time evaluation through special directives:
 
-```skarn
+```gabbro
 // Compile-time if
 #if core::sizeof(usize) == 8 {
     // 64-bit platform code
@@ -638,7 +638,7 @@ size := #run compute_size();
 
 Zone blocks provide scoped memory management. See the [Memory & Zones](06_memory_zones.md) chapter for full details:
 
-```skarn
+```gabbro
 zone scratch: Arena {
     buf := scratch.new_slice(u8, 64);
     // arena freed at end of zone

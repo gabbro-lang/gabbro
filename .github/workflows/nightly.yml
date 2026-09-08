@@ -61,5 +61,5 @@ jobs:
           files: ${{ steps.pkg.outputs.archive }}
           body: |
             Automated build from the latest `main` — version `${{ steps.pkg.outputs.version }}`.
-            Download `${{ steps.pkg.outputs.archive_name }}`, extract, and run `bin/skarn`
+            Download `${{ steps.pkg.outputs.archive_name }}`, extract, and run `bin/gabbro`
             (the standard library + linker travel with it). Refreshed on every push.

@@ -1,8 +1,8 @@
 # diskscan
 
-A fast, multithreaded disk-usage analyzer for Windows — written in **skarn**, with
+A fast, multithreaded disk-usage analyzer for Windows — written in **gabbro**, with
 both a command-line tool and a native Win32 GUI browser. Think WinDirStat, but a
-few hundred lines of skarn and no dependencies.
+few hundred lines of gabbro and no dependencies.
 
 ```
 out/diskscan      [dir]     scan, print the biggest items + throughput  (console)
@@ -13,19 +13,19 @@ out/diskscan-gui  [dir]     browse the tree, recycle what you don't want (window
 
 ## Build
 
-Built entirely with the skarn build system (`build.sk`):
+Built entirely with the gabbro build system (`build.gab`):
 
 ```
-skarn build            # build both exes into ./out (release)
-skarn build run        # build + run the CLI on the current directory
-skarn build gui        # build + launch the GUI
-skarn build -Ddebug    # unoptimized build with safety checks
+gabbro build            # build both exes into ./out (release)
+gabbro build run        # build + run the CLI on the current directory
+gabbro build gui        # build + launch the GUI
+gabbro build -Ddebug    # unoptimized build with safety checks
 ```
 
 ## What makes it fast
 
 A full `C:` scan here is ~2.6 M files / 1.8 TB. The language is never the
-bottleneck — skarn compiles to native code through LLVM, so the cost is the OS's
+bottleneck — gabbro compiles to native code through LLVM, so the cost is the OS's
 directory enumeration. diskscan pulls two levers to minimize that cost:
 
 1. **Bulk directory reads.** Instead of `FindNextFile` (one entry per syscall),
@@ -46,17 +46,17 @@ The file size comes *free* with each directory record, so there is no second
 ## Layout
 
 ```
-build.sk              two artifacts (console CLI + windowed GUI), versioned
+build.gab              two artifacts (console CLI + windowed GUI), versioned
 src/
-  win32.sk            kernel32 bindings: bulk reads, threads, CPU count
-  node.sk             the directory tree (lazy-sorted children, tombstone delete)
-  scan.sk             the scanner — both levers, builds the tree
-  fmt.sk              human-readable sizes (1.5 GB, 870.4 KB, 42 B)
-  cli.sk              CLI entry: scan + sorted report + throughput
-  gui.sk             GUI entry: Win32 window, GDI drawing, navigation, delete
+  win32.gab            kernel32 bindings: bulk reads, threads, CPU count
+  node.gab             the directory tree (lazy-sorted children, tombstone delete)
+  scan.gab             the scanner — both levers, builds the tree
+  fmt.gab              human-readable sizes (1.5 GB, 870.4 KB, 42 B)
+  cli.gab              CLI entry: scan + sorted report + throughput
+  gui.gab             GUI entry: Win32 window, GDI drawing, navigation, delete
 ```
 
-`cli.sk` and `gui.sk` are two `#entry` points over the **same** scanner and tree
+`cli.gab` and `gui.gab` are two `#entry` points over the **same** scanner and tree
 — the build system compiles each into its own executable.
 
 ## The GUI

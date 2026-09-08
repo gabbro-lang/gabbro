@@ -46,7 +46,7 @@ pub const Diagnostic = struct {
     span: Span,
     file: []const u8,
     compiler_src: ?CompilerSrc = null,
-    /// Optional short code shown as `error[CODE]:` and looked up by `skarn explain`.
+    /// Optional short code shown as `error[CODE]:` and looked up by `gabbro explain`.
     code: ?[]const u8 = null,
     /// Text printed right after the primary underline (e.g. "found `bool`").
     primary_label: ?[]const u8 = null,
@@ -79,39 +79,39 @@ pub const Diagnostic = struct {
 /// Call as: printIce("what failed", @src())
 pub fn printIce(message: []const u8, comptime src: std.builtin.SourceLocation) void {
     std.debug.print(
-        "skarn: internal compiler error: {s}\n    [at {s}:{d} in {s}]\n",
+        "gabbro: internal compiler error: {s}\n    [at {s}:{d} in {s}]\n",
         .{ message, src.file, src.line, src.fn_name },
     );
 }
 
-/// Print a user-facing error tied to a Skarn source location (not an ICE — this is
+/// Print a user-facing error tied to a Gabbro source location (not an ICE — this is
 /// for genuine user errors discovered during lowering, e.g. a `#run` expression
 /// the comptime VM cannot evaluate).
 pub fn printErrorAt(
     message: []const u8,
-    skarn_file: []const u8,
-    skarn_source: []const u8,
+    gabbro_file: []const u8,
+    gabbro_source: []const u8,
     span: Span,
 ) void {
-    const location = span.line_col(skarn_source);
+    const location = span.line_col(gabbro_source);
     std.debug.print(
         "{s}:{d}:{d}: error: {s}\n",
-        .{ skarn_file, location.line, location.col, message },
+        .{ gabbro_file, location.line, location.col, message },
     );
 }
 
-/// Print an ICE with an associated Skarn source location.
+/// Print an ICE with an associated Gabbro source location.
 pub fn printIceAt(
     message: []const u8,
-    skarn_file: []const u8,
-    skarn_source: []const u8,
+    gabbro_file: []const u8,
+    gabbro_source: []const u8,
     span: Span,
     comptime src: std.builtin.SourceLocation,
 ) void {
-    const location = span.line_col(skarn_source);
+    const location = span.line_col(gabbro_source);
     std.debug.print(
         "{s}:{d}:{d}: internal compiler error: {s}\n    [at {s}:{d} in {s}]\n",
-        .{ skarn_file, location.line, location.col, message, src.file, src.line, src.fn_name },
+        .{ gabbro_file, location.line, location.col, message, src.file, src.line, src.fn_name },
     );
 }
 

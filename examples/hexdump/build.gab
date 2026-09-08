@@ -1,0 +1,8 @@
+#import std.build.{ Build, executable, release, run_step, default };
+
+build :: fn(b: Build) {
+    app := b.executable("hexdump", "main.gab");
+    app.release();
+    b.run_step("run", app);
+    b.default(app);
+}

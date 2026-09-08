@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: Apache-2.0
+// std.ptr — pointer/address conversions and alignment arithmetic.
+//
+// Gabbro has no pointer-arithmetic operators (no `p + 1`); address math goes through
+// usize and the unsafe cast / ptr_from_int intrinsics. This module names that dance
+// so call sites read as ptr.add_bytes / ptr.is_aligned instead of ad hoc unsafe casts.
+// Byte-stride ops (add_bytes/sub_bytes) work on raw addresses, so you pass the element
+// size you already know.
+
+// The integer address a pointer refers to.
+pub to_addr :: fn($T: type, p: *T) -> usize {
+    return unsafe (p as usize);
+}
+
+// Reinterpret an integer address as a `*T`. As unsafe as it looks: the caller
+// must know the address is valid and properly aligned for `T`.
+pub from_addr :: fn($T: type, addr: usize) -> *T {
+    return unsafe core::ptr_from_int(*T, addr);
+}
+
+pub is_null :: fn($T: type, p: *T) -> bool {
+    return to_addr(T, p) == 0usize;
+}
+
+// Advance an address by `offset` bytes.
+pub add_bytes :: fn(addr: usize, offset: usize) -> usize {
+    return addr + offset;
+}
+
+// Move an address back by `offset` bytes.
+pub sub_bytes :: fn(addr: usize, offset: usize) -> usize {
+    return addr - offset;
+}
+
+// Signed byte distance from `b` to `a` (i.e. `a - b`); negative when `a`
+// precedes `b` in memory.
+pub diff_bytes :: fn($T: type, a: *T, b: *T) -> isize {
+    addr_a := to_addr(T, a);
+    addr_b := to_addr(T, b);
+    if addr_a >= addr_b {
+        return (addr_a - addr_b) as isize;
+    }
+    return -((addr_b - addr_a) as isize);
+}
+
+// Alignment
+//
+// `alignment` must be a power of two — the standard precondition for the
+// mask-based tricks below (use `bits.is_power_of_two_u64` to check one).
+
+pub is_aligned :: fn(addr: usize, alignment: usize) -> bool {
+    return (addr & (alignment - 1usize)) == 0usize;
+}
+
+pub align_down :: fn(addr: usize, alignment: usize) -> usize {
+    return addr & ~(alignment - 1usize);
+}
+
+pub align_up :: fn(addr: usize, alignment: usize) -> usize {
+    return align_down(addr + (alignment - 1usize), alignment);
+}

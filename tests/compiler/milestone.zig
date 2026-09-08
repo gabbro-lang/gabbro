@@ -1,5 +1,5 @@
 const std = @import("std");
-const skarn = @import("skarn_compiler");
+const gabbro = @import("gabbro_compiler");
 
 const sample =
     \\#import std.io;
@@ -102,7 +102,7 @@ const sample =
     \\}
     \\
     \\main :: fn() -> i32 {
-    \\    write_stdout("hello from skarn\n");
+    \\    write_stdout("hello from gabbro\n");
     \\
     \\    mmio_write32(0x4000_0000, 1);
     \\
@@ -127,14 +127,14 @@ test "milestone syntax parses and checks" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var front_end = try skarn.compile(arena.allocator(), "milestone.sk", sample);
+    var front_end = try gabbro.compile(arena.allocator(), "milestone.gab", sample);
     defer front_end.deinit(arena.allocator());
 
     try std.testing.expectEqual(@as(usize, 15), front_end.module.items.len);
     try std.testing.expect(front_end.types.expr_types.count() > 40);
     try std.testing.expect(front_end.types.fn_sigs.count() == 9);
 
-    const module = try skarn.lowerFrontend(arena.allocator(), front_end);
+    const module = try gabbro.lowerFrontend(arena.allocator(), front_end);
     try std.testing.expectEqual(@as(usize, 2), module.structs.len);
     try std.testing.expectEqual(@as(usize, 9), module.functions.len);
     try std.testing.expectEqual(@as(usize, 1), module.globals.len);
@@ -155,10 +155,10 @@ test "milestone syntax parses and checks" {
     try std.testing.expect(read_header.blocks.len >= 5);
     try std.testing.expect(hasCondBranch(read_header));
 
-    try skarn.ir_mod.validateModule(module);
+    try gabbro.ir_mod.validateModule(module);
     var optimized = module;
-    try skarn.ir_mod.runDefaultPasses(arena.allocator(), &optimized);
-    try skarn.ir_mod.validateModule(optimized);
+    try gabbro.ir_mod.runDefaultPasses(arena.allocator(), &optimized);
+    try gabbro.ir_mod.validateModule(optimized);
 }
 
 test "return type mismatch fails semantic checking" {
@@ -171,12 +171,12 @@ test "return type mismatch fails semantic checking" {
         \\}
     ;
 
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad_return.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad_return.gab", bad));
 }
 
 test "ir validation rejects missing branch targets" {
-    const invalid = skarn.IrModule{
-        .file_name = "invalid.sk",
+    const invalid = gabbro.IrModule{
+        .file_name = "invalid.gab",
         .functions = &.{
             .{
                 .name = "broken",
@@ -202,17 +202,17 @@ test "ir validation rejects missing branch targets" {
         },
     };
 
-    try std.testing.expectError(error.InvalidIr, skarn.ir_mod.validateModule(invalid));
+    try std.testing.expectError(error.InvalidIr, gabbro.ir_mod.validateModule(invalid));
 }
 
-fn findFunction(module: skarn.IrModule, name: []const u8) ?skarn.ir_mod.IrFunction {
+fn findFunction(module: gabbro.IrModule, name: []const u8) ?gabbro.ir_mod.IrFunction {
     for (module.functions) |function| {
         if (std.mem.eql(u8, function.name, name)) return function;
     }
     return null;
 }
 
-fn hasCondBranch(function: skarn.ir_mod.IrFunction) bool {
+fn hasCondBranch(function: gabbro.ir_mod.IrFunction) bool {
     for (function.blocks) |block| {
         if (block.terminator) |term| switch (term) {
             .cond_branch => return true,

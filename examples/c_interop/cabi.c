@@ -1,5 +1,5 @@
 /* A tiny C library exercising by-value struct passing — the shapes raylib uses.
- * Build it the way any C dependency would be built, then link it from Skarn.
+ * Build it the way any C dependency would be built, then link it from Gabbro.
  *
  *   clang -c -target x86_64-pc-windows-msvc -O2 cabi.c -o cabi.obj
  *   llvm-lib /out:cabi.lib cabi.obj

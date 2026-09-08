@@ -1,6 +1,6 @@
-# Skarn Language Overview
+# Gabbro Language Overview
 
-Skarn is an experimental systems programming language written in Zig. Key design principles:
+Gabbro is an experimental systems programming language written in Zig. Key design principles:
 - No hidden allocations
 - Explicit dynamic dispatch through `*Interface` values
 - Static polymorphism via monomorphized generics
@@ -22,26 +22,26 @@ zig build -Dllvm-path=Y:/SDK/LLVM
 
 Compiler commands:
 ```text
-skarn check <file>     Parse and type-check
-skarn ir <file>        Print Skarn IR
-skarn object <file>    Emit object file
-skarn build <file>     Build executable (Windows)
+gabbro check <file>     Parse and type-check
+gabbro ir <file>        Print Gabbro IR
+gabbro object <file>    Emit object file
+gabbro build <file>     Build executable (Windows)
 ```
 
 ## Hello World
 
-```skarn
+```gabbro
 #import std.io.{ println };
 
 main :: fn() -> i32 {
-    println("hello from Skarn");
+    println("hello from Gabbro");
     return 0;
 }
 ```
 
 ## Language at a Glance
 
-```skarn
+```gabbro
 #import std.io.{ Writer, println, print_u64 };
 #import std.mem.{ copy, eql_bytes };
 
@@ -96,7 +96,7 @@ parse :: fn(input: []const u8) -> i32 ! AppError {
 main :: fn() -> i32 {
     // Type-inferred locals
     x := 42;
-    name := "Skarn";
+    name := "Gabbro";
     
     // Typed locals  
     count: i32 = 10;

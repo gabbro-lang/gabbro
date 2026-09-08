@@ -1,0 +1,100 @@
+// ecs_game — a headless, deterministic ECS asteroids simulation.
+//
+// A turret at the centre of the field auto-fires at the nearest asteroid;
+// asteroids drift, bounce off the walls, and split into fragments when destroyed.
+// The world is a struct-of-arrays component store (see world.gab); each tick runs
+// the spawner / fire / movement / collision / lifetime systems (see systems.gab).
+// Every 30 frames it renders an ASCII snapshot, then prints a final report.
+
+#import std.heap.{ Arena, make, new };
+#import std.rand.{ Rng, seed, range_f32 };
+#import std.io.{ print };
+#import std.strings.{ StringBuilder, builder, str, clear, append, append_u64 };
+
+#import vec.{ Vec2, v2, scale, norm };
+#import components.{ Kind, FIELD_W, FIELD_H };
+#import world.{ World, init, spawn, count_kind, live_count };
+#import systems.{ movement, lifetime, fire, collisions, spawner };
+#import render.{ render };
+
+FRAMES :: 90;
+
+stat :: fn(sb: *StringBuilder, label: []const u8, n: u64) {
+    append(sb, label); append_u64(sb, n); append(sb, "\n");
+}
+
+#entry
+main :: fn() -> i32 {
+    a := make();
+    w := new(World, &a);
+    init(w);
+
+    rng := seed(0xC0FFEE1234u64);
+
+    // The turret sits at the centre.
+    cx: f32 = (FIELD_W as f32) * 0.5f32;
+    cy: f32 = (FIELD_H as f32) * 0.5f32;
+    turret := spawn(w, Kind.Turret, v2(cx, cy), v2(0.0f32, 0.0f32), 1.5f32, 0);
+
+    // Seed an initial asteroid belt.
+    k: i32 = 0;
+    while k < 6 {
+        p: Vec2 = .{ range_f32(&rng, 3.0f32, (FIELD_W - 3) as f32), range_f32(&rng, 3.0f32, (FIELD_H - 3) as f32) };
+        d: Vec2 = .{ range_f32(&rng, -1.0f32, 1.0f32), range_f32(&rng, -1.0f32, 1.0f32) };
+        vel: Vec2 = scale(norm(d), range_f32(&rng, 3.0f32, 6.0f32));
+        rad: f32 = range_f32(&rng, 3.0f32, 4.5f32);
+        discard := spawn(w, Kind.Asteroid, p, vel, rad, (rad as i32) * 14);
+        k = k + 1;
+    }
+
+    sb := builder(&a);
+    print("=== ECS asteroids — "); print_i(FRAMES); print(" ticks ===\n\n");
+
+    frame: u32 = 0u32;
+    while frame < (FRAMES as u32) {
+        spawner(w, &rng, frame);
+        if frame % 5u32 == 0u32 { fire(w); }
+        movement(w, 0.5f32);
+        collisions(w, &rng);
+        lifetime(w);
+
+        if frame % 30u32 == 0u32 {
+            clear(&sb);
+            append(&sb, "tick "); append_u64(&sb, frame as u64);
+            append(&sb, "  (asteroids "); append_u64(&sb, count_kind(w, Kind.Asteroid) as u64);
+            append(&sb, ", bullets "); append_u64(&sb, count_kind(w, Kind.Bullet) as u64);
+            append(&sb, ")\n");
+            render(w, &sb);
+            print(str(&sb));
+        }
+        frame = frame + 1u32;
+    }
+
+    clear(&sb);
+    append(&sb, "\n=== report ===\n");
+    stat(&sb, "  entities spawned: ", w.spawned as u64);
+    stat(&sb, "  entities killed:  ", w.killed as u64);
+    stat(&sb, "  shots fired:      ", w.shots as u64);
+    stat(&sb, "  asteroid hits:    ", w.hits as u64);
+    stat(&sb, "  live entities:    ", live_count(w) as u64);
+    stat(&sb, "  asteroids left:   ", count_kind(w, Kind.Asteroid) as u64);
+    print(str(&sb));
+    return 0;
+}
+
+print_i :: fn(n: i32) {
+    sb_buf: [16]u8 = .{};
+    // tiny non-arena int print
+    v: i32 = n;
+    len: usize = 0usize;
+    if v == 0 { sb_buf[0] = 48u8; len = 1usize; }
+    else {
+        tmp: [16]u8 = .{};
+        t: usize = 0usize;
+        while v > 0 { tmp[t] = (48 + (v % 10)) as u8; v = v / 10; t += 1usize; }
+        i: usize = 0usize;
+        while i < t { sb_buf[i] = tmp[t - 1usize - i]; i += 1usize; }
+        len = t;
+    }
+    print(sb_buf[0usize..len]);
+}

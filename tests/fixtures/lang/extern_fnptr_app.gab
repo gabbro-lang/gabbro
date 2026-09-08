@@ -1,0 +1,38 @@
+// Thin C function pointers: `extern fn(...)` is a bare, directly-callable address
+// (not gabbro's fat `{fn, env}` closure). This is what makes a dynamically-loaded
+// symbol — a `wglGetProcAddress`'d OpenGL function, a `GetProcAddress` result, a
+// COM vtable slot — callable. Returns 42.
+
+add5 :: fn(x: i32) -> i32 { return x + 5; }
+
+#extern("kernel32", "GetModuleHandleA")
+GetModuleHandleA :: fn(name: *const u8) -> usize;
+#extern("kernel32", "GetProcAddress")
+GetProcAddress :: fn(module: usize, name: *const u8) -> *void;
+
+// Copy a slice into a buffer and NUL-terminate it for the C ABI.
+cstr :: fn(s: []const u8, buf: []u8) -> *const u8 {
+    i: usize = 0usize;
+    while i < s.len { buf[i] = s[i]; i += 1usize; }
+    buf[s.len] = 0u8;
+    return buf.ptr;
+}
+
+#entry
+main :: fn() -> i32 {
+    // 1. Call a gabbro function through its raw address (reinterpreted as a thin fn ptr).
+    f := unsafe (core::fn_ptr(add5) as extern fn(i32) -> i32);
+    if f(30) != 35 { return 1; }
+
+    // 2. Resolve a function at RUNTIME and call it — the OpenGL-loader pattern.
+    b1: [32]u8 = .{};
+    b2: [32]u8 = .{};
+    b3: [32]u8 = .{};
+    k32 := GetModuleHandleA(cstr("kernel32.dll", b1[:]));
+    addr := GetProcAddress(k32, cstr("lstrlenA", b2[:]));
+    if unsafe (addr as usize) == 0usize { return 2; }
+    strlen := unsafe (addr as extern fn(*const u8) -> i32);
+    if strlen(cstr("abcdefg", b3[:])) != 7 { return 3; }
+
+    return 42;
+}

@@ -1,44 +1,44 @@
-# The Skarn Build System (`build.sk`)
+# The Gabbro Build System (`build.gab`)
 
-Your build is a Skarn program that runs inside the compiler. No Makefiles, no CMake,
+Your build is a Gabbro program that runs inside the compiler. No Makefiles, no CMake,
 no second language. The two pieces are already there: the comptime VM that executes
 the compiler's IR, and the `#compiler` message loop that inspects and generates the
 program. The build system sits on top.
 
 Planned on the same base: capability-sandboxed dependency builds (the structural fix
 for the `build.rs` problem), a content-hashed parallel build graph, typed-AST codegen,
-targets as values, and `--watch` on the `skarnld` linker.
+targets as values, and `--watch` on the `gabld` linker.
 
 This is the design. The VM/metaprogramming foundation is in
 [09_comptime.md](09_comptime.md).
 
 ## 1. The file and the execution model
 
-A project has a **`build.sk`** at its root. It defines a `build` procedure:
+A project has a **`build.gab`** at its root. It defines a `build` procedure:
 
-```skarn
+```gabbro
 #import std.build;
 
 build :: fn(b: *Build) {
-    exe := b.executable("hello", "src/main.sk");
+    exe := b.executable("hello", "src/main.gab");
     b.default(exe);
 }
 ```
 
-`skarn build` (no file argument) finds `./build.sk` and **runs `build(&b)` inside the
+`gabbro build` (no file argument) finds `./build.gab` and **runs `build(&b)` inside the
 comptime VM** — the same engine behind `#run` and `#compiler`. There is no
 separate "build binary": the build script never touches the disk to compile
-itself; it executes as compile-time Skarn. After it returns, the compiler reads the
+itself; it executes as compile-time Gabbro. After it returns, the compiler reads the
 populated `Build` value back out of VM memory and executes the plan.
 
 This is Jai's model (`#run build()`), minus the boilerplate. For Jai familiarity
-`#run build();` is also accepted, but bare `skarn build` is the idiom.
+`#run build();` is also accepted, but bare `gabbro build` is the idiom.
 
 **Three layers:**
 
 | Layer | Audience | Surface |
 | --- | --- | --- |
-| **0 — default** | `skarn build main.sk` | No `build.sk`; CLI flags → options. (Exists today.) |
+| **0 — default** | `gabbro build main.gab` | No `build.gab`; CLI flags → options. (Exists today.) |
 | **1 — declarative builder** | 90% of projects | `Build`/`Artifact`/`Step` + methods. Pure data. |
 | **2 — workspaces & options** | power users | Jai-parity `Workspace`, full `Options` struct, `add_file`/`add_source`/`add_quote`. |
 | **3 — compiler intercept** | tooling, codegen | the message loop: `wait_message`, typed `Message`, `set_status`. |
@@ -49,12 +49,12 @@ The everyday API. Methods on `*Build` and `*Artifact` (UFCS), which only populat
 data — the compiler performs the effects. The build is deterministic and sandboxable
 because of that split.
 
-```skarn
+```gabbro
 #import std.build;
 
 build :: fn(b: *Build) {
     // the game
-    game := b.executable("game", "src/main.sk");
+    game := b.executable("game", "src/main.gab");
     game.release();                      // or .optimize(.release_fast)
     game.link("raylib");                 // raylib.lib
     game.link("user32");
@@ -68,27 +68,27 @@ build :: fn(b: *Build) {
 
     // a codegen step that feeds a second artifact
     bind := b.codegen("bindings", gen_raylib_bindings);  // fn(*Gen)
-    tool := b.executable("packer", "tools/packer.sk");
+    tool := b.executable("packer", "tools/packer.gab");
     tool.needs(bind);                    // ordering + declared inputs
 
     // run / test steps
-    b.run_step("run", game);             // `skarn build run [-- args]`
-    b.test_dir("test", "tests/");        // `skarn build test`
+    b.run_step("run", game);             // `gabbro build run [-- args]`
+    b.test_dir("test", "tests/");        // `gabbro build test`
 
-    b.default(game);                     // what bare `skarn build` produces
+    b.default(game);                     // what bare `gabbro build` produces
 }
 ```
 
 ### Core types
 
-```skarn
+```gabbro
 pub Optimize   :: enum { debug, release_safe, release_fast, release_small }
 pub OutputKind :: enum { executable, shared_library, static_library, object, none }
-pub Backend    :: enum { llvm, native }   // native = skarn's own backend (future)
+pub Backend    :: enum { llvm, native }   // native = gabbro's own backend (future)
 
 pub Artifact :: struct {
     name:    []const u8,
-    root:    []const u8,        // entry .sk source
+    root:    []const u8,        // entry .gab source
     kind:    OutputKind,
     opt:     Optimize,
     backend: Backend,
@@ -124,7 +124,7 @@ pub Artifact :: struct {
 A workspace is an isolated compilation environment, as in Jai. Layer 1 makes one
 per artifact; in Layer 2 you drive them directly.
 
-```skarn
+```gabbro
 build :: fn(b: *Build) {
     w := b.workspace("Main program");
     o := w.options();
@@ -139,7 +139,7 @@ build :: fn(b: *Build) {
     o.emit_debug_info = true;
     w.set_options(o);
 
-    w.add_file("main.sk");
+    w.add_file("main.gab");
     // add generated code as text …
     w.add_source("VERSION :: 3;");
     // … or as TYPED AST (validated at the generation site — better than a string)
@@ -149,7 +149,7 @@ build :: fn(b: *Build) {
 
 ### `Options` — the full knob set (Jai's `Build_Options`, modernized)
 
-```skarn
+```gabbro
 pub Options :: struct {
     kind:            OutputKind,   // executable | shared_library | static_library | object | none
     output_name:     []const u8,
@@ -161,7 +161,7 @@ pub Options :: struct {
     bounds_check:    Check,
     cast_check:      Check,
     null_check:      Check,
-    overflow_check:  Check,        // Skarn's overflow policy lives here
+    overflow_check:  Check,        // Gabbro's overflow policy lives here
 
     // codegen / artifacts
     emit_debug_info: bool,         // .pdb / DWARF
@@ -189,15 +189,15 @@ block at once, like Jai's `set_optimization`.
 
 ## 4. Layer 3 — the compiler intercept (message loop)
 
-This is the Jai message loop, built on Skarn's `#compiler` hook + `compiler_decls()`
+This is the Jai message loop, built on Gabbro's `#compiler` hook + `compiler_decls()`
 (already implemented). Register interest in a workspace, then pull typed messages
 as each phase finishes a unit — and **inspect or alter the program** before it
 lowers.
 
-```skarn
+```gabbro
 build :: fn(b: *Build) {
     w := b.workspace("Main");
-    w.add_file("main.sk");
+    w.add_file("main.gab");
     w.intercept();                       // begin
 
     had_error := false;
@@ -207,7 +207,7 @@ build :: fn(b: *Build) {
             .file_parsed => {}
             .typechecked => {
                 // m carries the typed declaration: name, kind, type info,
-                // and (Skarn extension) the decl's AST for rewriting.
+                // and (Gabbro extension) the decl's AST for rewriting.
                 if !check_decl(b, m) { had_error = true; }
             }
             .phase => {}
@@ -221,13 +221,13 @@ build :: fn(b: *Build) {
 }
 ```
 
-```skarn
+```gabbro
 pub MessageKind :: enum { file_parsed, typechecked, phase, complete, error }
 
 pub Message :: struct {
     kind:      MessageKind,
     workspace: u32,
-    // typechecked payload (Jai gives you syntax trees + types here; Skarn too):
+    // typechecked payload (Jai gives you syntax trees + types here; Gabbro too):
     decl_name: []const u8,
     decl_kind: []const u8,   // "fn" | "struct" | ...  (from compiler_decls())
     // …typed AST handle + type_info handle (Layer-3 extensions)
@@ -241,14 +241,14 @@ and adds the typed-AST/type-info handles.
 ## 5. The distinctive parts
 
 ### 5.1 Capability-sandboxed dependency builds — the supply-chain fix
-Jai's build is arbitrary code with full host access; so is `build.rs`. **Skarn hands
-every build hook a capability set.** A dependency's `build.sk` receives a
+Jai's build is arbitrary code with full host access; so is `build.rs`. **Gabbro hands
+every build hook a capability set.** A dependency's `build.gab` receives a
 `*Caps` it cannot forge or widen:
 
-```skarn
-// vendor/raylib/build.sk  — runs sandboxed
+```gabbro
+// vendor/raylib/build.gab  — runs sandboxed
 build :: fn(b: *Build, caps: *Caps) {
-    lib := b.static("raylib", "src/raylib.sk");
+    lib := b.static("raylib", "src/raylib.gab");
     lib.optimize(.release_fast);
 
     caps.read_dir(".");          // ALLOWED — granted its own folder
@@ -266,17 +266,17 @@ to the build-script supply-chain hole.
 ### 5.2 Content-hashed, parallel build graph
 Steps and artifacts form a DAG. Each step declares inputs/outputs and is
 **content-hashed**: unchanged steps are skipped, independent steps run in
-parallel. Jai's build is largely linear; Skarn's is incremental by construction.
-`skarn build --explain` prints the graph and why each step ran or was cached.
+parallel. Jai's build is largely linear; Gabbro's is incremental by construction.
+`gabbro build --explain` prints the graph and why each step ran or was cached.
 
 ### 5.3 Typed-AST codegen + `#provided`
 Generated code goes in as **typed AST** (`w.add_quote(#quote { … })`), validated
 at the generation site — not a raw string that fails at splice time. The
-`#provided NAME;` directive is Skarn's typed `#placeholder`: it promises a symbol the
+`#provided NAME;` directive is Gabbro's typed `#placeholder`: it promises a symbol the
 build will generate, and the type-checker trusts it until the build supplies it.
 
-```skarn
-// main.sk
+```gabbro
+// main.gab
 #provided GIT_REV: []const u8;       // build will define this
 println(GIT_REV);
 ```
@@ -284,45 +284,45 @@ println(GIT_REV);
 ### 5.4 Targets as values → build matrices
 `Target` is an ordinary value, so cross-compilation is a loop:
 
-```skarn
+```gabbro
 targets := [_]Target{ Target.win_x64, Target.linux_x64, Target.macos_arm64 };
 for t in targets {
-    e := b.executable("tool", "src/main.sk");
+    e := b.executable("tool", "src/main.gab");
     e.target(t);
     e.output(out_for(t));
 }
 ```
 
 ### 5.5 `--watch`, hermetic builds, asset pipelines
-- **`skarn build --watch`** re-runs only affected steps on file change; the
-  microsecond-class `skarnld` linker makes the loop feel instant.
+- **`gabbro build --watch`** re-runs only affected steps on file change; the
+  microsecond-class `gabld` linker makes the loop feel instant.
 - **Hermetic/reproducible:** pin the toolchain, record input hashes, `--frozen`
   fails on lockfile drift.
 - **Asset/codegen steps** (shader compile, embed-file, bindings) are first-class
   graph nodes with declared inputs/outputs, so they cache and parallelize too.
 
 ### 5.6 Bindings generation, on typed AST
-A `b.codegen` step can read C/C++ headers (or, natively, introspect Skarn via
+A `b.codegen` step can read C/C++ headers (or, natively, introspect Gabbro via
 `compiler_decls()`/`type_info`) and emit **typed AST** bindings into a workspace —
 the safer, faster cousin of Jai's `generate_bindings`.
 
 ## 6. CLI surface
 
 ```text
-skarn build                  run ./build.sk, build the default artifact
-skarn build <name>           build a named artifact or step
-skarn build run [-- args]    build the default exe, then run it
-skarn build test             build + run the test step
-skarn build --list           list artifacts and steps
-skarn build --release        shorthand override (debug → release_fast)
-skarn build -D key=value     set an option the script reads via b.option(...)
-skarn build --watch          rebuild affected steps on change
-skarn build --explain        print the build graph + cache decisions
-skarn build --frozen         fail if the lockfile would change
-skarn build <file.sk>        direct single-file build (back-compat, today's behavior)
+gabbro build                  run ./build.gab, build the default artifact
+gabbro build <name>           build a named artifact or step
+gabbro build run [-- args]    build the default exe, then run it
+gabbro build test             build + run the test step
+gabbro build --list           list artifacts and steps
+gabbro build --release        shorthand override (debug → release_fast)
+gabbro build -D key=value     set an option the script reads via b.option(...)
+gabbro build --watch          rebuild affected steps on change
+gabbro build --explain        print the build graph + cache decisions
+gabbro build --frozen         fail if the lockfile would change
+gabbro build <file.gab>        direct single-file build (back-compat, today's behavior)
 ```
 
-Like Jai (`-- meta Build`) and the Default_Metaprogram, the no-`build.sk` path is
+Like Jai (`-- meta Build`) and the Default_Metaprogram, the no-`build.gab` path is
 the built-in default metaprogram: it just turns flags into `Options`.
 
 ## 7. Location directives (Jai parity)
@@ -339,11 +339,11 @@ For asserts, logging, and codegen:
 
 Paths always use `/`, even on Windows.
 
-## 8. Jai → Skarn mapping (and the extensions)
+## 8. Jai → Gabbro mapping (and the extensions)
 
-| Jai | Skarn |
+| Jai | Gabbro |
 | --- | --- |
-| `build.jai` / `first.jai`, `#run build()` | `build.sk`, bare `skarn build` (or `#run build()`) |
+| `build.jai` / `first.jai`, `#run build()` | `build.gab`, bare `gabbro build` (or `#run build()`) |
 | module `Compiler`, `#compiler` proc | `std.build`, `#compiler` hook (built) |
 | `compiler_create_workspace()` | `b.workspace(name)` |
 | `get_build_options` / `set_build_options` | `w.options()` / `w.set_options(o)` |
@@ -353,7 +353,7 @@ Paths always use `/`, even on Windows.
 | `compiler_begin_intercept` / `wait_for_message` / `end_intercept` | `w.intercept()` / `w.wait_message()` / `w.end_intercept()` |
 | `compiler_set_workspace_status(.FAILED)` | `w.set_status(.failed)` |
 | `set_build_options_dc(.{do_output=false})` | implicit — the build script never self-compiles to an exe |
-| Default_Metaprogram | `skarn build` with no `build.sk` |
+| Default_Metaprogram | `gabbro build` with no `build.gab` |
 | `generate_bindings` | `b.codegen` step emitting typed AST |
 | — | **capabilities/sandbox, content-hashed parallel graph, `--watch`, target matrix, hermetic/`--frozen`** |
 
@@ -365,12 +365,12 @@ What the build system needs, against what already exists:
 | --- | --- |
 | Comptime VM that runs IR | ✅ done |
 | `#compiler` hook + `compiler_decls()` (program introspection) | ✅ done |
-| Driver `compileFileWithLlvm` (exe/dll/obj) + `skarnld` linker | ✅ done |
-| **`skarn build` dir-mode**: find `build.sk`, run `build(b)` in the VM | ✅ done |
+| Driver `compileFileWithLlvm` (exe/dll/obj) + `gabld` linker | ✅ done |
+| **`gabbro build` dir-mode**: find `build.gab`, run `build(b)` in the VM | ✅ done |
 | **Config capture**: `host_call` opcode → `__build_*` intrinsics → host `BuildPlan` | ✅ done |
 | **Plan executor**: per-artifact `compileFileWithLlvm`, wired outputs/libs/opt | ✅ done |
 | Layer 1 surface: `executable`/`shared`/`static`/`object`, `link`/`lib_path`/`output`/`optimize`/`define`, `require_*`/`depend`, `run_step`/`test_dir`/`default` | ✅ done |
-| CLI: `skarn build` / `run` / `<name>` / `--list` / `--release` / `-q` | ✅ done |
+| CLI: `gabbro build` / `run` / `<name>` / `--list` / `--release` / `-q` | ✅ done |
 | `test_dir` step execution | ⏳ next |
 | Build graph: deps/steps DAG, topo order, parallel | later |
 | Content hashing + incremental + `--watch` | later |
@@ -392,12 +392,12 @@ incremental → capabilities → Layers 2–3 surface → cross-compile.
 
 ## 10. Minimal end-to-end (the target for v1)
 
-```skarn
-// build.sk
+```gabbro
+// build.gab
 #import std.build;
 
 build :: fn(b: *Build) {
-    app := b.executable("app", "src/main.sk");
+    app := b.executable("app", "src/main.gab");
     app.release();
     app.link("user32");
     b.run_step("run", app);
@@ -406,9 +406,9 @@ build :: fn(b: *Build) {
 ```
 
 ```text
-$ skarn build            # → bin/app.exe via skarnld
-$ skarn build run        # → builds, then runs app.exe
-$ skarn build --release  # → release_fast override
+$ gabbro build            # → bin/app.exe via gabld
+$ gabbro build run        # → builds, then runs app.exe
+$ gabbro build --release  # → release_fast override
 ```
 
 ## API reference (expanded)
@@ -438,7 +438,7 @@ static-vs-dynamic workflow and cross-platform linking.
 
 **Executable settings**: `a.subsystem(.console|.windows)`, `a.console()`,
 `a.windowed()` (GUI — no console window), `a.entry(symbol)`, `a.stack_size(bytes)`.
-These force the LLD path (the fast skarnld linker can't apply them).
+These force the LLD path (the fast gabld linker can't apply them).
 
 **Output**: `a.output(path)` (explicit), `a.out_dir(dir)` (a directory, name derived),
 and the workspace-wide `b.out_root(dir)` (a per-artifact `out_dir` wins).
@@ -451,40 +451,40 @@ and the workspace-wide `b.out_root(dir)` (a per-artifact `out_dir` wins).
 
 **Workspace & options**: `b.workspace(name)`, `b.summary()` (print a post-build
 summary). Build options come from the command line: `b.option(name) -> bool`
-(`skarn build -Dname`) and `b.option_str(name, default) -> []const u8`
-(`skarn build -Dname=value`).
+(`gabbro build -Dname`) and `b.option_str(name, default) -> []const u8`
+(`gabbro build -Dname=value`).
 
 **Steps & default**: `b.run_step(name, artifact)`, `b.test_dir(name, dir)`,
 `b.default(artifact)`.
 
-See `examples/build_showcase/` for a build.sk exercising most of these.
+See `examples/build_showcase/` for a build.gab exercising most of these.
 
 ## Test steps
 
 `b.test_dir(name, dir)` declares a test step. Running it compiles and runs every
-`*.sk` file directly under `dir` as a standalone program — each one **passes when
+`*.gab` file directly under `dir` as a standalone program — each one **passes when
 it exits 0**:
 
 ```sh
-skarn build test          # the step named "test"
+gabbro build test          # the step named "test"
 ```
 
 ```text
 running tests in tests/
-  ✓ parser_test.sk
-  ✓ lexer_test.sk
-  ✗ sema_test.sk
+  ✓ parser_test.gab
+  ✓ lexer_test.gab
+  ✗ sema_test.gab
 
 2 passed, 1 failed
 ```
 
-A test is just a `.sk` with a `main :: fn() -> i32` that returns `0` on success
-and non-zero on failure. The step itself fails (non-zero `skarn build` exit) if any
+A test is just a `.gab` with a `main :: fn() -> i32` that returns `0` on success
+and non-zero on failure. The step itself fails (non-zero `gabbro build` exit) if any
 test fails, so it drops cleanly into CI. Tests are compiled at `-O0` for speed.
 
 ## Inspecting the plan
 
-`skarn build --list` prints the resolved plan without building anything — every
+`gabbro build --list` prints the resolved plan without building anything — every
 artifact with its kind, optimization level, version, install flag, and linked
 libraries, plus the declared steps and their targets:
 

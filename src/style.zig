@@ -56,7 +56,7 @@ const win = struct {
 pub fn forStderr() Palette {
     if (builtin.target.os.tag != .windows) return .plain;
     if (envSet("NO_COLOR")) return .plain; // https://no-color.org
-    if (envSet("SKARN_COLOR")) return .{ .on = true }; // force on (e.g. piping to a pager)
+    if (envSet("GABBRO_COLOR")) return .{ .on = true }; // force on (e.g. piping to a pager)
     const h = win.GetStdHandle(win.std_error_handle) orelse return .plain;
     var mode: u32 = 0;
     if (win.GetConsoleMode(h, &mode) == 0) return .plain; // redirected → no console

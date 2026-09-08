@@ -1,6 +1,6 @@
 # Linux / ELF / SysV backend
 
-Skarn cross-compiles from Windows to a static, freestanding Linux x86-64 ELF — no
+Gabbro cross-compiles from Windows to a static, freestanding Linux x86-64 ELF — no
 libc — and runs it. Compute and CLI programs work today: I/O, the heap allocator,
 `Vec`, strings, formatting. Filesystem, time, process, net, and threads still call
 Win32; they aren't ported yet.
@@ -14,18 +14,18 @@ diverges.
 Use `--target linux` to cross-compile from a Windows host:
 
 ```
-skarn build hello.sk -o hello --target linux --llvm-path Y:/SDK/LLVM
+gabbro build hello.gab -o hello --target linux --llvm-path Y:/SDK/LLVM
 # → a static, non-PIE ELF; runs under Linux/WSL with no shared-library deps
 
-skarn build app.sk -o app --target linux --libc --sysroot <dir-with-libc.so.6> --llvm-path Y:/SDK/LLVM
+gabbro build app.gab -o app --target linux --libc --sysroot <dir-with-libc.so.6> --llvm-path Y:/SDK/LLVM
 # → a normal dynamically-linked glibc ELF (ldd → libc.so.6); _start hands off to
 #   __libc_start_main, which initializes glibc. `#extern("c", …)` now resolves
-#   against libc.so.6 (verified: getpid, and puts via glibc stdio). The whole skarn
+#   against libc.so.6 (verified: getpid, and puts via glibc stdio). The whole gabbro
 #   stdlib still works under either ABI (it uses syscalls either way).
 #   `--target linux-gnu` is sugar for `--target linux --libc`.
 ```
 
-`--libc` (or build.sk `app.link_libc()`) is the **portable "I need libc" switch**:
+`--libc` (or build.gab `app.link_libc()`) is the **portable "I need libc" switch**:
 the Windows CRT on Windows, glibc on Linux. The entire `std` library (io, heap,
 time, fs, process — incl. `set_env`, net, thread) runs on Linux — **full parity
 with Windows**. Both the static (`linux`, default) and glibc (`linux --libc`)
@@ -54,17 +54,17 @@ Key implementation notes / gotchas:
   and let its `_start` call `main`. The implementation instead ships its own
   `#naked _start` and talks to the kernel directly — so the output is a single
   static ELF with **zero** dynamic dependencies (`ldd` → "not a dynamic
-  executable"). This matches skarn's no-libc Windows story.
+  executable"). This matches gabbro's no-libc Windows story.
 - **`_start` must be a GLOBAL symbol.** `ld.lld -e _start` resolves the entry
   against global symbols; `#keep` (external linkage) was not enough on its own,
   so `_start` uses `#entry` (which also keeps it out of internalization, like
   `main`). A local `_start` links "successfully" with entry `0x0` → segfault.
-- **Inline-asm template quirks.** skarn's asm template does not process `\n`
+- **Inline-asm template quirks.** gabbro's asm template does not process `\n`
   escapes, so multi-instruction asm uses `;` separators (a valid x86 GAS
   statement separator). A literal `$` in an LLVM asm string is an operand
   reference, so AT&T immediates are escaped as `$$-16` / `$$60`. Integer asm
   args are coerced to `i64` to match the asm function type.
-- **The platform allocator is a runtime seam, not `#if`.** skarn has no conditional
+- **The platform allocator is a runtime seam, not `#if`.** gabbro has no conditional
   compilation, so `std.heap` stays OS-agnostic and the *runtime* (selected per
   target) provides `os_*`. The runtime-free `compile` path injects a host shim
   so the prelude still type-checks (`pipeline.prependHeapPrelude`).
@@ -132,7 +132,7 @@ Linux. No aggregates, no FFI, no stdlib OS calls yet.
    `cc out.o -o out -no-pie` (or PIE; see §7). Fall back to `ld.lld` with
    explicit crt objects when no `cc` is present.
 3. **Entry**: drop `/ENTRY:mainCRTStartup`. With `cc`/crt1.o, the program entry
-   is glibc's `_start`, which calls our `main(argc, argv)`. skarn's `#entry main`
+   is glibc's `_start`, which calls our `main(argc, argv)`. gabbro's `#entry main`
    already lowers to a C-callable `main` returning `i32` — that's exactly what
    `_start` expects, so the exit code flows through.
 4. Gate the `__chkstk` module-asm ([context.zig](../src/backend/llvm/context.zig))
@@ -209,7 +209,7 @@ The pattern: split each into a thin **os shim** the way `std.net` already layers
    Heavier; defer past first boot.
 
 `std.net` is the nicest payoff: the layered `os/socket/tcp/udp` split means only
-`net/os.sk` changes — `socket.sk`/`tcp.sk`/`udp.sk` are already written against
+`net/os.gab` changes — `socket.gab`/`tcp.gab`/`udp.gab` are already written against
 the shim and need no edits. (BSD sockets even drop `WSAStartup`/`WSACleanup`, so
 `net::init` becomes a no-op on Linux.)
 
@@ -227,8 +227,8 @@ or, shorter-term, conditional injection in the pipeline keyed on `Target`.
   Either build `-no-pie` (simplest; `RelocDefault` already suits it) or switch
   the `TargetMachine` reloc model to `PIC` for Linux and link a PIE. Start with
   `-no-pie`, revisit for hardening.
-- **`skarnld`**: the self-hosted linker is COFF-only and is purely an optimization
-  (LLD is always the correctness path). An ELF `skarnld` is a *much* later,
+- **`gabld`**: the self-hosted linker is COFF-only and is purely an optimization
+  (LLD is always the correctness path). An ELF `gabld` is a *much* later,
   optional flourish — out of scope here.
 
 ## 8. Suggested order

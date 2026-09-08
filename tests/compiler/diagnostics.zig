@@ -1,5 +1,5 @@
 const std = @import("std");
-const skarn = @import("skarn_compiler");
+const gabbro = @import("gabbro_compiler");
 
 test "diagnostics: return type mismatch shows types" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -8,7 +8,7 @@ test "diagnostics: return type mismatch shows types" {
     const bad =
         \\bad :: fn() -> i32 { return true; }
     ;
-    const result = skarn.compile(arena.allocator(), "bad.sk", bad);
+    const result = gabbro.compile(arena.allocator(), "bad.gab", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -20,7 +20,7 @@ test "diagnostics: returning a capturing closure is rejected (would dangle)" {
     const bad =
         \\make :: fn(n: i32) -> fn(i32) -> i32 { return fn(x: i32) -> i32 { return x + n; }; }
     ;
-    const result = skarn.compile(arena.allocator(), "escape.sk", bad);
+    const result = gabbro.compile(arena.allocator(), "escape.gab", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -31,7 +31,7 @@ test "diagnostics: returning a capturing closure held in a local is rejected" {
     const bad =
         \\make :: fn(n: i32) -> fn(i32) -> i32 { f := fn(x: i32) -> i32 { return x + n; }; return f; }
     ;
-    const result = skarn.compile(arena.allocator(), "escape2.sk", bad);
+    const result = gabbro.compile(arena.allocator(), "escape2.gab", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -43,7 +43,7 @@ test "diagnostics: returning a non-capturing function value is allowed" {
         \\dbl :: fn(x: i32) -> i32 { return x * 2; }
         \\get :: fn() -> fn(i32) -> i32 { return dbl; }
     ;
-    var fe = try skarn.compile(arena.allocator(), "ok.sk", ok);
+    var fe = try gabbro.compile(arena.allocator(), "ok.gab", ok);
     fe.deinit(arena.allocator());
 }
 
@@ -54,7 +54,7 @@ test "diagnostics: unknown name shows identifier" {
     const bad =
         \\bad :: fn() -> i32 { return foo; }
     ;
-    const result = skarn.compile(arena.allocator(), "bad.sk", bad);
+    const result = gabbro.compile(arena.allocator(), "bad.gab", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -66,7 +66,7 @@ test "diagnostics: wrong arg count shows expected vs actual" {
         \\add :: fn(a: i32, b: i32) -> i32 { return a + b; }
         \\bad :: fn() -> i32 { return add(1); }
     ;
-    const result = skarn.compile(arena.allocator(), "bad.sk", bad);
+    const result = gabbro.compile(arena.allocator(), "bad.gab", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -78,7 +78,7 @@ test "diagnostics: arg type mismatch shows types" {
         \\add :: fn(a: i32, b: i32) -> i32 { return a + b; }
         \\bad :: fn() -> i32 { return add(1, true); }
     ;
-    const result = skarn.compile(arena.allocator(), "bad.sk", bad);
+    const result = gabbro.compile(arena.allocator(), "bad.gab", bad);
     try std.testing.expectError(error.SemanticFailed, result);
 }
 
@@ -90,7 +90,7 @@ test "diagnostics: sema errors are stored in TypeEnv" {
     const src =
         \\add :: fn(a: i32, b: i32) -> i32 { return a + b; }
     ;
-    var fe = try skarn.compile(arena.allocator(), "ok.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "ok.gab", src);
     defer fe.deinit(arena.allocator());
     try std.testing.expectEqual(@as(usize, 0), fe.types.diagnostics.items.len);
 }
@@ -104,7 +104,7 @@ test "diagnostics: fail outside error function is caught" {
         \\bad :: fn() -> i32 { fail .timeout; return 0; }
     ;
     try std.testing.expectError(error.SemanticFailed,
-        skarn.compile(arena.allocator(), "bad.sk", bad));
+        gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "diagnostics: renderDiagnostic produces correct format" {
@@ -119,16 +119,16 @@ test "diagnostics: renderDiagnostic produces correct format" {
     ;
     // Just verify compile fails — rendering is tested via existence
     try std.testing.expectError(error.SemanticFailed,
-        skarn.compile(arena.allocator(), "test.sk", bad));
+        gabbro.compile(arena.allocator(), "test.gab", bad));
 
     // Verify Diagnostic.err constructor works
-    const d = skarn.Diagnostic.err("test message",
-        skarn.Span.new(0, 3), "test.sk");
-    try std.testing.expectEqual(skarn.DiagKind.err, d.kind);
+    const d = gabbro.Diagnostic.err("test message",
+        gabbro.Span.new(0, 3), "test.gab");
+    try std.testing.expectEqual(gabbro.DiagKind.err, d.kind);
 
-    const rendered = try skarn.renderDiagnostic(arena.allocator(), "test.sk", src, d);
+    const rendered = try gabbro.renderDiagnostic(arena.allocator(), "test.gab", src, d);
     // Should contain file:line:col: error: message
-    try std.testing.expect(std.mem.indexOf(u8, rendered, "test.sk") != null);
+    try std.testing.expect(std.mem.indexOf(u8, rendered, "test.gab") != null);
     try std.testing.expect(std.mem.indexOf(u8, rendered, "error:") != null);
     try std.testing.expect(std.mem.indexOf(u8, rendered, "test message") != null);
     try std.testing.expect(std.mem.indexOf(u8, rendered, "^^^") != null);
@@ -139,12 +139,12 @@ test "diagnostics: rich render carries caret label, help and note; color only wh
     defer arena.deinit();
     const a = arena.allocator();
     const src = "main :: fn() -> i32 { return x; }";
-    var d = skarn.Diagnostic.err("undefined name `x`", skarn.Span.new(28, 29), "t.sk");
+    var d = gabbro.Diagnostic.err("undefined name `x`", gabbro.Span.new(28, 29), "t.gab");
     d.primary_label = "not found in this scope";
     d.helps = &.{"declare it first: `x := 0;`"};
     d.notes = &.{"names are resolved top to bottom"};
 
-    const plain = try skarn.renderDiagnostic(a, "t.sk", src, d);
+    const plain = try gabbro.renderDiagnostic(a, "t.gab", src, d);
     try std.testing.expect(std.mem.indexOf(u8, plain, "not found in this scope") != null);
     try std.testing.expect(std.mem.indexOf(u8, plain, "help: declare it first") != null);
     try std.testing.expect(std.mem.indexOf(u8, plain, "note: names are resolved") != null);
@@ -152,7 +152,7 @@ test "diagnostics: rich render carries caret label, help and note; color only wh
     try std.testing.expect(std.mem.indexOfScalar(u8, plain, 0x1b) == null);
 
     // An explicit colored palette does carry them.
-    const colored = try skarn.renderDiagnosticColored(a, "t.sk", src, d, .{ .on = true });
+    const colored = try gabbro.renderDiagnosticColored(a, "t.gab", src, d, .{ .on = true });
     try std.testing.expect(std.mem.indexOfScalar(u8, colored, 0x1b) != null);
 }
 
@@ -160,13 +160,13 @@ test "diagnostics: rich render carries caret label, help and note; color only wh
 /// tolerant mode so the diagnostics survive even though checking fails. Lets the
 /// tests below assert the *text* of an error, not just that one occurred.
 fn firstError(arena: std.mem.Allocator, src: []const u8) !?[]const u8 {
-    const mod = try skarn.parseSource(arena, "t.sk", src);
-    var syms = try skarn.sema_mod.collectSymbols(arena, mod);
-    const env = try skarn.sema_mod.checkTypesTolerant(arena, mod, &syms, src, "t.sk");
+    const mod = try gabbro.parseSource(arena, "t.gab", src);
+    var syms = try gabbro.sema_mod.collectSymbols(arena, mod);
+    const env = try gabbro.sema_mod.checkTypesTolerant(arena, mod, &syms, src, "t.gab");
     for (env.diagnostics.items) |d| {
         // Render so the assertions see the whole diagnostic (message + caret label +
         // `help:`/`note:` lines), matching what a user reads.
-        if (d.kind == .err) return try skarn.renderDiagnostic(arena, d.file, src, d);
+        if (d.kind == .err) return try gabbro.renderDiagnostic(arena, d.file, src, d);
     }
     return null;
 }

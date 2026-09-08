@@ -23,15 +23,15 @@ pub fn build(b: *std.Build) void {
     const stdlib_root = b.option(
         []const u8,
         "stdlib-root",
-        "Path to the Skarn modules directory containing std/",
+        "Path to the Gabbro modules directory containing std/",
     ) orelse b.pathFromRoot("lib");
 
-    // Bake skarnld into skarn.exe for a one-file release. The base exe compiles
-    // skarnld.sk to an object; the final exe links it in. Off = ship the dll instead.
-    const embed_linker = b.option(bool, "embed-linker", "Bake skarnld into skarn.exe (single-binary release)") orelse false;
+    // Bake gabld into gabbro.exe for a one-file release. The base exe compiles
+    // gabld.gab to an object; the final exe links it in. Off = ship the dll instead.
+    const embed_linker = b.option(bool, "embed-linker", "Bake gabld into gabbro.exe (single-binary release)") orelse false;
 
     // the compiler, as a reusable library
-    const compiler_mod = b.addModule("skarn_compiler", .{
+    const compiler_mod = b.addModule("gabbro_compiler", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
@@ -57,8 +57,8 @@ pub fn build(b: *std.Build) void {
     // `std.heap.Arena`) works in every compile path — including the inline
     // `compile(source)` path that never touches disk. `@embedFile` resolves
     // these import names; the files remain the single source of truth in lib/.
-    compiler_mod.addAnonymousImport("std_heap_skarn", .{ .root_source_file = b.path("lib/std/heap.sk") });
-    compiler_mod.addAnonymousImport("std_ptr_skarn", .{ .root_source_file = b.path("lib/std/ptr.sk") });
+    compiler_mod.addAnonymousImport("std_heap_gabbro", .{ .root_source_file = b.path("lib/std/heap.gab") });
+    compiler_mod.addAnonymousImport("std_ptr_gabbro", .{ .root_source_file = b.path("lib/std/ptr.gab") });
 
     // Wire LLVM into the compiler library when a path is provided.
     if (llvm_path) |lp| {
@@ -70,34 +70,34 @@ pub fn build(b: *std.Build) void {
         //   Linux/macOS:                 LLVM-17 / LLVM
         compiler_mod.linkSystemLibrary("LLVM-C", .{});
         // libclang isn't linked. The include path gives @cImport its types, but the
-        // functions load at runtime (clang_c.zig), so skarn.exe doesn't drag in the
-        // 81 MB libclang.dll. It's pulled in only for `skarn bindgen`.
+        // functions load at runtime (clang_c.zig), so gabbro.exe doesn't drag in the
+        // 81 MB libclang.dll. It's pulled in only for `gabbro bindgen`.
     }
 
-    // optional in-process LLD (skarnlld.dll)
+    // optional in-process LLD (gabbrolld.dll)
     // -Din-process-lld builds a DLL with the LLD COFF driver + its LLVM deps, so
-    // `skarn build` links in-process instead of spawning lld-link.exe. Off by default.
-    const in_process_lld = b.option(bool, "in-process-lld", "Build skarnlld.dll for in-process linking") orelse false;
+    // `gabbro build` links in-process instead of spawning lld-link.exe. Off by default.
+    const in_process_lld = b.option(bool, "in-process-lld", "Build gabbrolld.dll for in-process linking") orelse false;
     opts.addOption(bool, "in_process_lld", in_process_lld and llvm_path != null);
     if (in_process_lld) {
         if (llvm_path) |lp| {
             // The SDK's LLVM static libs are MSVC-ABI (/MT). Build the shim DLL
             // against the MSVC toolchain so the CRT/STL match.
             const msvc_target = b.resolveTargetQuery(.{ .cpu_arch = .x86_64, .os_tag = .windows, .abi = .msvc });
-            // Always ReleaseFast + stripped: the DLL is loaded on every `skarn
+            // Always ReleaseFast + stripped: the DLL is loaded on every `gabbro
             // build`, so its size drives link latency. Debug info would bloat it
             // to ~77 MB and dominate the load.
-            const skarnlld = b.addLibrary(.{
-                .name = "skarnlld",
+            const gabbrolld = b.addLibrary(.{
+                .name = "gabbrolld",
                 .linkage = .dynamic,
                 .root_module = b.createModule(.{ .target = msvc_target, .optimize = .ReleaseFast, .strip = true, .link_libc = true }),
             });
-            skarnlld.root_module.addCSourceFile(.{
+            gabbrolld.root_module.addCSourceFile(.{
                 .file = b.path("src/backend/llvm/lld_shim.cpp"),
                 .flags = &.{ "-std=c++17", "-fno-rtti" },
             });
-            skarnlld.root_module.addIncludePath(.{ .cwd_relative = b.fmt("{s}/include", .{lp}) });
-            skarnlld.root_module.addLibraryPath(.{ .cwd_relative = b.fmt("{s}/lib", .{lp}) });
+            gabbrolld.root_module.addIncludePath(.{ .cwd_relative = b.fmt("{s}/include", .{lp}) });
+            gabbrolld.root_module.addLibraryPath(.{ .cwd_relative = b.fmt("{s}/lib", .{lp}) });
             // LLD + the FULL LLVM static set (all targets — LLD's LTO path
             // references every target initializer), in `llvm-config --libnames
             // all` order, then the Windows system libs LLVM needs.
@@ -174,8 +174,8 @@ pub fn build(b: *std.Build) void {
                 "xml2s",  "psapi",  "shell32", "ole32",
                 "uuid",   "advapi32", "ws2_32", "ntdll",
             };
-            for (lld_llvm_libs) |name| skarnlld.root_module.linkSystemLibrary(name, .{});
-            b.installArtifact(skarnlld);
+            for (lld_llvm_libs) |name| gabbrolld.root_module.linkSystemLibrary(name, .{});
+            b.installArtifact(gabbrolld);
         }
     }
 
@@ -187,45 +187,45 @@ pub fn build(b: *std.Build) void {
     ) orelse "C:\\Users\\chris\\backend\\basalt\\bin";
 
     // CLI executable
-    const exe_mod = b.addModule("skarn", .{
+    const exe_mod = b.addModule("gabbro", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    const exe = b.addExecutable(.{ .name = "skarn", .root_module = exe_mod });
-    exe.root_module.addImport("skarn_compiler", compiler_mod);
+    const exe = b.addExecutable(.{ .name = "gabbro", .root_module = exe_mod });
+    exe.root_module.addImport("gabbro_compiler", compiler_mod);
     exe.root_module.addLibraryPath(.{ .cwd_relative = basalt_lib_dir });
 
     if (embed_linker and llvm_path != null) {
-        // Stage 1: the base skarn.exe compiles the linker to a freestanding object
+        // Stage 1: the base gabbro.exe compiles the linker to a freestanding object
         // (no entry / _fltused). It only does codegen, so it needs LLVM-C.dll on
         // PATH but no linker.
         const lp = llvm_path.?;
         const gen = b.addRunArtifact(exe);
         gen.addArg("object");
-        gen.addFileArg(b.path("linker/skarnld.sk"));
+        gen.addFileArg(b.path("linker/gabld.gab"));
         gen.addArgs(&.{ "--no-entry", "-O2", "-o" });
-        const skarnld_obj = gen.addOutputFileArg("skarnld.obj");
+        const gabld_obj = gen.addOutputFileArg("gabld.obj");
         gen.addPathDir(b.fmt("{s}/bin", .{lp})); // so LLVM-C.dll resolves at run time
 
-        // Stage 2: the shipped skarn.exe links that object in and exports skarn_link_mem
+        // Stage 2: the shipped gabbro.exe links that object in and exports gabbro_link_mem
         // (link.zig finds it via GetProcAddress on its own module). One binary.
         // A SEPARATE module so the object isn't pulled into the base exe above
         // (which would make the generator depend on its own output — a cycle).
-        const final_mod = b.addModule("skarn_embed", .{
+        const final_mod = b.addModule("gabbro_embed", .{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
         });
-        final_mod.addImport("skarn_compiler", compiler_mod);
+        final_mod.addImport("gabbro_compiler", compiler_mod);
         final_mod.addLibraryPath(.{ .cwd_relative = basalt_lib_dir });
-        final_mod.addObjectFile(skarnld_obj);
-        // The embedded object carries the skarn runtime, which references ws2_32
+        final_mod.addObjectFile(gabld_obj);
+        // The embedded object carries the gabbro runtime, which references ws2_32
         // (the net module). kernel32 is already linked; add Winsock.
         final_mod.linkSystemLibrary("ws2_32", .{});
-        const final = b.addExecutable(.{ .name = "skarn", .root_module = final_mod });
-        final.win32_module_definition = b.path("linker/skarnld_embed.def");
+        const final = b.addExecutable(.{ .name = "gabbro", .root_module = final_mod });
+        final.win32_module_definition = b.path("linker/gabld_embed.def");
         b.installArtifact(final);
     } else {
         b.installArtifact(exe);
@@ -234,7 +234,7 @@ pub fn build(b: *std.Build) void {
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| run_cmd.addArgs(args);
-    const run_step = b.step("run", "Run skarn");
+    const run_step = b.step("run", "Run gabbro");
     run_step.dependOn(&run_cmd.step);
 
     // Tests
@@ -242,7 +242,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/root.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "skarn_compiler", .module = compiler_mod }},
+        .imports = &.{.{ .name = "gabbro_compiler", .module = compiler_mod }},
     });
 
     const test_filter = b.option([]const u8, "test-filter", "Only run tests whose name contains this substring");

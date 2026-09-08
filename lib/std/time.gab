@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: Apache-2.0
+// std.time — wall-clock time, a monotonic clock, sleeping, and a UTC calendar
+// breakdown. Cross-platform.
+//
+//   secs := time::unix_seconds();          // seconds since 1970-01-01 UTC
+//   dt   := time::utc(secs);               // → DateTime { year, month, day, ... }
+//   start := time::now();                  // monotonic Instant
+//   time::sleep_ms(16u32);
+//   ns := time::since_nanos(start);        // elapsed, never goes backwards
+//
+// OS clocks come through the runtime's nanosecond seam (os_wall_nanos,
+// os_monotonic_nanos, os_sleep_nanos; windows.gab → kernel32, linux.gab →
+// clock_gettime/nanosleep). The UTC breakdown is pure arithmetic (civil-from-days).
+
+// Wall clock (Unix epoch)
+
+// Nanoseconds since 1970-01-01 00:00:00 UTC.
+pub unix_nanos :: fn() -> i64 { return os_wall_nanos(); }
+
+// Milliseconds since the Unix epoch.
+pub unix_millis :: fn() -> i64 { return os_wall_nanos() / 1000000i64; }
+
+// Whole seconds since 1970-01-01 00:00:00 UTC.
+pub unix_seconds :: fn() -> i64 { return os_wall_nanos() / 1000000000i64; }
+
+// Monotonic clock
+
+// A point on the monotonic clock. Compare via `since_*`; never wall-time.
+pub Instant :: struct { nanos: i64 }
+
+// Capture the current monotonic instant.
+pub now :: fn() -> Instant { r: Instant = .{ os_monotonic_nanos() }; return r; }
+
+// Nanoseconds elapsed since `start` (monotonic — never negative for `start`
+// captured in the past).
+pub since_nanos :: fn(start: Instant) -> i64 { return os_monotonic_nanos() - start.nanos; }
+
+// Milliseconds elapsed since `start`.
+pub since_millis :: fn(start: Instant) -> i64 { return since_nanos(start) / 1000000i64; }
+
+// Fractional seconds elapsed since `start`.
+pub since_seconds :: fn(start: Instant) -> f64 {
+    return (since_nanos(start) as f64) / 1000000000.0;
+}
+
+// Milliseconds on the monotonic clock (handy for frame timing).
+pub monotonic_millis :: fn() -> u64 { return (os_monotonic_nanos() / 1000000i64) as u64; }
+
+// Suspend the current thread for at least `millis` milliseconds.
+pub sleep_ms :: fn(millis: u32) { os_sleep_nanos((millis as i64) * 1000000i64); }
+
+// UTC calendar breakdown
+
+// A broken-down UTC date and time. `weekday` is 0=Sunday … 6=Saturday.
+pub DateTime :: struct {
+    year:    i64,
+    month:   u8,   // 1–12
+    day:     u8,   // 1–31
+    hour:    u8,   // 0–23
+    minute:  u8,   // 0–59
+    second:  u8,   // 0–59
+    weekday: u8,   // 0=Sun … 6=Sat
+}
+
+// Floor-divide (rounds toward −∞), so pre-epoch times still break down correctly.
+fdiv :: fn(a: i64, b: i64) -> i64 {
+    q: i64 = a / b;
+    if (a % b != 0i64) && ((a < 0i64) != (b < 0i64)) { return q - 1i64; }
+    return q;
+}
+
+// Break `secs` (seconds since the Unix epoch) into its UTC components.
+pub utc :: fn(secs: i64) -> DateTime {
+    days:    i64 = fdiv(secs, 86400i64);
+    rem:     i64 = secs - days * 86400i64;   // 0 … 86399 (floor-correct)
+
+    // Howard Hinnant's civil-from-days: shift the epoch to 0000-03-01.
+    z:   i64 = days + 719468i64;
+    era: i64 = fdiv(z, 146097i64);
+    doe: i64 = z - era * 146097i64;                                  // 0 … 146096
+    yoe: i64 = (doe - doe / 1460i64 + doe / 36524i64 - doe / 146096i64) / 365i64; // 0 … 399
+    y:   i64 = yoe + era * 400i64;
+    doy: i64 = doe - (365i64 * yoe + yoe / 4i64 - yoe / 100i64);     // 0 … 365
+    mp:  i64 = (5i64 * doy + 2i64) / 153i64;                         // 0 … 11
+    d:   i64 = doy - (153i64 * mp + 2i64) / 5i64 + 1i64;             // 1 … 31
+    m:   i64 = mp + 3i64;
+    if mp >= 10i64 { m = mp - 9i64; }
+    if m <= 2i64 { y = y + 1i64; }
+
+    wd: i64 = fdiv(days + 4i64, 7i64);                              // 1970-01-01 = Thursday
+    weekday: i64 = days + 4i64 - wd * 7i64;
+
+    out: DateTime = .{
+        y,
+        m as u8,
+        d as u8,
+        (rem / 3600i64) as u8,
+        ((rem / 60i64) % 60i64) as u8,
+        (rem % 60i64) as u8,
+        weekday as u8,
+    };
+    return out;
+}
+
+// `utc(unix_seconds())` — the current UTC date and time.
+pub now_utc :: fn() -> DateTime { return utc(unix_seconds()); }

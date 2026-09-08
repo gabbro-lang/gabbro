@@ -27,7 +27,7 @@ const format_version: u32 = 1;
 pub const Key = [Sha256.digest_length]u8;
 
 /// Default on-disk location, relative to the working directory.
-pub const default_dir = ".skarn-cache/run";
+pub const default_dir = ".gabbro-cache/run";
 
 const win = struct {
     const HANDLE = *anyopaque;
@@ -46,12 +46,12 @@ const win = struct {
     extern "kernel32" fn CloseHandle(h: HANDLE) callconv(.winapi) i32;
 };
 
-/// The persistent cache is opt-in while it's young: `SKARN_CACHE=1` (or `on`).
+/// The persistent cache is opt-in while it's young: `GABBRO_CACHE=1` (or `on`).
 /// Windows-only — the comptime cache is Windows-tested; elsewhere it stays off.
 pub fn enabledByEnv() bool {
     if (builtin.target.os.tag != .windows) return false;
     var buf: [8]u8 = undefined;
-    const n = win.GetEnvironmentVariableA("SKARN_CACHE", &buf, buf.len);
+    const n = win.GetEnvironmentVariableA("GABBRO_CACHE", &buf, buf.len);
     if (n == 0 or n > buf.len) return false;
     const v = buf[0..n];
     return std.mem.eql(u8, v, "1") or std.mem.eql(u8, v, "on");

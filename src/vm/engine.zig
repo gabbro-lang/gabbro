@@ -35,7 +35,7 @@ const Frame = struct {
     zone_watermark: usize,
 };
 
-/// The Skarn compile-time virtual machine.
+/// The Gabbro compile-time virtual machine.
 /// A side-effecting bridge to the embedding host, invoked by the `host_call`
 /// opcode. The build driver installs one so `std.build`'s `__build_*` intrinsics
 /// record into a BuildPlan. `op` is a `BuildOp`; `args` are the call arguments
@@ -46,7 +46,7 @@ pub const BuildHost = struct {
 };
 
 /// What a comptime run is allowed to do. A bare `#run` gets none of these — it is
-/// pure — and the build driver grants `ffi` to `build.sk`. Capabilities only narrow
+/// pure — and the build driver grants `ffi` to `build.gab`. Capabilities only narrow
 /// as the call stack descends; they can't be forged or widened. This is the
 /// structural fix for the `build.rs` surface: a dependency's compile-time code
 /// can't reach the host unless it was handed the capability to.
@@ -64,7 +64,7 @@ pub const Vm = struct {
     /// Optional host bridge for `host_call` (the build driver). Null → trap.
     host: ?BuildHost = null,
     /// What this run may do. Default: nothing privileged (a pure `#run`). The build
-    /// driver sets `caps.ffi = true` for `build.sk`. See `Caps`.
+    /// driver sets `caps.ffi = true` for `build.gab`. See `Caps`.
     caps: Caps = .{},
     call_depth: usize = 0,
     max_call_depth: usize = 512,
@@ -105,14 +105,14 @@ pub const Vm = struct {
 
     /// Call a host function, gated by the `ffi` capability. A pure `#run` may only
     /// reach the benign memory primitives above; anything else halts the build with
-    /// a diagnostic. `build.sk` runs with `ffi` granted, so it reaches everything.
+    /// a diagnostic. `build.gab` runs with `ffi` granted, so it reaches everything.
     fn callExtern(self: *Vm, ec: ffi.ExternCall, args: []const Value) error{Trap}!Value {
         if (!self.caps.ffi and !ffiAlwaysAllowed(ec)) {
             self.compiler_error_msg = std.fmt.allocPrint(
                 self.allocator,
-                "comptime FFI to `{s}` (in `{s}`) is not allowed here: this ran as a pure `#run`, which has no `ffi` capability. Only `build.sk` is granted FFI.",
+                "comptime FFI to `{s}` (in `{s}`) is not allowed here: this ran as a pure `#run`, which has no `ffi` capability. Only `build.gab` is granted FFI.",
                 .{ ec.symbol, ec.lib },
-            ) catch "comptime FFI requires the `ffi` capability (only `build.sk` has it)";
+            ) catch "comptime FFI requires the `ffi` capability (only `build.gab` has it)";
             return error.Trap;
         }
         return ffi.call(self.allocator, ec, args) catch error.Trap;

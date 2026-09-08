@@ -1,0 +1,226 @@
+// SPDX-License-Identifier: Apache-2.0
+// std.fs — minimal synchronous file I/O for Gabbro. OS calls go through the platform
+// runtime (windows.gab → kernel32; linux.gab → openat/read/write/..), so this file is
+// OS-agnostic. File implements std.io.Reader and Writer; there's open/create/append,
+// exists/is_dir/delete, read_all, and DirIter for directory walking, all sharing FsError.
+//
+// Paths are plain []const u8, copied into a small stack buffer and NUL-terminated for
+// the OS; anything too long fails with path_too_long.
+//
+//   f := fs.create("out.txt") catch err { return 1; };
+//   w: *Writer = &f;
+//   w.write_all("hello\n") catch err {};
+//   (&f).close();
+
+#import std.io.{ Writer, Reader, IoError };
+#import std.heap.{ Arena };
+
+// The file/dir seam, provided by the platform runtime:
+//   os_file_open(path, mode) -> i64   mode 0=read, 1=create/trunc, 2=append; -1 = fail
+//   os_file_read(h, buf, len) -> i64  bytes read, or -1
+//   os_file_write(h, buf, len) -> i64 bytes written, or -1
+//   os_file_close(h)
+//   os_file_seek(h, off, whence) -> i64   whence 0=set, 1=cur, 2=end; new pos or -1
+//   os_path_kind(path) -> i32         0=missing, 1=file, 2=directory
+//   os_unlink(path) -> i32            0 = ok
+//   os_dir_open(path) -> i64          opaque iterator handle, or -1
+//   os_dir_next(h, name) -> i64       entry-name length copied into `name`, or -1 at end
+//   os_dir_is_dir(h)/os_dir_is_reparse(h) -> bool, os_dir_size(h) -> u64   (last entry)
+//   os_dir_close(h)
+
+FS_INVALID :: -1i64;       // a closed/invalid handle (matches the seam's failure value)
+MAX_PATH_BYTES :: 260usize;
+
+// Errors
+
+pub FsError :: errors {
+    not_found,       // open of an existing file failed — the path doesn't exist (or access denied)
+    create_failed,   // create/append failed
+    read_failed,     // a read returned an error
+    write_failed,    // a write returned an error
+    seek_failed,     // a seek returned an error
+    delete_failed,   // delete failed
+    path_too_long,   // path (plus NUL terminator) doesn't fit in the internal buffer
+}
+
+// Path helpers
+
+// Copy `path` into `buf`, append a NUL terminator, and return a pointer to the
+// start of `buf` suitable for the OS `*A`/syscall APIs.
+fs_to_cstr :: fn(path: []const u8, buf: []u8) -> *const u8 ! FsError {
+    if path.len + 1usize > buf.len { fail .path_too_long; }
+    i := 0usize;
+    while i < path.len {
+        buf[i] = path[i];
+        i += 1usize;
+    }
+    buf[path.len] = 0u8;
+    return buf.ptr;
+}
+
+// File
+
+// An open OS file handle. Implements both `Reader` and `Writer`, so it works
+// anywhere a `*Reader`/`*Writer` is expected — pipelines, formatters, loggers.
+pub File :: struct {
+    handle: i64,
+}
+
+File as Reader {
+    read :: fn(self: *Self, buf: []u8) -> usize ! IoError {
+        if buf.len == 0usize { return 0usize; }
+        n := os_file_read(self.handle, buf.ptr, buf.len);
+        if n < 0i64 { fail .read_failed; }
+        return n as usize;
+    }
+}
+
+File as Writer {
+    write :: fn(self: *Self, data: []const u8) -> usize ! IoError {
+        if data.len == 0usize { return 0usize; }
+        n := os_file_write(self.handle, data.ptr, data.len);
+        if n < 0i64 { fail .write_failed; }
+        return n as usize;
+    }
+    flush :: fn(self: *Self) -> void ! IoError {
+        return;
+    }
+}
+
+// True while the handle is open. Call as `(&file).is_open()`.
+pub is_open :: fn(self: *File) -> bool {
+    return self.handle != FS_INVALID;
+}
+
+// Close the underlying OS handle. Safe to call more than once. Call as
+// `(&file).close()`.
+pub close :: fn(self: *File) {
+    if self.handle == FS_INVALID { return; }
+    os_file_close(self.handle);
+    self.handle = FS_INVALID;
+}
+
+// Open an existing file for reading. Fails with `not_found` if it can't be
+// opened for read access.
+pub open :: fn(path: []const u8) -> File ! FsError {
+    path_buf: [260]u8 = .{};
+    cpath := fs_to_cstr(path, path_buf[:])?;
+    h := os_file_open(cpath, 0);
+    if h == FS_INVALID { fail .not_found; }
+    return .{ h };
+}
+
+// Create a file for writing, truncating it if it already exists (`fopen(…,"w")`).
+pub create :: fn(path: []const u8) -> File ! FsError {
+    path_buf: [260]u8 = .{};
+    cpath := fs_to_cstr(path, path_buf[:])?;
+    h := os_file_open(cpath, 1);
+    if h == FS_INVALID { fail .create_failed; }
+    return .{ h };
+}
+
+// Open a file for appending, creating it if it doesn't exist (`fopen(…,"a")`).
+pub append :: fn(path: []const u8) -> File ! FsError {
+    path_buf: [260]u8 = .{};
+    cpath := fs_to_cstr(path, path_buf[:])?;
+    h := os_file_open(cpath, 2);
+    if h == FS_INVALID { fail .create_failed; }
+    return .{ h };
+}
+
+// True if `path` refers to an existing file or directory. Never fails.
+pub exists :: fn(path: []const u8) -> bool {
+    path_buf: [260]u8 = .{};
+    cpath := fs_to_cstr(path, path_buf[:]) catch err { return false; };
+    return os_path_kind(cpath) != 0;
+}
+
+// True if `path` is a directory.
+pub is_dir :: fn(path: []const u8) -> bool {
+    path_buf: [260]u8 = .{};
+    cpath := fs_to_cstr(path, path_buf[:]) catch err { return false; };
+    return os_path_kind(cpath) == 2;
+}
+
+// Remove a file. Fails with `delete_failed` if it can't be removed.
+pub delete :: fn(path: []const u8) -> void ! FsError {
+    path_buf: [260]u8 = .{};
+    cpath := fs_to_cstr(path, path_buf[:])?;
+    if os_unlink(cpath) != 0 { fail .delete_failed; }
+    return;
+}
+
+// Read an entire file into a fresh buffer allocated in `a`. Returns the bytes.
+pub read_all :: fn(path: []const u8, a: *Arena) -> []u8 ! FsError {
+    path_buf: [260]u8 = .{};
+    cpath := fs_to_cstr(path, path_buf[:])?;
+    h := os_file_open(cpath, 0);
+    if h == FS_INVALID { fail .not_found; }
+    sz := os_file_seek(h, 0i64, 2);     // SEEK_END → size
+    back := os_file_seek(h, 0i64, 0);   // SEEK_SET → rewind
+    if sz < 0i64 || back < 0i64 { os_file_close(h); fail .seek_failed; }
+    buf: []u8 = a.alloc_bytes(sz as usize);
+    total: usize = 0usize;
+    while total < buf.len {
+        n := os_file_read(h, &buf[total], buf.len - total);
+        if n < 0i64 { os_file_close(h); fail .read_failed; }
+        if n == 0i64 { break; }
+        total += n as usize;
+    }
+    os_file_close(h);
+    return buf[0usize..total];
+}
+
+// Directory iteration
+// `open_dir` takes a directory PATH (each platform adds its own glob/listing
+// mechanism). `dir_next` yields each entry name (including "." and ".."), valid
+// only until the following `dir_next` call.
+pub DirIter :: struct {
+    handle:  i64,
+    namebuf: [260]u8,
+    namelen: usize,
+}
+
+pub open_dir :: fn(path: []const u8) -> DirIter ! FsError {
+    iter: DirIter = .{ FS_INVALID, .{}, 0usize };
+    path_buf: [260]u8 = .{};
+    cpath := fs_to_cstr(path, path_buf[:])?;
+    iter.handle = os_dir_open(cpath);
+    if iter.handle == FS_INVALID { fail .not_found; }
+    return iter;
+}
+
+// The next entry name, or null at the end. Call as `(&it).dir_next()`.
+pub dir_next :: fn(self: *DirIter) -> ?[]const u8 {
+    if self.handle == FS_INVALID { return null; }
+    n := os_dir_next(self.handle, self.namebuf[:]);
+    if n < 0i64 { return null; }
+    self.namelen = n as usize;
+    return self.namebuf[0usize..self.namelen];
+}
+
+// Whether the entry most recently returned by `dir_next` is a subdirectory.
+pub dir_is_dir :: fn(self: *DirIter) -> bool {
+    if self.handle == FS_INVALID { return false; }
+    return os_dir_is_dir(self.handle);
+}
+
+// Size in bytes of the most recent entry (free on Windows; 0 on Linux, whose
+// getdents64 doesn't carry it — stat the path if you need it there).
+pub dir_size :: fn(self: *DirIter) -> u64 {
+    if self.handle == FS_INVALID { return 0u64; }
+    return os_dir_size(self.handle);
+}
+
+// True if the most recent entry is a symlink/reparse point — skip these when
+// scanning to avoid cycles and double-counting.
+pub dir_is_reparse :: fn(self: *DirIter) -> bool {
+    if self.handle == FS_INVALID { return false; }
+    return os_dir_is_reparse(self.handle);
+}
+
+pub dir_close :: fn(self: *DirIter) {
+    if self.handle == FS_INVALID { return; }
+    os_dir_close(self.handle);
+    self.handle = FS_INVALID;
+}

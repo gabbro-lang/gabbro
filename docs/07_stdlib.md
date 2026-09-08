@@ -1,6 +1,6 @@
 # Standard Library
 
-Skarn's standard library (`std`): minimal, and allocation-free where it can be. 
+Gabbro's standard library (`std`): minimal, and allocation-free where it can be. 
 
 Here are the primary modules:
 
@@ -86,7 +86,7 @@ the element type** (no explicit `$T`). Read-modify-write helpers return the
 ordering; for finer control call the `core::atomic_*` builtins with an ordering
 constant (`Relaxed`/`Acquire`/`Release`/`AcqRel`/`SeqCst`).
 
-```skarn
+```gabbro
 #import std.atomics;
 
 counter: u32 = 0u32;
@@ -120,7 +120,7 @@ The free functions act on a raw `*T`. `Atomic(T)` instead *wraps* the value, so 
 type itself documents that it's shared, and the operations read as methods. The
 element type is recovered from the receiver, so you never write `$T`:
 
-```skarn
+```gabbro
 #import std.atomics;
 #import std.atomics.{Atomic};         // bring the type name into scope
 
@@ -135,21 +135,21 @@ Methods: `get`/`set`, `get_acquire`/`set_release`, `exchange`, `cas`/`cas_value`
 each carrying the same compile-time contract as its free-function counterpart.
 
 > Atomic increments across threads lose nothing under contention — that's the whole
-> point (a plain `+= 1` would race). See `tests/fixtures/stdlib/atomics_thread_app.sk`,
-> and `atomic_cell_app.sk` for the `Atomic(T)` method API.
+> point (a plain `+= 1` would race). See `tests/fixtures/stdlib/atomics_thread_app.gab`,
+> and `atomic_cell_app.gab` for the `Atomic(T)` method API.
 
 ## `std.thread`
-Native OS threads and structured helpers. skarn favours *real threads* over async/await
+Native OS threads and structured helpers. gabbro favours *real threads* over async/await
 — no function colouring, no hidden executor, no heap-allocated coroutine frames; a
 thread is a stack plus an entry point. An entry has the shape `fn(*void) -> u32`: it
 receives a single context pointer and returns an exit code.
 
-Because skarn's ordinary function value is a fat `{fn, env}` closure that a C ABI can't
+Because gabbro's ordinary function value is a fat `{fn, env}` closure that a C ABI can't
 call, hand the entry over as **`core::fn_ptr(worker)`** — the raw thin function
 pointer. The context pointer you pass must outlive the thread (join before its data
 leaves scope, or put the data on a long-lived arena).
 
-```skarn
+```gabbro
 #import std.thread;
 #import std.atomics;
 
@@ -172,7 +172,7 @@ code := t.join();                // blocks; returns the worker's exit code
   `join_all()` blocks until the whole batch finishes (the batch can't outlive the
   call site). `thread::group()` makes an empty one.
 
-```skarn
+```gabbro
 g := thread::group();
 i: usize = 0usize;
 while i < thread::cpu_count() as usize { g.spawn(core::fn_ptr(worker), cp); i += 1usize; }
@@ -180,7 +180,7 @@ g.join_all();                    // wait for all
 ```
 
 > Thread pools and channels build on a future `std.sync` (Mutex/CondVar); for now
-> coordinate with `std.atomics`. See `tests/fixtures/stdlib/thread_app.sk`.
+> coordinate with `std.atomics`. See `tests/fixtures/stdlib/thread_app.gab`.
 
 ## `std.net` — networking
 TCP and UDP over Winsock2, layered across a subdirectory module so each piece stays
@@ -200,7 +200,7 @@ and `!`-fallible returns. Every layer fails with the one shared `os::NetError`.
 
 **Addresses** (`std.net.addr`) — `IpV4` (`#derive(Eq)` + a hand-written `format`
 rendering a dotted quad) and `SocketAddr` (whose derived `Eq` recurses into `IpV4.eq`):
-```skarn
+```gabbro
 #import std.net.addr as addr;
 ip  := addr::parse("127.0.0.1") catch e { ... };   // fallible
 sa  := addr::socket_addr(addr::localhost(), 8080u16);
@@ -208,7 +208,7 @@ sa.format(&sb);                                      // "127.0.0.1:8080"
 ```
 
 **TCP** — `init()` once, then `connect(addr)` / `listen(addr)`:
-```skarn
+```gabbro
 #import std.net as net;
 #import std.net.addr as addr;
 #import std.net.tcp as tcp;          // for the TcpStream / TcpListener types
@@ -227,7 +227,7 @@ a  := ln.accept() catch e { return; };   // a.stream + a.peer (blocks for a clie
 ```
 
 **UDP** — connectionless datagrams, or `connect` to pin a default peer:
-```skarn
+```gabbro
 #import std.net.udp as udp;
 
 srv := udp::bind(addr::socket_addr(addr::any(), 9000u16)) catch e { return; };
@@ -244,10 +244,10 @@ ignored := srv.send_to("pong", d.from) catch e {};  // reply to sender
   language doesn't re-export a type across modules; the facade hands those types
   back, so you only need the submodule import for a type annotation.
 - The raw Winsock bindings keep a `sys_` prefix; the `#extern` 2nd arg is the real
-  link symbol, so the skarn name is free to differ from the C name.
+  link symbol, so the gabbro name is free to differ from the C name.
 
 > Loopback round-trips combining net + thread + addr are in
-> `tests/fixtures/stdlib/net_echo_app.sk` (TCP echo) and `net_udp_app.sk` (UDP echo).
+> `tests/fixtures/stdlib/net_echo_app.gab` (TCP echo) and `net_udp_app.gab` (UDP echo).
 > DNS (`getaddrinfo`) and a small HTTP client are the natural next additions.
 
 ## Game & graphics modules
@@ -283,7 +283,7 @@ A generic `List(T)` dynamic array backed by an `Arena` — the intended collecti
 type for entities/projectiles. The arena owns every element; there are no per-element
 frees. Pass the element type explicitly to each op (`list::push(Bullet, &xs, b)`).
 
-```skarn
+```gabbro
 #import std.heap as heap;
 #import std.list as list;
 
@@ -309,14 +309,14 @@ The container library has one defining trait: every container is **region-bound*
 It carries a borrowed `*Arena` and grows by bump-allocating from it — there are no
 per-element frees and no destructors. When the region is `reset`/`deinit`-ed, every
 container that lived in it is gone at once. That's the whole memory story, and it's
-what makes skarn's containers different from Rust's owning collections or Zig's
+what makes gabbro's containers different from Rust's owning collections or Zig's
 allocator-injected ones.
 
 ### `std.vec` — `Vec(T)`
 
 A growable array with in-struct methods (UFCS), the successor to `std.list`:
 
-```skarn
+```gabbro
 #import std.heap as heap;
 #import std.vec as vec;
 
@@ -346,7 +346,7 @@ with `vec::from(T, a, u.items())`.
 
 Open-addressed (linear-probing) hash maps, also region-bound.
 
-```skarn
+```gabbro
 #import std.map as map;
 
 m := map::auto(i32, i32, &a);       // keys: ANY value type
@@ -368,7 +368,7 @@ sm.get("alpha");                    // hashes + compares the string bytes
   (and copying each key into the region so the map owns its keys).
 - Both: `put`, `get` (→ `?V`), `contains`, `remove`, `clear`, `len`, `cap`, `is_empty`.
 
-> skarn's hashing identity: a struct that `#derive(Hash, Eq)`s gets `hash()`/`eq()` for
+> gabbro's hashing identity: a struct that `#derive(Hash, Eq)`s gets `hash()`/`eq()` for
 > free — but `AutoHashMap` doesn't even need that, because byte-hashing covers every
 > POD key with zero ceremony. Drop a value in and it's a key.
 
@@ -380,13 +380,13 @@ Filesystem path strings — pure manipulation, no I/O. Both `/` and `\` are acce
 as separators; `join` writes the platform `SEP`. Query functions return sub-slices
 (no allocation); builders take an `*Arena`.
 
-```skarn
+```gabbro
 path::basename("a/b/c.txt")            // "c.txt"
 path::dirname ("a/b/c.txt")            // "a/b"   ("." when no separator)
 path::extension("c.txt")               // ".txt"  (with the dot; "" if none)
 path::stem("c.txt")                    // "c"
 path::is_absolute("/x")                // true (also "C:\…" and "\unc")
-path::has_extension("c.sk", "sk")      // true (leading dot optional)
+path::has_extension("c.gab", "sk")      // true (leading dot optional)
 path::join(&a, "a/b", "c.txt")         // "a/b\c.txt"
 path::with_extension(&a, "c.txt", "md")// "c.md"
 ```
@@ -398,7 +398,7 @@ Invariant: `basename(p)` == `stem(p)` ++ `extension(p)`.
 Wall-clock time, a monotonic clock, sleeping, and a UTC calendar breakdown
 (Windows backend, kernel32).
 
-```skarn
+```gabbro
 secs := time::unix_seconds();          // i64 seconds since 1970-01-01 UTC
 ms   := time::unix_millis();
 dt   := time::utc(secs);               // DateTime { year, month, day, hour, minute, second, weekday }
@@ -416,7 +416,7 @@ is `0`=Sunday … `6`=Saturday.
 
 Hashing and checksums — pure computation.
 
-```skarn
+```gabbro
 d := crypto::sha256("abc");                     // FIPS 180-4 SHA-256 → Digest
 h := crypto::to_hex(&a, d);                      // "ba7816bf8f01cfea…"
 
@@ -436,7 +436,7 @@ Reflection-driven JSON, both directions, with **no per-type code**. One generic 
 and one generic parser walk the type's `core::type_info` for its *shape* and an `core::any`
 for the field *values/slots*, recursing through nested structs and slices automatically.
 
-```skarn
+```gabbro
 #import std.heap as heap;
 #import std.serde as serde;
 

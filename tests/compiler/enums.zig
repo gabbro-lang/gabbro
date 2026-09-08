@@ -1,5 +1,5 @@
 const std = @import("std");
-const skarn = @import("skarn_compiler");
+const gabbro = @import("gabbro_compiler");
 
 test "enum: simple declaration and value access" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -22,10 +22,10 @@ test "enum: simple declaration and value access" {
         \\    return go(Direction.north);
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "enum.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "enum.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     // The enum should appear in module.variants
     try std.testing.expectEqual(@as(usize, 1), m.variants.len);
@@ -67,10 +67,10 @@ test "enum: match generates variant_is instructions" {
         \\    }
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "color.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "color.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     const fn_ = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "name")) break f;
@@ -104,10 +104,10 @@ test "enum: payload variant with binding" {
         \\    }
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "msg.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "msg.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     // Enum with payload should be in variants
     try std.testing.expectEqual(@as(usize, 1), m.variants.len);
@@ -134,10 +134,10 @@ test "function pointers: declare, pass, and call through local" {
         \\    return f(n);
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "fnptr.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "fnptr.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 }
 
 test "self-referencing type: linked list node" {
@@ -161,10 +161,10 @@ test "self-referencing type: linked list node" {
         \\    return false;
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "linked.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "linked.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     // Node struct should appear in IR
     var found_node = false;
@@ -187,7 +187,7 @@ test "enum: unknown variant in match fails sema" {
         \\    match d { .east => return 1; else => return 0; }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "enum: total match (all variants, no else) is exhaustive and returns on all paths" {
@@ -205,7 +205,7 @@ test "enum: total match (all variants, no else) is exhaustive and returns on all
         \\    }
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "ok.sk", ok);
+    var fe = try gabbro.compile(arena.allocator(), "ok.gab", ok);
     defer fe.deinit(arena.allocator());
 }
 
@@ -218,7 +218,7 @@ test "enum: non-exhaustive match (missing variant, no else) fails sema" {
         \\    match d { .north => { return 1; } .south => { return 2; } }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "enum: duplicate match arm for a variant fails sema" {
@@ -230,7 +230,7 @@ test "enum: duplicate match arm for a variant fails sema" {
         \\    match d { .north => { return 1; } .north => { return 2; } .south => { return 3; } }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "enum: non-exhaustive match *expression* fails sema" {
@@ -243,7 +243,7 @@ test "enum: non-exhaustive match *expression* fails sema" {
         \\    return match d { .north => 1, .south => 2 };
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "enum: match expression arms with incompatible types fail sema" {
@@ -256,7 +256,7 @@ test "enum: match expression arms with incompatible types fail sema" {
         \\    return r;
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "enum: range pattern on an enum subject fails sema" {
@@ -268,7 +268,7 @@ test "enum: range pattern on an enum subject fails sema" {
         \\    match d { 1..=5 => { return 0; } else => { return 1; } }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "enum: a non-bool match guard fails sema" {
@@ -279,7 +279,7 @@ test "enum: a non-bool match guard fails sema" {
         \\    match x { n if n => { return 0; } else => { return 1; } }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "enum: a guarded-only catch-all is not exhaustive (expression) — fails sema" {
@@ -290,7 +290,7 @@ test "enum: a guarded-only catch-all is not exhaustive (expression) — fails se
         \\    return match x { n if n > 0 => 42 };
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "enum: match subject must be enum type" {
@@ -302,7 +302,7 @@ test "enum: match subject must be enum type" {
         \\    match x { .foo => return 1; else => return 0; }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad.gab", bad));
 }
 
 test "integer match: single and grouped values lower to comparisons" {
@@ -319,10 +319,10 @@ test "integer match: single and grouped values lower to comparisons" {
         \\    }
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "int_match.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "int_match.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     const func = for (m.functions) |f| {
         if (std.mem.eql(u8, f.name, "classify")) break f;
@@ -353,7 +353,7 @@ test "integer match: enum pattern is rejected" {
         \\    match value { .one => return 1; else => return 0; }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad_int_match.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad_int_match.gab", bad));
 }
 
 test "enum match: integer pattern is rejected" {
@@ -366,5 +366,5 @@ test "enum match: integer pattern is rejected" {
         \\    match value { 1 => return 1; else => return 0; }
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "bad_enum_match.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "bad_enum_match.gab", bad));
 }

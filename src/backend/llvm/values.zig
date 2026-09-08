@@ -5,7 +5,7 @@ const llvm = @import("c_api.zig").llvm;
 const types = @import("types.zig");
 const ModuleCg = @import("context.zig").ModuleCg;
 
-/// Process Skarn string escape sequences: \n \r \t \\ \" \0 \xHH
+/// Process Gabbro string escape sequences: \n \r \t \\ \" \0 \xHH
 /// The input is already quote-stripped (trimQuotes was applied in ir.zig).
 /// Returns heap-allocated buffer; caller must free.
 fn unescapeString(allocator: std.mem.Allocator, s: []const u8) ![]u8 {
@@ -136,7 +136,7 @@ pub fn optionalSome(cg: *ModuleCg, payload: llvm.LLVMValueRef, payload_ty: ir.Ir
     return llvm.LLVMBuildInsertValue(cg.builder, opt, stored_payload, 1, "");
 }
 
-/// Resolve a Skarn Value to an LLVMValueRef.
+/// Resolve a Gabbro Value to an LLVMValueRef.
 /// `fncg` is *FnCg from functions.zig — passed as anytype to avoid circular imports.
 pub fn resolveValue(
     cg: *ModuleCg,
@@ -191,7 +191,7 @@ pub fn resolveValue(
 ///
 /// On mismatch, records an internal lowering error (turned into a clean
 /// `error.LoweringFailed` by `LlvmBackend.lower`) and returns `null` instead
-/// of calling into LLVM with bad input — "malformed-but-typeable Skarn source
+/// of calling into LLVM with bad input — "malformed-but-typeable Gabbro source
 /// must never crash the compiler process" is the invariant this protects.
 pub fn extractAggregateField(
     cg: *ModuleCg,
@@ -305,7 +305,7 @@ pub fn coerce(
 }
 
 /// Type-aware numeric coercion. LLVM integer types do not retain signedness,
-/// so explicit casts must use the Skarn source/destination types to select the
+/// so explicit casts must use the Gabbro source/destination types to select the
 /// correct extension and float-conversion instructions.
 pub fn coerceTyped(
     builder: llvm.LLVMBuilderRef,

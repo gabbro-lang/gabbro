@@ -1,0 +1,196 @@
+// SPDX-License-Identifier: Apache-2.0
+// std.vec — Vec(T), a growable array with an identity all gabbro's own.
+//
+// gabbro containers are region-bound: a Vec carries a borrowed *Arena and grows by
+// bump-allocating a bigger block from it. No per-element frees, no destructors —
+// reset/deinit the region and every Vec in it is gone at once. That's the model:
+//
+//   v := vec::make(i32, &a);
+//   v.push(10); v.push(20); v.push(30);
+//   total := 0; for x in v.items() { total += x; }   // 60
+//   a.reset();   // v's storage is reclaimed — don't touch v after this
+//
+// Vec is the managed form (it remembers its region). VecU(T) is the unmanaged twin:
+// no region, you pass the *Arena to each growing call. Vec is just VecU + a region.
+
+#import std.heap.{ Arena, alloc };
+
+pub Vec :: struct($T: type) {
+    region: *Arena,    // the region this Vec grows into (borrowed, not owned)
+    data:   []T,       // backing storage; capacity == data.len
+    count:  usize      // elements in use
+
+    // Size & access
+    pub len      :: fn(self: *Self) -> usize { return self.count; }
+    pub cap      :: fn(self: *Self) -> usize { return self.data.len; }
+    pub is_empty :: fn(self: *Self) -> bool  { return self.count == 0usize; }
+
+    pub get :: fn(self: *Self, i: usize) -> T    { return self.data[i]; }
+    pub set :: fn(self: *Self, i: usize, v: T)   { self.data[i] = v; }
+
+    // A pointer to element `i` — for in-place mutation (`v.at(i).field = …`).
+    pub at :: fn(self: *Self, i: usize) -> *T { return &self.data[i]; }
+
+    // The last element (assumes non-empty).
+    pub last :: fn(self: *Self) -> T { return self.data[self.count - 1usize]; }
+
+    // The live elements as a slice (valid until the next growth).
+    pub items :: fn(self: *Self) -> []T { return self.data[0..self.count]; }
+
+    // Growth
+    // Ensure capacity for at least `want` elements (×2 growth, never shrinks).
+    pub reserve :: fn(self: *Self, want: usize) {
+        if want <= self.data.len { return; }
+        new_cap: usize = self.data.len * 2usize;
+        if new_cap < 4usize { new_cap = 4usize; }
+        if new_cap < want { new_cap = want; }
+        nbuf: []T = alloc(T, self.region, new_cap);
+        i: usize = 0usize;
+        while i < self.count { nbuf[i] = self.data[i]; i += 1usize; }
+        self.data = nbuf;
+    }
+
+    // Mutation
+    pub push :: fn(self: *Self, item: T) {
+        self.reserve(self.count + 1usize);
+        self.data[self.count] = item;
+        self.count += 1usize;
+    }
+
+    // Append every element of `src`.
+    pub extend :: fn(self: *Self, src: []const T) {
+        self.reserve(self.count + src.len);
+        i: usize = 0usize;
+        while i < src.len { self.data[self.count] = src[i]; self.count += 1usize; i += 1usize; }
+    }
+
+    // Remove and return the last element (assumes non-empty).
+    pub pop :: fn(self: *Self) -> T {
+        self.count -= 1usize;
+        return self.data[self.count];
+    }
+
+    // Insert `item` at `i`, shifting the tail right (O(n)).
+    pub insert :: fn(self: *Self, i: usize, item: T) {
+        self.reserve(self.count + 1usize);
+        j: usize = self.count;
+        while j > i { self.data[j] = self.data[j - 1usize]; j -= 1usize; }
+        self.data[i] = item;
+        self.count += 1usize;
+    }
+
+    // Remove element `i`, shifting the tail left — order preserved (O(n)).
+    pub remove :: fn(self: *Self, i: usize) -> T {
+        gone: T = self.data[i];
+        j: usize = i;
+        while j + 1usize < self.count { self.data[j] = self.data[j + 1usize]; j += 1usize; }
+        self.count -= 1usize;
+        return gone;
+    }
+
+    // O(1) removal: overwrite `i` with the last element, then shrink. Order is
+    // NOT preserved — ideal for "remove this dead entity" in a hot loop.
+    pub remove_swap :: fn(self: *Self, i: usize) -> T {
+        gone: T = self.data[i];
+        self.count -= 1usize;
+        if i < self.count { self.data[i] = self.data[self.count]; }
+        return gone;
+    }
+
+    // Drop every element (keeps the backing capacity for reuse).
+    pub clear :: fn(self: *Self) { self.count = 0usize; }
+
+    // A deep copy of the live elements into region `into` (which may differ from
+    // this Vec's region — the gabbro way to let data escape a scratch arena).
+    pub clone_into :: fn(self: *Self, into: *Arena) -> Vec(T) {
+        n: usize = self.count;
+        if n < 1usize { n = 1usize; }
+        nbuf: []T = alloc(T, into, n);
+        i: usize = 0usize;
+        while i < self.count { nbuf[i] = self.data[i]; i += 1usize; }
+        out: Vec(T) = .{ into, nbuf, self.count };
+        return out;
+    }
+}
+
+// Constructors
+
+// A new empty Vec bound to region `a`, with a small initial capacity.
+pub make :: fn($T: type, a: *Arena) -> Vec(T) {
+    r: Vec(T) = .{ a, alloc(T, a, 4usize), 0usize };
+    return r;
+}
+
+// A new empty Vec with at least `cap` elements reserved up front.
+pub with_cap :: fn($T: type, a: *Arena, cap: usize) -> Vec(T) {
+    want: usize = cap;
+    if want < 1usize { want = 1usize; }
+    r: Vec(T) = .{ a, alloc(T, a, want), 0usize };
+    return r;
+}
+
+// Build a Vec from an existing slice (copies the elements into `a`).
+pub from :: fn($T: type, a: *Arena, src: []const T) -> Vec(T) {
+    r: Vec(T) = with_cap(T, a, src.len);
+    r.extend(src);
+    return r;
+}
+
+// VecUnmanaged(T) — the region passed per growing call
+//
+// The *unmanaged* twin holds no region of its own; every operation that may grow
+// takes the `*Arena` explicitly. Use it when the same vector is filled from more
+// than one region, embedded in another struct, or stored in bulk where the extra
+// pointer per element would add up — the cost is threading the arena through.
+//
+//   v: vec::VecUnmanaged(i32) = vec::empty(i32);
+//   v.push(&a, 10); v.push(&a, 20);
+//   for x in v.items() { ... }
+pub VecUnmanaged :: struct($T: type) {
+    data:  []T,
+    count: usize
+
+    pub len      :: fn(self: *Self) -> usize { return self.count; }
+    pub cap      :: fn(self: *Self) -> usize { return self.data.len; }
+    pub is_empty :: fn(self: *Self) -> bool  { return self.count == 0usize; }
+    pub get      :: fn(self: *Self, i: usize) -> T  { return self.data[i]; }
+    pub set      :: fn(self: *Self, i: usize, v: T) { self.data[i] = v; }
+    pub last     :: fn(self: *Self) -> T { return self.data[self.count - 1usize]; }
+    pub items    :: fn(self: *Self) -> []T { return self.data[0..self.count]; }
+    pub clear    :: fn(self: *Self) { self.count = 0usize; }
+
+    pub reserve :: fn(self: *Self, a: *Arena, want: usize) {
+        if want <= self.data.len { return; }
+        new_cap: usize = self.data.len * 2usize;
+        if new_cap < 4usize { new_cap = 4usize; }
+        if new_cap < want { new_cap = want; }
+        nbuf: []T = alloc(T, a, new_cap);
+        i: usize = 0usize;
+        while i < self.count { nbuf[i] = self.data[i]; i += 1usize; }
+        self.data = nbuf;
+    }
+
+    pub push :: fn(self: *Self, a: *Arena, item: T) {
+        self.reserve(a, self.count + 1usize);
+        self.data[self.count] = item;
+        self.count += 1usize;
+    }
+
+    pub pop :: fn(self: *Self) -> T {
+        self.count -= 1usize;
+        return self.data[self.count];
+    }
+}
+// To move unmanaged data into the ergonomic managed API, copy it with
+// `vec::from(T, a, v.items())`.
+
+// An empty unmanaged vector with no storage yet (the first `push` allocates).
+pub empty :: fn($T: type) -> VecUnmanaged(T) {
+    e: VecUnmanaged(T) = .{ alloc_none(T), 0usize };
+    return e;
+}
+
+// A zero-length `[]T` (a null backing slice) — `reserve`/`push` replace it.
+alloc_none :: fn($T: type) -> []T {
+    return unsafe core::slice_raw(T, core::ptr_from_int(*T, 0usize), 0usize);
+}

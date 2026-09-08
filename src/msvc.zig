@@ -2,7 +2,7 @@
 //!
 //! Locates the `VC/Tools/MSVC/<version>/lib/x64` directory that ships
 //! `vcruntime.lib`, so linking C libraries against the C runtime works out of the
-//! box — without the user passing `-Dmsvc-lib-path` (baked in at skarn's build time)
+//! box — without the user passing `-Dmsvc-lib-path` (baked in at gabbro's build time)
 //! or `--lib-path`. Windows-only; returns null on other platforms or when no
 //! Visual Studio / Build Tools install is found.
 

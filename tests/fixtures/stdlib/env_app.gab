@@ -1,0 +1,23 @@
+// std.process environment mutation: set_env → get_env reflects it, overwrite,
+// unset → get_env reports missing, and an inherited var (PATH) is still
+// readable. Returns 42 iff all correct. (Windows: kernel32 env block; Linux: a
+// runtime overlay made possible by mutable globals.)
+#import std.process;
+
+main :: fn() -> i32 {
+    if !process::set_env("GABBRO_T", "hello42") { return 1; }
+    b1: [64]u8 = .{};
+    if process::get_env("GABBRO_T", b1[:]) |v| { if v.len != 7usize { return 2; } } else { return 3; }
+
+    ig := process::set_env("GABBRO_T", "world");        // overwrite
+    b2: [64]u8 = .{};
+    if process::get_env("GABBRO_T", b2[:]) |v| { if v.len != 5usize { return 4; } } else { return 5; }
+
+    ig2 := process::unset_env("GABBRO_T");              // remove
+    b3: [64]u8 = .{};
+    if process::get_env("GABBRO_T", b3[:]) |v| { return 6; } else {}
+
+    p: [4096]u8 = .{};                               // inherited env still readable
+    if process::get_env("PATH", p[:]) |v| { if v.len == 0usize { return 7; } } else { return 8; }
+    return 42;
+}

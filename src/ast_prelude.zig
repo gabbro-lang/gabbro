@@ -1,4 +1,4 @@
-// Compiler-provided ast.* types for metaprogramming (Phase 2). Ordinary Skarn types
+// Compiler-provided ast.* types for metaprogramming (Phase 2). Ordinary Gabbro types
 // mirroring a subset of the compiler's own AST (src/ast.zig), so user code can build
 // them via #quote, match on them, and return them from comptime. The materializer +
 // Reifier in ir.zig map between these and real ast.zig nodes.
@@ -131,7 +131,7 @@ pub const compiler_source =
 /// `materializeTypeInfo`. `void_`/`boolean` avoid the `void`/`bool` keywords.
 /// `Any` — a type-erased value: a borrowed pointer to the data plus the data's
 /// `typeid`. The wrap (`core::any(x)`) is compiler-driven (it spills `x` and records
-/// `core::type_id(T)`); the rest is ordinary generic Skarn, so downcasting is safe.
+/// `core::type_id(T)`); the rest is ordinary generic Gabbro, so downcasting is safe.
 pub const any_source =
     \\Any :: struct { data: *const u8, id: usize, name: []const u8 }
     \\

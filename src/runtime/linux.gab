@@ -1,0 +1,893 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Gabbro Linux runtime — compiled automatically into every Linux Gabbro program.
+/// Provides: @panic, assert, write_stdout, write_stderr
+/// No libc. Uses direct Linux syscalls.
+
+// Linux syscalls via inline asm
+
+/// Write bytes to a file descriptor. Returns bytes written.
+sys_write :: fn(fd: i32, data: []const u8) -> isize {
+    // Explicit register constraints (`{rax}` etc.) — the proven Linux-syscall
+    // form: the result and the syscall number share rax via the same register.
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(1), "{rdi}"(fd), "{rsi}"(data.ptr), "{rdx}"(data.len) },
+        outputs: { "={rax}"(isize) },
+        clobbers: { "rcx", "r11", "memory" },
+    );
+}
+
+/// Exit the process with the given code. Never returns.
+#noreturn
+sys_exit :: fn(code: i32) {
+    ignored := unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(60), "{rdi}"(code) },
+        outputs: {},
+        clobbers: { "memory" },
+    );
+}
+
+// The ELF entry point (`_start`) is appended per ABI by the runtime selector:
+// linux_start_none.gab (freestanding: call main + exit syscall) or
+// linux_start_gnu.gab (glibc: hand off to __libc_start_main).
+
+// Low-level I/O
+
+write_stdout :: fn(data: []const u8) -> usize {
+    written := sys_write(1, data);
+    if written <= 0 { return 0; }
+    return written as usize;
+}
+
+write_stderr :: fn(data: []const u8) -> usize {
+    written := sys_write(2, data);
+    if written <= 0 { return 0; }
+    return written as usize;
+}
+
+// OS page memory (backs std.heap)
+// mmap=9, mprotect=10, munmap=11. The Linux syscall ABI passes the 4th argument
+// in r10 (the `syscall` insn clobbers rcx), so mmap's flags go in r10.
+
+sys_mmap :: fn(addr: usize, len: usize, prot: i32, flags: i32, fd: i32, off: usize) -> usize {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(9), "{rdi}"(addr), "{rsi}"(len), "{rdx}"(prot), "{r10}"(flags), "{r8}"(fd), "{r9}"(off) },
+        outputs: { "={rax}"(usize) },
+        clobbers: { "rcx", "r11", "memory" },
+    );
+}
+
+sys_mprotect :: fn(addr: usize, len: usize, prot: i32) -> i32 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(10), "{rdi}"(addr), "{rsi}"(len), "{rdx}"(prot) },
+        outputs: { "={rax}"(i32) },
+        clobbers: { "rcx", "r11", "memory" },
+    );
+}
+
+sys_munmap :: fn(addr: usize, len: usize) -> i32 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(11), "{rdi}"(addr), "{rsi}"(len) },
+        outputs: { "={rax}"(i32) },
+        clobbers: { "rcx", "r11", "memory" },
+    );
+}
+
+// MAP_PRIVATE|MAP_ANONYMOUS = 0x22; PROT_READ|WRITE = 3; fd = -1. mmap returns
+// `-errno` (a small negative as isize) on failure → report 0 to match VirtualAlloc.
+
+// Reserve address space with no physical backing (commit lazily via os_commit).
+os_reserve :: fn(size: usize) -> usize {
+    r := sys_mmap(0usize, size, 0, 0x22, -1, 0usize); // PROT_NONE
+    if (r as isize) < 0 { return 0usize; }
+    return r;
+}
+
+// Make `[addr, addr+size)` readable + writable.
+os_commit :: fn(addr: usize, size: usize) -> bool {
+    return sys_mprotect(addr, size, 3) == 0; // PROT_READ|WRITE
+}
+
+// Reserve and commit in one call.
+os_alloc :: fn(size: usize) -> usize {
+    r := sys_mmap(0usize, size, 3, 0x22, -1, 0usize); // PROT_READ|WRITE
+    if (r as isize) < 0 { return 0usize; }
+    return r;
+}
+
+// Return a region (its exact size is required on Linux).
+os_release :: fn(addr: usize, size: usize) {
+    ignored := sys_munmap(addr, size);
+}
+
+// OS time (backs std.time)
+// clock_gettime=228, nanosleep=35. struct timespec = { i64 tv_sec; i64 tv_nsec }.
+
+TimeSpec :: struct { sec: i64, nsec: i64 }
+
+sys_clock_gettime :: fn(clk: i32, ts: *TimeSpec) -> i32 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(228), "{rdi}"(clk), "{rsi}"(ts) },
+        outputs: { "={rax}"(i32) },
+        clobbers: { "rcx", "r11", "memory" },
+    );
+}
+
+sys_nanosleep :: fn(req: *TimeSpec, rem: *TimeSpec) -> i32 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(35), "{rdi}"(req), "{rsi}"(rem) },
+        outputs: { "={rax}"(i32) },
+        clobbers: { "rcx", "r11", "memory" },
+    );
+}
+
+clock_nanos :: fn(clk: i32) -> i64 {
+    ts: TimeSpec = .{ 0i64, 0i64 };
+    ignored := sys_clock_gettime(clk, &ts);
+    return ts.sec * 1000000000i64 + ts.nsec;
+}
+
+os_wall_nanos :: fn() -> i64 { return clock_nanos(0); }      // CLOCK_REALTIME
+os_monotonic_nanos :: fn() -> i64 { return clock_nanos(1); } // CLOCK_MONOTONIC
+
+os_sleep_nanos :: fn(ns: i64) {
+    if ns <= 0i64 { return; }
+    req: TimeSpec = .{ ns / 1000000000i64, ns % 1000000000i64 };
+    rem: TimeSpec = .{ 0i64, 0i64 };
+    ignored := sys_nanosleep(&req, &rem);
+}
+
+// OS file system (backs std.fs)
+// openat=257, read=0, write=1, close=3, lseek=8, newfstatat=262, unlink=87,
+// getdents64=217. Paths are NUL-terminated C strings; AT_FDCWD = -100. A handle
+// is the raw fd (>= 0); -1 means failure (matches the file seam's contract).
+
+sys_openat :: fn(dirfd: i32, path: *const u8, flags: i32, mode: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(257), "{rdi}"(dirfd), "{rsi}"(path), "{rdx}"(flags), "{r10}"(mode) },
+        outputs: { "={rax}"(i64) },
+        clobbers: { "rcx", "r11", "memory" });
+}
+sys_read :: fn(fd: i64, buf: *u8, len: usize) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(0), "{rdi}"(fd), "{rsi}"(buf), "{rdx}"(len) },
+        outputs: { "={rax}"(i64) },
+        clobbers: { "rcx", "r11", "memory" });
+}
+sys_write_fd :: fn(fd: i64, buf: *const u8, len: usize) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(1), "{rdi}"(fd), "{rsi}"(buf), "{rdx}"(len) },
+        outputs: { "={rax}"(i64) },
+        clobbers: { "rcx", "r11", "memory" });
+}
+sys_close :: fn(fd: i64) -> i32 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(3), "{rdi}"(fd) },
+        outputs: { "={rax}"(i32) },
+        clobbers: { "rcx", "r11", "memory" });
+}
+sys_lseek :: fn(fd: i64, off: i64, whence: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(8), "{rdi}"(fd), "{rsi}"(off), "{rdx}"(whence) },
+        outputs: { "={rax}"(i64) },
+        clobbers: { "rcx", "r11", "memory" });
+}
+sys_unlink :: fn(path: *const u8) -> i32 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(87), "{rdi}"(path) },
+        outputs: { "={rax}"(i32) },
+        clobbers: { "rcx", "r11", "memory" });
+}
+sys_getdents64 :: fn(fd: i64, buf: *u8, len: usize) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(217), "{rdi}"(fd), "{rsi}"(buf), "{rdx}"(len) },
+        outputs: { "={rax}"(i64) },
+        clobbers: { "rcx", "r11", "memory" });
+}
+
+// struct stat is 144 bytes on x86-64; st_mode is a u32 at byte offset 24.
+StatBuf :: struct { data: [144]u8 }
+sys_newfstatat :: fn(dirfd: i32, path: *const u8, st: *StatBuf, flags: i32) -> i32 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs:  { "{rax}"(262), "{rdi}"(dirfd), "{rsi}"(path), "{rdx}"(st), "{r10}"(flags) },
+        outputs: { "={rax}"(i32) },
+        clobbers: { "rcx", "r11", "memory" });
+}
+
+// mode: 0 = read existing, 1 = create/truncate write, 2 = open/create append.
+os_file_open :: fn(path: *const u8, mode: i32) -> i64 {
+    flags: i32 = 0;                       // O_RDONLY
+    if mode == 1 { flags = 577; }         // O_WRONLY|O_CREAT|O_TRUNC
+    if mode == 2 { flags = 1089; }        // O_WRONLY|O_CREAT|O_APPEND
+    fd := sys_openat(-100, path, flags, 420);   // AT_FDCWD, 0644
+    if fd < 0i64 { return -1i64; }
+    return fd;
+}
+os_file_read :: fn(h: i64, buf: *u8, len: usize) -> i64 {
+    r := sys_read(h, buf, len);
+    if r < 0i64 { return -1i64; }
+    return r;
+}
+os_file_write :: fn(h: i64, buf: *const u8, len: usize) -> i64 {
+    r := sys_write_fd(h, buf, len);
+    if r < 0i64 { return -1i64; }
+    return r;
+}
+os_file_close :: fn(h: i64) { ignored := sys_close(h); }
+os_file_seek :: fn(h: i64, off: i64, whence: i32) -> i64 {
+    r := sys_lseek(h, off, whence);       // SEEK_SET/CUR/END = 0/1/2
+    if r < 0i64 { return -1i64; }
+    return r;
+}
+// 0 = missing, 1 = file, 2 = directory.
+os_path_kind :: fn(path: *const u8) -> i32 {
+    st: StatBuf = .{};
+    if sys_newfstatat(-100, path, &st, 0) < 0 { return 0; }
+    mode: u32 = (st.data[24] as u32) | ((st.data[25] as u32) << 8u32)
+              | ((st.data[26] as u32) << 16u32) | ((st.data[27] as u32) << 24u32);
+    if (mode & 0xF000u32) == 0x4000u32 { return 2; }   // S_IFDIR
+    return 1;
+}
+os_unlink :: fn(path: *const u8) -> i32 {
+    if sys_unlink(path) < 0 { return -1; }
+    return 0;
+}
+
+// Directory iteration over getdents64. The runtime owns the per-iterator state
+// (a heap struct holding the dirfd + a read-ahead buffer); std.fs sees an opaque
+// i64 handle. linux_dirent64: d_ino@0, d_off@8, d_reclen(u16)@16, d_type(u8)@18,
+// d_name@19. DT_DIR = 4.
+DirState :: struct {
+    fd:           i64,
+    buf_used:     i64,
+    buf_pos:      i64,
+    last_is_dir:  bool,
+    last_is_link: bool,
+    buf:          [4096]u8,
+}
+
+os_dir_open :: fn(path: *const u8) -> i64 {
+    // Accept a directory path with an optional trailing wildcard ("dir", "dir/*"
+    // both work); strip the glob to the bare directory for openat.
+    clean: [320]u8 = .{};
+    n: usize = 0usize;
+    while n < 316usize {
+        c := unsafe *core::ptr_from_int(*u8, (path as usize) + n);
+        if c == 0u8 { break; }
+        clean[n] = c;
+        n += 1usize;
+    }
+    if n > 0usize && clean[n - 1usize] == 42u8 {                          // trailing '*'
+        n -= 1usize;
+        if n > 0usize && (clean[n - 1usize] == 47u8 || clean[n - 1usize] == 92u8) { n -= 1usize; }  // '/' or '\'
+    }
+    if n == 0usize { clean[0] = 46u8; n = 1usize; }                      // empty → "."
+    clean[n] = 0u8;
+    fd := sys_openat(-100, &clean[0], 65536, 0);   // O_RDONLY|O_DIRECTORY (0x10000)
+    if fd < 0i64 { return -1i64; }
+    raw := os_alloc(4160usize);               // sizeof(DirState), rounded up
+    if raw == 0usize { ignored := sys_close(fd); return -1i64; }
+    st := unsafe core::ptr_from_int(*DirState, raw);
+    st.fd = fd;
+    st.buf_used = 0i64;
+    st.buf_pos = 0i64;
+    st.last_is_dir = false;
+    st.last_is_link = false;
+    return raw as i64;
+}
+// Copy the next entry's name into `name` (NUL not written); returns its length,
+// or -1 at end. Read fields by indexing the read-ahead buffer — no raw pointer
+// arithmetic. d_reclen(u16)@16, d_type(u8)@18, d_name@19; DT_DIR = 4.
+os_dir_next :: fn(h: i64, name: []u8) -> i64 {
+    st := unsafe core::ptr_from_int(*DirState, h as usize);
+    if st.buf_pos >= st.buf_used {
+        n := sys_getdents64(st.fd, &st.buf[0], 4096usize);
+        if n <= 0i64 { st.last_is_dir = false; return -1i64; }
+        st.buf_used = n;
+        st.buf_pos = 0i64;
+    }
+    p := st.buf_pos as usize;
+    reclen := (st.buf[p + 16usize] as usize) | ((st.buf[p + 17usize] as usize) << 8usize);
+    dtype := st.buf[p + 18usize];
+    st.last_is_dir = (dtype == 4u8);     // DT_DIR
+    st.last_is_link = (dtype == 10u8);   // DT_LNK
+    i: usize = 0usize;
+    while i + 1usize < name.len {
+        c := st.buf[p + 19usize + i];
+        if c == 0u8 { break; }
+        name[i] = c;
+        i += 1usize;
+    }
+    st.buf_pos = st.buf_pos + (reclen as i64);
+    return i as i64;
+}
+os_dir_is_dir :: fn(h: i64) -> bool {
+    st := unsafe core::ptr_from_int(*DirState, h as usize);
+    return st.last_is_dir;
+}
+os_dir_is_reparse :: fn(h: i64) -> bool {
+    st := unsafe core::ptr_from_int(*DirState, h as usize);
+    return st.last_is_link;
+}
+os_dir_size :: fn(h: i64) -> u64 {
+    ignored := h;
+    return 0u64;    // getdents64 doesn't carry the size (Windows' FindData does)
+}
+os_dir_close :: fn(h: i64) {
+    st := unsafe core::ptr_from_int(*DirState, h as usize);
+    ignored := sys_close(st.fd);
+    os_release(h as usize, 4160usize);
+}
+
+// OS process (backs std.process)
+// getpid=39, fork=57, execve=59, wait4=61, kill=62. Process info (cmdline, env)
+// is read from /proc; spawn runs `/bin/sh -c <cmd>`, so the shell does arg
+// splitting + PATH lookup. A child token is just its pid.
+
+sys_getpid :: fn() -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(39) }, outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+sys_fork :: fn() -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(57) }, outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+sys_execve :: fn(path: *const u8, argv: *usize, envp: *usize) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(59), "{rdi}"(path), "{rsi}"(argv), "{rdx}"(envp) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+sys_wait4 :: fn(pid: i64, status: *i32, options: i32, rusage: usize) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(61), "{rdi}"(pid), "{rsi}"(status), "{rdx}"(options), "{r10}"(rusage) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+sys_kill :: fn(pid: i64, sig: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(62), "{rdi}"(pid), "{rsi}"(sig) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+
+os_pid :: fn() -> i64 { return sys_getpid(); }
+
+// Read a whole (small) /proc file into `buf`; returns bytes read, or -1.
+proc_read :: fn(pathlit: []const u8, buf: []u8) -> i64 {
+    p: [64]u8 = .{};
+    if pathlit.len + 1usize > 64usize { return -1i64; }
+    i: usize = 0usize;
+    while i < pathlit.len { p[i] = pathlit[i]; i += 1usize; }
+    p[pathlit.len] = 0u8;
+    fd := sys_openat(-100, &p[0], 0, 0);
+    if fd < 0i64 { return -1i64; }
+    total: i64 = 0i64;
+    while (total as usize) < buf.len {
+        n := sys_read(fd, &buf[total as usize], buf.len - (total as usize));
+        if n <= 0i64 { break; }
+        total = total + n;
+    }
+    ignored := sys_close(fd);
+    return total;
+}
+
+// The command line, reconstructed from /proc/self/cmdline (NUL-separated args).
+os_cmdline :: fn(out: []u8) -> i64 {
+    n := proc_read("/proc/self/cmdline", out);
+    if n < 0i64 { return -1i64; }
+    i: usize = 0usize;
+    while i < (n as usize) {
+        if out[i] == 0u8 { out[i] = 32u8; }   // arg separators → spaces
+        i += 1usize;
+    }
+    if n > 0i64 && out[(n as usize) - 1usize] == 32u8 { return n - 1i64; }  // drop trailing
+    return n;
+}
+
+// Length of a NUL-terminated C string.
+cstrlen :: fn(s: *const u8) -> usize {
+    n := 0usize;
+    while unsafe *core::ptr_from_int(*u8, (s as usize) + n) != 0u8 { n += 1usize; }
+    return n;
+}
+
+// Environment overlay (set_env / unset_env)
+// Linux has no syscall to mutate the process environ; libc keeps a `char**` it
+// edits. Freestanding, we keep our own overlay table (lazily heap-allocated,
+// anchored by a mutable global) that get_env consults first and spawn merges in.
+// Parallel flat arrays avoid nested struct-array access; mmap zero-fills it.
+EnvTable :: struct {
+    count:   usize,
+    klen:    [64]usize,
+    vlen:    [64]usize,
+    removed: [64]i32,
+    keys:    [8192]u8,    // 64 × 128
+    vals:    [32768]u8,   // 64 × 512
+}
+env_overlay: usize = 0usize;   // *EnvTable, lazily allocated; 0 = none yet
+
+env_overlay_table :: fn() -> usize {
+    if env_overlay == 0usize { env_overlay = os_alloc(core::sizeof(EnvTable)); } // pages are zero
+    return env_overlay;
+}
+
+// Index of the slot whose key equals `name` (nlen bytes), or -1.
+env_find :: fn(t: *EnvTable, name: *const u8, nlen: usize) -> i64 {
+    i := 0usize;
+    while i < t.count {
+        if t.klen[i] == nlen {
+            same := true;
+            j := 0usize;
+            while j < nlen {
+                if t.keys[i * 128usize + j] != unsafe *core::ptr_from_int(*u8, (name as usize) + j) { same = false; }
+                j += 1usize;
+            }
+            if same { return i as i64; }
+        }
+        i += 1usize;
+    }
+    return -1i64;
+}
+
+os_set_env :: fn(name: *const u8, value: *const u8) -> bool {
+    raw := env_overlay_table();
+    if raw == 0usize { return false; }
+    t := unsafe core::ptr_from_int(*EnvTable, raw);
+    nlen := cstrlen(name);
+    vlen := cstrlen(value);
+    if nlen >= 128usize || vlen >= 512usize { return false; }
+    idx := env_find(t, name, nlen);
+    slot: usize = 0usize;
+    if idx >= 0i64 {
+        slot = idx as usize;
+    } else {
+        if t.count >= 64usize { return false; }
+        slot = t.count;
+        j := 0usize;
+        while j < nlen { t.keys[slot * 128usize + j] = unsafe *core::ptr_from_int(*u8, (name as usize) + j); j += 1usize; }
+        t.klen[slot] = nlen;
+        t.count = t.count + 1usize;
+    }
+    k := 0usize;
+    while k < vlen { t.vals[slot * 512usize + k] = unsafe *core::ptr_from_int(*u8, (value as usize) + k); k += 1usize; }
+    t.vlen[slot] = vlen;
+    t.removed[slot] = 0;
+    return true;
+}
+
+os_unset_env :: fn(name: *const u8) -> bool {
+    raw := env_overlay_table();
+    if raw == 0usize { return false; }
+    t := unsafe core::ptr_from_int(*EnvTable, raw);
+    nlen := cstrlen(name);
+    if nlen >= 128usize { return false; }
+    idx := env_find(t, name, nlen);
+    if idx >= 0i64 {
+        t.removed[idx as usize] = 1;
+    } else {
+        if t.count >= 64usize { return false; }
+        slot := t.count;
+        j := 0usize;
+        while j < nlen { t.keys[slot * 128usize + j] = unsafe *core::ptr_from_int(*u8, (name as usize) + j); j += 1usize; }
+        t.klen[slot] = nlen;
+        t.removed[slot] = 1;
+        t.count = t.count + 1usize;
+    }
+    return true;
+}
+
+// Look up `name`: the overlay (set_env/unset_env) wins over the inherited
+// environment, which is read from /proc/self/environ ("KEY=VALUE", NUL-separated).
+os_get_env :: fn(name: *const u8, out: []u8) -> i64 {
+    if env_overlay != 0usize {
+        t := unsafe core::ptr_from_int(*EnvTable, env_overlay);
+        idx := env_find(t, name, cstrlen(name));
+        if idx >= 0i64 {
+            si := idx as usize;
+            if t.removed[si] != 0 { return -1i64; }   // unset shadows the inherited value
+            vl := t.vlen[si];
+            if vl > out.len { return -1i64; }
+            k := 0usize;
+            while k < vl { out[k] = t.vals[si * 512usize + k]; k += 1usize; }
+            return vl as i64;
+        }
+    }
+    buf: [8192]u8 = .{};
+    n := proc_read("/proc/self/environ", buf[:]);
+    if n <= 0i64 { return -1i64; }
+    nlen: usize = cstrlen(name);
+    total := n as usize;
+    i: usize = 0usize;
+    while i < total {
+        start := i;
+        eq := i;
+        while eq < total && buf[eq] != 0u8 && buf[eq] != 61u8 { eq += 1usize; }  // '='
+        if eq < total && buf[eq] == 61u8 && (eq - start) == nlen {
+            matched := true;
+            j: usize = 0usize;
+            while j < nlen {
+                if buf[start + j] != unsafe *core::ptr_from_int(*u8, (name as usize) + j) { matched = false; }
+                j += 1usize;
+            }
+            if matched {
+                vstart := eq + 1usize;
+                vend := vstart;
+                while vend < total && buf[vend] != 0u8 { vend += 1usize; }
+                vlen := vend - vstart;
+                if vlen > out.len { return -1i64; }   // doesn't fit (matches Windows)
+                k: usize = 0usize;
+                while k < vlen { out[k] = buf[vstart + k]; k += 1usize; }
+                return vlen as i64;
+            }
+        }
+        while i < total && buf[i] != 0u8 { i += 1usize; }   // skip to next entry
+        i += 1usize;
+    }
+    return -1i64;
+}
+
+// Index of the overlay slot whose key equals `buf[start..start+klen]`, or -1.
+env_find_bytes :: fn(t: *EnvTable, buf: []u8, start: usize, klen: usize) -> i64 {
+    i := 0usize;
+    while i < t.count {
+        if t.klen[i] == klen {
+            same := true;
+            j := 0usize;
+            while j < klen {
+                if t.keys[i * 128usize + j] != buf[start + j] { same = false; }
+                j += 1usize;
+            }
+            if same { return i as i64; }
+        }
+        i += 1usize;
+    }
+    return -1i64;
+}
+
+// Build the child's environment (the inherited /proc env with the overlay
+// applied) as a NULL-terminated char** in `eptr`: pointers into `pbuf` (the
+// inherited bytes) for kept entries, and into `ebuf` for overlay entries.
+build_child_env :: fn(pbuf: []u8, ebuf: []u8, eptr: []usize) {
+    cnt := 0usize;
+    np := proc_read("/proc/self/environ", pbuf);
+    if np > 0i64 {
+        total := np as usize;
+        i := 0usize;
+        while i < total && cnt + 1usize < eptr.len {
+            start := i;
+            eq := i;
+            while eq < total && pbuf[eq] != 0u8 && pbuf[eq] != 61u8 { eq += 1usize; }  // '='
+            ee := eq;
+            while ee < total && pbuf[ee] != 0u8 { ee += 1usize; }                       // entry end
+            // Keep the inherited entry unless the overlay overrides/removes its key.
+            keep := eq < total && pbuf[eq] == 61u8;
+            if keep && env_overlay != 0usize {
+                t := unsafe core::ptr_from_int(*EnvTable, env_overlay);
+                if env_find_bytes(t, pbuf, start, eq - start) >= 0i64 { keep = false; }
+            }
+            if keep {
+                eptr[cnt] = unsafe ((&pbuf[start]) as usize);
+                cnt += 1usize;
+            }
+            i = ee + 1usize;
+        }
+    }
+    // Append overlay (non-removed) entries as fresh "KEY=VALUE\0" strings.
+    if env_overlay != 0usize {
+        t := unsafe core::ptr_from_int(*EnvTable, env_overlay);
+        off := 0usize;
+        s := 0usize;
+        while s < t.count && cnt + 1usize < eptr.len {
+            if t.removed[s] == 0 {
+                kl := t.klen[s]; vl := t.vlen[s];
+                if off + kl + vl + 2usize < ebuf.len {
+                    estart := off;
+                    j := 0usize;
+                    while j < kl { ebuf[off] = t.keys[s * 128usize + j]; off += 1usize; j += 1usize; }
+                    ebuf[off] = 61u8; off += 1usize;   // '='
+                    j = 0usize;
+                    while j < vl { ebuf[off] = t.vals[s * 512usize + j]; off += 1usize; j += 1usize; }
+                    ebuf[off] = 0u8; off += 1usize;
+                    eptr[cnt] = unsafe ((&ebuf[estart]) as usize);
+                    cnt += 1usize;
+                }
+            }
+            s += 1usize;
+        }
+    }
+    eptr[cnt] = 0usize;   // NULL-terminate the char** array
+}
+
+// fork + execve `/bin/sh -c <cmd>`; the child token is its pid (-1 on failure).
+// The child inherits the parent's environment (with set_env/unset_env applied).
+os_spawn :: fn(cmd: *const u8) -> i64 {
+    pbuf: [8192]u8 = .{};
+    ebuf: [8192]u8 = .{};
+    eptr: [256]usize = .{};
+    build_child_env(pbuf[:], ebuf[:], eptr[:]);   // before fork; COW-copied to the child
+    pid := sys_fork();
+    if pid < 0i64 { return -1i64; }
+    if pid == 0i64 {
+        sh: [12]u8 = .{};
+        dc: [4]u8 = .{};
+        cstrcpy(sh[:], "/bin/sh");
+        cstrcpy(dc[:], "-c");
+        p_sh: usize = unsafe ((&sh[0]) as usize);
+        p_dc: usize = unsafe ((&dc[0]) as usize);
+        p_cmd: usize = unsafe (cmd as usize);
+        argv: [4]usize = .{ p_sh, p_dc, p_cmd, 0usize };
+        ignored := sys_execve(&sh[0], &argv[0], &eptr[0]);
+        sys_exit(127);   // only reached if execve failed
+    }
+    return pid;
+}
+
+// Copy a literal into a NUL-terminated byte buffer.
+cstrcpy :: fn(dst: []u8, src: []const u8) {
+    i: usize = 0usize;
+    while i < src.len && i + 1usize < dst.len { dst[i] = src[i]; i += 1usize; }
+    dst[i] = 0u8;
+}
+
+// block=true → wait; else poll. Returns exit code, -2 if still running, -1 error.
+os_wait :: fn(token: i64, block: bool) -> i64 {
+    status: i32 = 0;
+    options: i32 = if block { 0 } else { 1 };   // WNOHANG = 1
+    r := sys_wait4(token, &status, options, 0usize);
+    if r < 0i64 { return -1i64; }
+    if r == 0i64 { return -2i64; }               // WNOHANG: not yet exited
+    if (status & 0x7f) == 0 { return ((status >> 8) & 0xff) as i64; }  // WIFEXITED
+    return 128i64 + ((status & 0x7f) as i64);    // killed by signal
+}
+os_kill :: fn(token: i64) -> bool { return sys_kill(token, 9) == 0i64; }  // SIGKILL
+os_proc_release :: fn(token: i64) { ignored := token; }                  // no handles to free
+
+// OS sockets (backs std.net)
+// socket=41 connect=42 accept=43 sendto=44 recvfrom=45 shutdown=48 bind=49
+// listen=50 getsockname=51 setsockopt=54 fcntl=72. AF_INET/SOCK_*/IPPROTO_* match
+// Windows; only the SOL_SOCKET option *constants* differ, translated below.
+// std.net passes Windows constants; the runtime maps them. A socket handle is the
+// raw fd as usize; failures normalize to NET_INVALID (~0) to match INVALID_SOCKET.
+
+NET_INVALID :: 18446744073709551615usize;
+
+ll_socket :: fn(dom: i32, kind: i32, proto: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(41), "{rdi}"(dom), "{rsi}"(kind), "{rdx}"(proto) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_connect :: fn(fd: usize, addr: *const u8, len: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(42), "{rdi}"(fd), "{rsi}"(addr), "{rdx}"(len) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_accept :: fn(fd: usize, addr: usize, lenp: usize) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(43), "{rdi}"(fd), "{rsi}"(addr), "{rdx}"(lenp) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_sendto :: fn(fd: usize, buf: *const u8, len: i32, flags: i32, to: usize, tolen: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(44), "{rdi}"(fd), "{rsi}"(buf), "{rdx}"(len), "{r10}"(flags), "{r8}"(to), "{r9}"(tolen) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_recvfrom :: fn(fd: usize, buf: *u8, len: i32, flags: i32, from: usize, fromlen: usize) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(45), "{rdi}"(fd), "{rsi}"(buf), "{rdx}"(len), "{r10}"(flags), "{r8}"(from), "{r9}"(fromlen) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_shutdown :: fn(fd: usize, how: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(48), "{rdi}"(fd), "{rsi}"(how) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_bind :: fn(fd: usize, addr: *const u8, len: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(49), "{rdi}"(fd), "{rsi}"(addr), "{rdx}"(len) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_listen :: fn(fd: usize, backlog: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(50), "{rdi}"(fd), "{rsi}"(backlog) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_getsockname :: fn(fd: usize, addr: usize, lenp: usize) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(51), "{rdi}"(fd), "{rsi}"(addr), "{rdx}"(lenp) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_setsockopt :: fn(fd: usize, level: i32, opt: i32, val: *const u8, len: i32) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(54), "{rdi}"(fd), "{rsi}"(level), "{rdx}"(opt), "{r10}"(val), "{r8}"(len) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+ll_fcntl :: fn(fd: usize, cmd: i32, arg: i64) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(72), "{rdi}"(fd), "{rsi}"(cmd), "{rdx}"(arg) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+
+os_net_init :: fn() -> i32 { return 0; }      // no Winsock to start
+os_net_cleanup :: fn() -> i32 { return 0; }
+os_net_lasterr :: fn() -> i32 { return 0; }   // no per-thread errno without mutable globals
+
+os_net_socket :: fn(af: i32, kind: i32, proto: i32) -> usize {
+    r := ll_socket(af, kind, proto);
+    if r < 0i64 { return NET_INVALID; }
+    return r as usize;
+}
+os_net_close :: fn(s: usize) -> i32 { return sys_close(s as i64); }
+os_net_connect :: fn(s: usize, name: *const u8, namelen: i32) -> i32 { return ll_connect(s, name, namelen) as i32; }
+os_net_bind :: fn(s: usize, name: *const u8, namelen: i32) -> i32 { return ll_bind(s, name, namelen) as i32; }
+os_net_listen :: fn(s: usize, backlog: i32) -> i32 { return ll_listen(s, backlog) as i32; }
+os_net_accept :: fn(s: usize, name: ?*u8, namelen: ?*i32) -> usize {
+    an: usize = 0usize; al: usize = 0usize;
+    if name |p|    { an = unsafe (p as usize); }
+    if namelen |q| { al = unsafe (q as usize); }
+    r := ll_accept(s, an, al);
+    if r < 0i64 { return NET_INVALID; }
+    return r as usize;
+}
+os_net_send :: fn(s: usize, buf: *const u8, len: i32, flags: i32) -> i32 {
+    return ll_sendto(s, buf, len, flags, 0usize, 0) as i32;
+}
+os_net_recv :: fn(s: usize, buf: *u8, len: i32, flags: i32) -> i32 {
+    return ll_recvfrom(s, buf, len, flags, 0usize, 0usize) as i32;
+}
+os_net_sendto :: fn(s: usize, buf: *const u8, len: i32, flags: i32, to: *const u8, tolen: i32) -> i32 {
+    return ll_sendto(s, buf, len, flags, unsafe (to as usize), tolen) as i32;
+}
+os_net_recvfrom :: fn(s: usize, buf: *u8, len: i32, flags: i32, from: *u8, fromlen: *i32) -> i32 {
+    return ll_recvfrom(s, buf, len, flags, unsafe (from as usize), unsafe (fromlen as usize)) as i32;
+}
+os_net_getsockname :: fn(s: usize, name: *u8, namelen: *i32) -> i32 {
+    return ll_getsockname(s, unsafe (name as usize), unsafe (namelen as usize)) as i32;
+}
+os_net_shutdown :: fn(s: usize, how: i32) -> i32 { return ll_shutdown(s, how) as i32; }
+
+// Translate the Windows SOL_SOCKET option constants std.net passes to Linux ones.
+os_net_setsockopt :: fn(s: usize, level: i32, opt: i32, val: *const u8, len: i32) -> i32 {
+    if level == 65535 {                                  // Windows SOL_SOCKET (0xFFFF)
+        if opt == 4 { return ll_setsockopt(s, 1, 2, val, len) as i32; }        // SO_REUSEADDR → 2
+        if opt == 32 { return ll_setsockopt(s, 1, 6, val, len) as i32; }       // SO_BROADCAST → 6
+        if opt == 4102 { return setsockopt_timeo(s, 20, val); }                // SO_RCVTIMEO(0x1006) → 20
+        if opt == 4101 { return setsockopt_timeo(s, 21, val); }                // SO_SNDTIMEO(0x1005) → 21
+        return ll_setsockopt(s, 1, opt, val, len) as i32;
+    }
+    return ll_setsockopt(s, level, opt, val, len) as i32;                      // e.g. IPPROTO_TCP/TCP_NODELAY (same)
+}
+// Windows passes a 4-byte ms DWORD; Linux wants a struct timeval { i64 sec; i64 usec }.
+setsockopt_timeo :: fn(s: usize, optname: i32, val: *const u8) -> i32 {
+    ms := unsafe *core::ptr_from_int(*i32, val as usize);
+    tv: TimeSpec = .{ (ms / 1000) as i64, ((ms % 1000) * 1000) as i64 };  // {sec, usec}; TimeSpec is 2×i64
+    return ll_setsockopt(s, 1, optname, unsafe ((&tv) as *const u8), 16) as i32;
+}
+// std.net uses ioctlsocket(FIONBIO) for non-blocking; Linux uses fcntl(F_SETFL).
+os_net_ioctlsocket :: fn(s: usize, cmd: u32, argp: *u32) -> i32 {
+    ignored := cmd;   // only FIONBIO is used
+    mode := unsafe *core::ptr_from_int(*u32, argp as usize);
+    cur := ll_fcntl(s, 3, 0i64);             // F_GETFL
+    nf := cur;
+    if mode != 0u32 { nf = cur | 2048i64; }  // set O_NONBLOCK (0x800)
+    else { nf = cur & (-2049i64); }          // clear O_NONBLOCK
+    return ll_fcntl(s, 4, nf) as i32;        // F_SETFL
+}
+
+// OS threads (backs std.thread)
+// clone=56, gettid=186, sched_yield=24, sched_getaffinity=204. A thread is a
+// clone() that shares VM/FS/FILES and exits with SIGCHLD so the parent can
+// wait4() it for join. We allocate the child stack, then in asm: clone; the
+// PARENT gets the tid, the CHILD (rax==0, rsp==stack top) calls entry(arg) and
+// exits with its return value. r15/r14 hold entry/arg (callee-saved across the
+// syscall). The token is a heap ThreadState { tid, stack, size }.
+
+ThreadState :: struct { tid: i64, stack: usize, size: usize }
+
+sys_gettid :: fn() -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(186) }, outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+sys_sched_yield :: fn() -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(24) }, outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+sys_sched_getaffinity :: fn(pid: i64, len: usize, mask: *u8) -> i64 {
+    return unsafe core::asm(volatile, "syscall",
+        inputs: { "{rax}"(204), "{rdi}"(pid), "{rsi}"(len), "{rdx}"(mask) },
+        outputs: { "={rax}"(i64) }, clobbers: { "rcx", "r11", "memory" });
+}
+
+os_thread_spawn :: fn(entry: *void, arg: *void) -> i64 {
+    size := 1048576usize;                 // 1 MiB child stack
+    base := os_alloc(size);
+    if base == 0usize { return -1i64; }
+    top := base + size;                   // grows down; clone sets child rsp = top (16-aligned)
+    flags := 0x711;                       // CLONE_VM|CLONE_FS|CLONE_FILES | SIGCHLD(17)
+    tid := unsafe core::asm(volatile,
+        "syscall; test %rax, %rax; jnz 1f; mov %r14, %rdi; call *%r15; mov %eax, %edi; mov $$60, %eax; syscall; 1:",
+        inputs: { "{rax}"(56), "{rdi}"(flags), "{rsi}"(top), "{rdx}"(0), "{r10}"(0), "{r8}"(0), "{r15}"(entry), "{r14}"(arg) },
+        outputs: { "={rax}"(i64) },
+        clobbers: { "rcx", "r11", "memory" },
+    );
+    if tid < 0i64 { os_release(base, size); return -1i64; }
+    raw := os_alloc(24usize);
+    if raw == 0usize { os_release(base, size); return -1i64; }
+    st := unsafe core::ptr_from_int(*ThreadState, raw);
+    st.tid = tid;
+    st.stack = base;
+    st.size = size;
+    return raw as i64;
+}
+
+// Decode a wait4 status into an exit code (low 8 bits — exit() only carries that).
+thread_code :: fn(status: i32) -> u32 {
+    if (status & 0x7f) == 0 { return ((status >> 8) & 0xff) as u32; }
+    return 0u32;
+}
+
+os_thread_join :: fn(token: i64) -> u32 {
+    st := unsafe core::ptr_from_int(*ThreadState, token as usize);
+    status: i32 = 0;
+    ig := sys_wait4(st.tid, &status, 0, 0usize);
+    os_release(st.stack, st.size);
+    os_release(token as usize, 24usize);
+    return thread_code(status);
+}
+os_thread_detach :: fn(token: i64) {
+    // The thread runs on; its stack must outlive it and we can't know when it
+    // exits, so the stack is intentionally leaked (reclaimed at process exit).
+    // Only the small token state is freed.
+    os_release(token as usize, 24usize);
+}
+os_thread_running :: fn(token: i64) -> bool {
+    st := unsafe core::ptr_from_int(*ThreadState, token as usize);
+    status: i32 = 0;
+    r := sys_wait4(st.tid, &status, 1, 0usize);   // WNOHANG
+    return r == 0i64;                              // 0 → not yet exited
+}
+os_thread_id :: fn() -> u32 { return sys_gettid() as u32; }
+os_thread_yield :: fn() { ignored := sys_sched_yield(); }
+os_cpu_count :: fn() -> u32 {
+    mask: [128]u8 = .{};                  // up to 1024 CPUs
+    n := sys_sched_getaffinity(0i64, 128usize, &mask[0]);
+    if n <= 0i64 { return 1u32; }
+    count: u32 = 0u32;
+    i: usize = 0usize;
+    while i < (n as usize) {
+        b := mask[i];
+        while b != 0u8 { count = count + ((b & 1u8) as u32); b = b >> 1u8; }
+        i += 1usize;
+    }
+    if count == 0u32 { return 1u32; }
+    return count;
+}
+
+// Core runtime functions
+
+/// Exit with an application-defined status.
+#noreturn
+exit :: fn(code: u32) {
+    sys_exit(code as i32);
+}
+
+/// Terminate after an unrecoverable runtime failure.
+#noreturn
+abort :: fn() {
+    sys_exit(1);
+}
+
+/// Abort with a message. Never returns.
+#noreturn
+@panic :: fn(msg: []const u8) {
+    write_stderr("panic: ");
+    write_stderr(msg);
+    write_stderr("\n");
+    abort();
+}
+
+/// Assert a condition is true; panic with a default message if not.
+assert :: fn(cond: bool) {
+    if !cond { core::panic("assertion failed"); }
+}
+
+/// Assert with a custom message.
+assert_msg :: fn(cond: bool, msg: []const u8) {
+    if !cond { core::panic(msg); }
+}

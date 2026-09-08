@@ -1,5 +1,5 @@
 const std = @import("std");
-const skarn = @import("skarn_compiler");
+const gabbro = @import("gabbro_compiler");
 
 test "interfaces: explicit conformance and dynamic dispatch lower end to end" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -39,10 +39,10 @@ test "interfaces: explicit conformance and dynamic dispatch lower end to end" {
         \\}
     ;
 
-    var fe = try skarn.compile(arena.allocator(), "interfaces.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "interfaces.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     try std.testing.expectEqual(@as(usize, 1), m.vtables.len);
     try std.testing.expectEqual(@as(usize, 2), m.vtables[0].methods.len);
@@ -77,8 +77,8 @@ test "interfaces: explicit conformance and dynamic dispatch lower end to end" {
     };
     try std.testing.expectEqual(@as(usize, 1), return_make);
 
-    if (comptime skarn.llvm_enabled) {
-        var backend = skarn.LlvmBackend.init(arena.allocator(), "interfaces");
+    if (comptime gabbro.llvm_enabled) {
+        var backend = gabbro.LlvmBackend.init(arena.allocator(), "interfaces");
         defer backend.deinit();
         try backend.lower(m);
         const llvm_ir = try backend.getIrText(arena.allocator());
@@ -101,7 +101,7 @@ test "interfaces: missing required method fails sema" {
         \\    flush :: fn(self: *Self) {}
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "missing_method.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "missing_method.gab", bad));
 }
 
 test "interfaces: dynamic coercion requires explicit conformance" {
@@ -117,5 +117,5 @@ test "interfaces: dynamic coercion requires explicit conformance" {
         \\    writer: *Writer = file;
         \\}
     ;
-    try std.testing.expectError(error.SemanticFailed, skarn.compile(arena.allocator(), "missing_impl.sk", bad));
+    try std.testing.expectError(error.SemanticFailed, gabbro.compile(arena.allocator(), "missing_impl.gab", bad));
 }

@@ -1,4 +1,4 @@
-/// Skarn runtime module embedded inside the compiler binary.
+/// Gabbro runtime module embedded inside the compiler binary.
 ///
 /// Real programs automatically receive the host runtime, which provides:
 ///   - write_stdout(data), write_stderr(data)
@@ -9,11 +9,11 @@
 /// `__libc_start_main` (the dynamically-linked `linux-gnu` target).
 const builtin = @import("builtin");
 
-pub const windows_src = @embedFile("runtime/windows.sk");
+pub const windows_src = @embedFile("runtime/windows.gab");
 
-const linux_body = @embedFile("runtime/linux.sk");
-const linux_start_none = @embedFile("runtime/linux_start_none.sk");
-const linux_start_gnu = @embedFile("runtime/linux_start_gnu.sk");
+const linux_body = @embedFile("runtime/linux.gab");
+const linux_start_none = @embedFile("runtime/linux_start_none.gab");
+const linux_start_gnu = @embedFile("runtime/linux_start_gnu.gab");
 
 pub const linux_none_src = linux_body ++ "\n" ++ linux_start_none;
 pub const linux_gnu_src = linux_body ++ "\n" ++ linux_start_gnu;

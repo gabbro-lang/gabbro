@@ -2,8 +2,8 @@
 //!
 //! The header is `@cImport`ed for its *types/enums/constants* (CXCursor, CXType,
 //! the CXType_*/CXCursor_* tags, …), but the **functions are loaded at runtime**
-//! via `std.DynLib` rather than linked — so `skarn.exe` carries no dependency on the
-//! 81 MB `libclang.dll`. The core compiler never touches it; only `skarn bindgen`
+//! via `std.DynLib` rather than linked — so `gabbro.exe` carries no dependency on the
+//! 81 MB `libclang.dll`. The core compiler never touches it; only `gabbro bindgen`
 //! calls `load()` (or the lazy `ensureLoaded()`), exactly like Jai's
 //! Bindings_Generator module loads libclang on demand. libclang ships as an
 //! optional component, not part of the default release.
@@ -125,7 +125,7 @@ pub fn load(path: []const u8) LoadError!void {
 /// in-memory/embedded entry points (and tests) that don't do the CLI's richer
 /// path resolution: the build-time LLVM dir (valid on the dev/CI box), then the
 /// bare name (the OS loader's search path). The CLI calls `load()` explicitly
-/// first with exe-relative / `$SKARN_LIBCLANG` resolution, making this a no-op.
+/// first with exe-relative / `$GABBRO_LIBCLANG` resolution, making this a no-op.
 pub fn ensureLoaded() LoadError!void {
     if (handle != null) return;
     const name = libName();

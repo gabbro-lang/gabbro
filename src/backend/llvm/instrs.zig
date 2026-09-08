@@ -724,7 +724,7 @@ fn lowerCallIndirect(
     ci: ir.CallIndirectInstr,
     ret_ty: ir.IrType,
 ) ?llvm.LLVMValueRef {
-    // For a skarn function value the callee is a fat closure `{ fn, env }`: extract
+    // For a gabbro function value the callee is a fat closure `{ fn, env }`: extract
     // the `fn` field to call, and pass the `env` as a hidden leading argument so
     // every closure is invoked uniformly as `fn(env, args)`.
     const closure_val = if (ci.is_closure) resolveVal(cg, fncg, ci.callee, .unknown) else null;
@@ -1572,7 +1572,7 @@ fn lowerStructLit(
 
 // Atomic helpers
 
-/// Map a skarn ordering constant (0=relaxed … 4=seq_cst) to an LLVM atomic ordering.
+/// Map a gabbro ordering constant (0=relaxed … 4=seq_cst) to an LLVM atomic ordering.
 fn atomicOrdering(arg: ir.Value) c_uint {
     const n: i64 = switch (arg) {
         .imm => |im| switch (im) {

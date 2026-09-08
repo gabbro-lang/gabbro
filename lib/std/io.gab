@@ -1,0 +1,376 @@
+// SPDX-License-Identifier: Apache-2.0
+// std.io — synchronous, allocation-free I/O for Gabbro.
+//
+// Writer and Reader are the interfaces. Concrete writers: Stdout, Stderr, FixedBuf
+// (a 256-byte stack scratch buffer), and NullWriter (discards but counts bytes).
+// There's allocation-free number formatting (write_u64/i64, the write_hex_* family,
+// write_bool/char/repeat) and print/println-style helpers for stdout and stderr.
+
+// Error set
+
+pub IoError :: errors {
+    write_failed,   // The underlying write call returned zero bytes
+    short_write,    // A partial write occurred where a full write was required
+    read_failed,    // The underlying read call failed
+    end_of_stream,  // The reader reached the end of available data
+    buffer_full,    // A FixedBuf ran out of space mid-write
+}
+
+// Interfaces
+
+// Writer is the core output interface. Any type that can receive bytes
+// implements Writer. The dynamic version (*Writer) enables generic output
+// pipelines: loggers, buffered writers, hex dumpers, null sinks, etc.
+pub Writer :: interface {
+    write :: fn(self: *Self, data: []const u8) -> usize ! IoError;
+    flush :: fn(self: *Self) -> void ! IoError;
+}
+
+// Reader is the core input interface. Implement it for byte sources:
+// stdin, files, network sockets, in-memory slices, ring buffers, etc.
+pub Reader :: interface {
+    read :: fn(self: *Self, buf: []u8) -> usize ! IoError;
+}
+
+// Standard streams
+
+pub Stdout :: struct { marker: u8, }
+pub Stderr :: struct { marker: u8, }
+
+Stdout as Writer {
+    write :: fn(self: *Self, data: []const u8) -> usize ! IoError {
+        if data.len == 0usize { return 0usize; }
+        n := write_stdout(data);
+        if n == 0usize { fail .write_failed; }
+        return n;
+    }
+    flush :: fn(self: *Self) -> void ! IoError {
+        return;
+    }
+}
+
+Stderr as Writer {
+    write :: fn(self: *Self, data: []const u8) -> usize ! IoError {
+        if data.len == 0usize { return 0usize; }
+        n := write_stderr(data);
+        if n == 0usize { fail .write_failed; }
+        return n;
+    }
+    flush :: fn(self: *Self) -> void ! IoError {
+        return;
+    }
+}
+
+pub stdout :: fn() -> Stdout {
+    return .{ 0u8 };
+}
+
+pub stderr :: fn() -> Stderr {
+    return .{ 0u8 };
+}
+
+// FixedBuf
+//
+// A 256-byte stack-allocated write buffer. Use it to format numbers and
+// strings without heap allocation, then flush to any *Writer or directly
+// to stdout/stderr.
+//
+//   buf := fixed_buf();
+//   w: *Writer = &buf;
+//   w.write_i64(-42i64) catch err {};
+//   w.write_all(", ") catch err {};
+//   w.write_u64(100u64) catch err {};
+//   buf.buf_flush_stdout() catch err {};
+//
+// Writes that exceed 256 bytes fail with IoError.buffer_full.
+
+pub FixedBuf :: struct {
+    data: [256]u8,
+    pos: usize,
+}
+
+FixedBuf as Writer {
+    write :: fn(self: *Self, data: []const u8) -> usize ! IoError {
+        available := 256usize - self.pos;
+        count := data.len;
+        if data.len > available { count = available; }
+        i := 0usize;
+        while i < count {
+            self.data[self.pos] = data[i];
+            self.pos += 1usize;
+            i += 1usize;
+        }
+        if count < data.len { fail .buffer_full; }
+        return count;
+    }
+    flush :: fn(self: *Self) -> void ! IoError {
+        return;
+    }
+}
+
+// Create a new empty FixedBuf.
+pub fixed_buf :: fn() -> FixedBuf {
+    return .{ .{}, 0usize };
+}
+
+// Number of bytes written into the buffer.
+pub buf_len :: fn(self: *FixedBuf) -> usize {
+    return self.pos;
+}
+
+// Number of bytes still available before the buffer is full.
+pub buf_remaining :: fn(self: *FixedBuf) -> usize {
+    return 256usize - self.pos;
+}
+
+// Clear the buffer so it can be reused.
+pub buf_reset :: fn(self: *FixedBuf) {
+    self.pos = 0usize;
+}
+
+// Flush the buffer contents to stdout in a single syscall.
+pub buf_flush_stdout :: fn(self: *FixedBuf) -> usize ! IoError {
+    pending := self.data[0usize..self.pos];
+    if pending.len == 0usize { return 0usize; }
+    n := write_stdout(pending);
+    if n == 0usize { fail .write_failed; }
+    return n;
+}
+
+// Flush the buffer contents to stderr in a single syscall.
+pub buf_flush_stderr :: fn(self: *FixedBuf) -> usize ! IoError {
+    pending := self.data[0usize..self.pos];
+    if pending.len == 0usize { return 0usize; }
+    n := write_stderr(pending);
+    if n == 0usize { fail .write_failed; }
+    return n;
+}
+
+// Flush the buffer contents to an arbitrary *Writer in a single call.
+pub buf_flush :: fn(self: *FixedBuf, sink: *Writer) -> usize ! IoError {
+    pending := self.data[0usize..self.pos];
+    if pending.len == 0usize { return 0usize; }
+    return sink.write_all(pending)?;
+}
+
+// NullWriter
+//
+// NullWriter discards all output but accumulates a count of bytes written.
+// Use it to measure formatted output size before allocating or sending.
+//
+//   sink := null_writer();
+//   w: *Writer = &sink;
+//   w.write_u64(some_value) catch err {};
+//   w.write_all(", ") catch err {};
+//   w.write_i64(other_value) catch err {};
+//   size := sink.count;   // total bytes that would have been written
+
+pub NullWriter :: struct {
+    count: usize,
+}
+
+NullWriter as Writer {
+    write :: fn(self: *Self, data: []const u8) -> usize ! IoError {
+        self.count += data.len;
+        return data.len;
+    }
+    flush :: fn(self: *Self) -> void ! IoError {
+        return;
+    }
+}
+
+// Create a new NullWriter with a zero byte counter.
+pub null_writer :: fn() -> NullWriter {
+    return .{ 0usize };
+}
+
+// Reset the byte counter to zero.
+pub null_reset :: fn(self: *NullWriter) {
+    self.count = 0usize;
+}
+
+// Writer extension methods
+
+// Write the entire slice or fail. Turns a short write into an error.
+pub write_all :: fn(self: *Writer, data: []const u8) -> usize ! IoError {
+    written := self.write(data)?;
+    if written != data.len { fail .short_write; }
+    return written;
+}
+
+// Write the slice followed by a newline ("\n").
+pub write_line :: fn(self: *Writer, data: []const u8) -> usize ! IoError {
+    a := self.write_all(data)?;
+    b := self.write_all("\n")?;
+    return a + b;
+}
+
+// Write a single byte.
+pub write_char :: fn(self: *Writer, ch: u8) -> usize ! IoError {
+    tmp: [1]u8 = .{};
+    tmp[0] = ch;
+    return self.write_all(tmp[:])?;
+}
+
+// Write `count` copies of the byte `ch`.
+// Common uses: padding with spaces (32u8), horizontal rules with '=' (61u8).
+pub write_repeat :: fn(self: *Writer, ch: u8, count: usize) -> usize ! IoError {
+    tmp: [1]u8 = .{};
+    tmp[0] = ch;
+    written := 0usize;
+    i := 0usize;
+    while i < count {
+        n := self.write_all(tmp[:])?;
+        written += n;
+        i += 1usize;
+    }
+    return written;
+}
+
+// Write "true" or "false".
+pub write_bool :: fn(self: *Writer, value: bool) -> usize ! IoError {
+    if value { return self.write_all("true")?; }
+    return self.write_all("false")?;
+}
+
+// Decimal output
+
+// Internal: write a single decimal digit 0..9 as its ASCII character.
+write_decimal_digit :: fn(self: *Writer, digit: u64) -> usize ! IoError {
+    tmp: [1]u8 = .{};
+    tmp[0] = 48u8 + (digit as u8);   // 48 == '0'
+    return self.write_all(tmp[:])?;
+}
+
+// Write an unsigned 64-bit integer in decimal.
+// Allocation-free; recursion depth is bounded to 20 (u64 has at most 20 digits).
+pub write_u64 :: fn(self: *Writer, value: u64) -> usize ! IoError {
+    if value < 10u64 {
+        return self.write_decimal_digit(value)?;
+    }
+    a := self.write_u64(value / 10u64)?;
+    b := self.write_decimal_digit(value % 10u64)?;
+    return a + b;
+}
+
+// Write a signed 64-bit integer in decimal.
+// Handles all values including i64 minimum (-9223372036854775808) without
+// triggering signed overflow. Uses the identity abs(n) = -(n+1) + 1 which
+// keeps all intermediate values inside the valid i64 range when n is negative.
+pub write_i64 :: fn(self: *Writer, value: i64) -> usize ! IoError {
+    if value >= 0i64 {
+        return self.write_u64(value as u64)?;
+    }
+    a := self.write_all("-")?;
+    abs := (-(value + 1i64)) as u64 + 1u64;
+    b := self.write_u64(abs)?;
+    return a + b;
+}
+
+// Hexadecimal output
+
+// Internal: ASCII character for a hex nibble in the range 0..15.
+hex_char :: fn(n: u8) -> u8 {
+    if n < 10u8 {
+        return 48u8 + n;          // '0'..'9'
+    }
+    return 97u8 + (n - 10u8);     // 'a'..'f'
+}
+
+// Internal: write one hex nibble as a single character.
+write_hex_nibble :: fn(self: *Writer, n: u8) -> usize ! IoError {
+    tmp: [1]u8 = .{};
+    tmp[0] = hex_char(n);
+    return self.write_all(tmp[:])?;
+}
+
+// Write a single byte as exactly two lowercase hex digits.
+//   0x00 -> "00",  0xAB -> "ab",  0xFF -> "ff"
+pub write_hex_byte :: fn(self: *Writer, value: u8) -> usize ! IoError {
+    a := self.write_hex_nibble(value >> 4u8)?;
+    b := self.write_hex_nibble(value & 15u8)?;
+    return a + b;
+}
+
+// Write a u64 as compact lowercase hex with no leading zeros and no prefix.
+//   0          -> "0"
+//   255        -> "ff"
+//   3735928559 -> "deadbeef"
+// Recursion depth is bounded to 16 (u64 has at most 16 hex digits).
+pub write_hex_u64 :: fn(self: *Writer, value: u64) -> usize ! IoError {
+    if value < 16u64 {
+        return self.write_hex_nibble(value as u8)?;
+    }
+    a := self.write_hex_u64(value >> 4u64)?;
+    b := self.write_hex_nibble((value & 15u64) as u8)?;
+    return a + b;
+}
+
+// Write a u64 as exactly 16 lowercase hex digits with no prefix.
+//   0x0102030405060708 -> "0102030405060708"
+// Useful for memory addresses and binary data dumps.
+pub write_hex_u64_full :: fn(self: *Writer, value: u64) -> usize ! IoError {
+    a := self.write_hex_byte((value >> 56u64) as u8)?;
+    b := self.write_hex_byte((value >> 48u64) as u8)?;
+    c := self.write_hex_byte((value >> 40u64) as u8)?;
+    d := self.write_hex_byte((value >> 32u64) as u8)?;
+    e := self.write_hex_byte((value >> 24u64) as u8)?;
+    f := self.write_hex_byte((value >> 16u64) as u8)?;
+    g := self.write_hex_byte((value >> 8u64) as u8)?;
+    h := self.write_hex_byte((value & 255u64) as u8)?;
+    return a + b + c + d + e + f + g + h;
+}
+
+// Stdout convenience
+
+pub print :: fn(data: []const u8) -> usize ! IoError {
+    out := stdout();
+    return (&out).write_all(data)?;
+}
+
+pub println :: fn(data: []const u8) -> usize ! IoError {
+    out := stdout();
+    return (&out).write_line(data)?;
+}
+
+pub print_u64 :: fn(value: u64) -> usize ! IoError {
+    out := stdout();
+    return (&out).write_u64(value)?;
+}
+
+pub print_i64 :: fn(value: i64) -> usize ! IoError {
+    out := stdout();
+    return (&out).write_i64(value)?;
+}
+
+pub print_hex_u64 :: fn(value: u64) -> usize ! IoError {
+    out := stdout();
+    return (&out).write_hex_u64(value)?;
+}
+
+pub print_bool :: fn(value: bool) -> usize ! IoError {
+    out := stdout();
+    return (&out).write_bool(value)?;
+}
+
+// Stderr convenience
+
+pub eprint :: fn(data: []const u8) -> usize ! IoError {
+    out := stderr();
+    return (&out).write_all(data)?;
+}
+
+pub eprintln :: fn(data: []const u8) -> usize ! IoError {
+    out := stderr();
+    return (&out).write_line(data)?;
+}
+
+pub eprint_u64 :: fn(value: u64) -> usize ! IoError {
+    out := stderr();
+    return (&out).write_u64(value)?;
+}
+
+pub eprint_i64 :: fn(value: i64) -> usize ! IoError {
+    out := stderr();
+    return (&out).write_i64(value)?;
+}

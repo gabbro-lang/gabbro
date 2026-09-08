@@ -41,8 +41,8 @@ program.
 ## Comptime FFI and build
 
 Comptime code can call host DLLs, given the capability (below): `src/vm/ffi.zig` does
-`LoadLibraryA`/`GetProcAddress` and marshals `Value` against the C ABI. `skarn build`
-is the same machinery — `build.sk` runs in the VM, lowering builder calls to
+`LoadLibraryA`/`GetProcAddress` and marshals `Value` against the C ABI. `gabbro build`
+is the same machinery — `build.gab` runs in the VM, lowering builder calls to
 `__build_*` intrinsics that produce the build plan. See
 [10_build_system.md](10_build_system.md).
 
@@ -54,7 +54,7 @@ into a host function halts the build:
     comptime FFI to `MulDiv` (in `kernel32`) is not allowed here: this ran as a
     pure `#run`, which has no `ffi` capability.
 
-`build.sk` runs with `ffi` granted; it's the script you wrote, the trusted root. The
+`build.gab` runs with `ffi` granted; it's the script you wrote, the trusted root. The
 two primitives the comptime heap reserves pages through, `VirtualAlloc` and
 `VirtualFree`, stay open to everyone — they hand back memory and nothing else.
 
@@ -69,7 +69,7 @@ Code: `Vm.caps` in `src/vm/engine.zig`, checked at the FFI opcode.
 
 Purity pays off here. A pure `#run` is a deterministic function of its bytecode, so
 its result is content-addressable: hash the thunk plus its call closure, name a file
-by that hash, skip the run when the file already exists. `SKARN_CACHE=1` turns it on
+by that hash, skip the run when the file already exists. `GABBRO_CACHE=1` turns it on
 (opt-in while it's young).
 
     grind(5_000_000) at comptime:  ~600 ms cold  →  ~6 ms warm
@@ -82,7 +82,7 @@ read isn't possible, because whatever changed is part of the key.
 When the closure can't be pinned from bytecode alone — it reaches FFI, a global, an
 indirect call, a print — there's no key and the `#run` just runs. Slice 1 stores
 scalar results; aggregates (tables, structs) wait on `Value` serialization. Entries
-live under `.skarn-cache/`. Code: `src/vm/run_cache.zig`.
+live under `.gabbro-cache/`. Code: `src/vm/run_cache.zig`.
 
 ## Limits
 

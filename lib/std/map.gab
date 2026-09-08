@@ -1,0 +1,323 @@
+// SPDX-License-Identifier: Apache-2.0
+// std.map — hash maps with a gabbro flavour. Both are open-addressed (linear probing)
+// and region-bound like the rest of gabbro's containers: the tables live in an Arena,
+// so there are no per-entry frees — reset/deinit the region to reclaim the whole map.
+//
+//   AutoHashMap(K, V)  keys any value type, hashing the key's raw bytes (no Hash/Eq,
+//                      no derive) — great for ints, enums, points, small POD structs.
+//   StrMap(V)          keys are []const u8, hashed/compared by CONTENTS, and copied
+//                      into the region so the map owns them.
+//
+//   m := map::auto(i32, i32, &a);
+//   m.put(7, 100); m.put(7, 101);   // overwrites → one entry; m.get(7) is 101
+//
+// Caveat: AutoHashMap only suits keys whose identity IS their bytes. Don't use it for
+// keys holding pointers/slices (e.g. strings) or structs with padding — use StrMap.
+
+#import std.heap.{ Arena, alloc, dupe };
+
+// Slot states.
+EMPTY :: 0u8;
+USED  :: 1u8;
+TOMB  :: 2u8;   // a deleted slot — probing skips past it but doesn't stop
+
+INIT_CAP :: 8usize;   // always a power of two so `hash & (cap-1)` indexes a slot
+
+// Raw byte hashing (FNV-1a)
+fnv_bytes :: fn(p: *const u8, n: usize) -> u64 {
+    h: u64 = 14695981039346656037u64;
+    i: usize = 0usize;
+    while i < n {
+        h = (h ^ (p[i] as u64)) *% 1099511628211u64;
+        i += 1usize;
+    }
+    return h;
+}
+
+eq_bytes :: fn(a: *const u8, b: *const u8, n: usize) -> bool {
+    i: usize = 0usize;
+    while i < n {
+        if a[i] != b[i] { return false; }
+        i += 1usize;
+    }
+    return true;
+}
+
+// AutoHashMap(K, V) — byte-hashed, any value-type key
+pub AutoHashMap :: struct($K: type, $V: type) {
+    region: *Arena,
+    states: []u8,
+    keys:   []K,
+    vals:   []V,
+    count:  usize,    // live entries
+    tombs:  usize     // tombstone slots (count toward the load factor)
+
+    pub len      :: fn(self: *Self) -> usize { return self.count; }
+    pub cap      :: fn(self: *Self) -> usize { return self.states.len; }
+    pub is_empty :: fn(self: *Self) -> bool  { return self.count == 0usize; }
+
+    // hash a key by its raw bytes (copied to a local so its address is stable).
+    hash_of :: fn(self: *Self, k: K) -> u64 {
+        kk: K = k;
+        return fnv_bytes(unsafe ((&kk) as *const u8), core::sizeof(K));
+    }
+
+    // does slot `i` hold a key byte-equal to `k`?
+    same_key :: fn(self: *Self, i: usize, k: K) -> bool {
+        sk: K = self.keys[i];
+        kk: K = k;
+        return eq_bytes(unsafe ((&sk) as *const u8), unsafe ((&kk) as *const u8), core::sizeof(K));
+    }
+
+    // Insert/overwrite into the CURRENT table (no growth). Reuses a tombstone if
+    // one was passed on the way to an empty slot. Manages count/tombs.
+    place :: fn(self: *Self, k: K, v: V) {
+        mask: usize = self.states.len - 1usize;
+        i: usize = (self.hash_of(k) as usize) & mask;
+        tomb: usize = self.states.len;             // sentinel "no tombstone seen"
+        steps: usize = 0usize;
+        while steps <= self.states.len {
+            st: u8 = self.states[i];
+            if st == EMPTY {
+                slot: usize = i;
+                if tomb < self.states.len { slot = tomb; self.tombs -= 1usize; }
+                self.states[slot] = USED;
+                self.keys[slot] = k;
+                self.vals[slot] = v;
+                self.count += 1usize;
+                return;
+            }
+            if st == TOMB {
+                if tomb == self.states.len { tomb = i; }
+            } else {
+                if self.same_key(i, k) { self.vals[i] = v; return; }
+            }
+            i = (i + 1usize) & mask;
+            steps += 1usize;
+        }
+    }
+
+    // Double the table and re-insert every live entry (drops tombstones).
+    grow :: fn(self: *Self) {
+        old_states: []u8 = self.states;
+        old_keys:   []K  = self.keys;
+        old_vals:   []V  = self.vals;
+        new_cap: usize = self.states.len * 2usize;
+        if new_cap < INIT_CAP { new_cap = INIT_CAP; }
+        self.states = alloc(u8, self.region, new_cap);
+        self.keys   = alloc(K,  self.region, new_cap);
+        self.vals   = alloc(V,  self.region, new_cap);
+        c: usize = 0usize;
+        while c < new_cap { self.states[c] = EMPTY; c += 1usize; }
+        self.count = 0usize;
+        self.tombs = 0usize;
+        j: usize = 0usize;
+        while j < old_states.len {
+            if old_states[j] == USED { self.place(old_keys[j], old_vals[j]); }
+            j += 1usize;
+        }
+    }
+
+    // Insert `k → v`, overwriting any existing value for `k`. Grows past a 0.75
+    // load factor (live + tombstones) so probe chains stay short.
+    pub put :: fn(self: *Self, k: K, v: V) {
+        if (self.count + self.tombs + 1usize) * 4usize >= self.states.len * 3usize {
+            self.grow();
+        }
+        self.place(k, v);
+    }
+
+    // The index of `k`, or `cap` if absent. Stops at the first EMPTY slot.
+    find :: fn(self: *Self, k: K) -> usize {
+        mask: usize = self.states.len - 1usize;
+        i: usize = (self.hash_of(k) as usize) & mask;
+        steps: usize = 0usize;
+        while steps <= self.states.len {
+            st: u8 = self.states[i];
+            if st == EMPTY { return self.states.len; }
+            if st == USED {
+                if self.same_key(i, k) { return i; }
+            }
+            i = (i + 1usize) & mask;
+            steps += 1usize;
+        }
+        return self.states.len;
+    }
+
+    // The value for `k`, or `null`.
+    pub get :: fn(self: *Self, k: K) -> ?V {
+        i: usize = self.find(k);
+        if i == self.states.len { return null; }
+        return self.vals[i];
+    }
+
+    pub contains :: fn(self: *Self, k: K) -> bool {
+        return self.find(k) != self.states.len;
+    }
+
+    // Remove `k`; returns whether it was present. Leaves a tombstone.
+    pub remove :: fn(self: *Self, k: K) -> bool {
+        i: usize = self.find(k);
+        if i == self.states.len { return false; }
+        self.states[i] = TOMB;
+        self.count -= 1usize;
+        self.tombs += 1usize;
+        return true;
+    }
+
+    // Empty the map, keeping the backing tables for reuse.
+    pub clear :: fn(self: *Self) {
+        c: usize = 0usize;
+        while c < self.states.len { self.states[c] = EMPTY; c += 1usize; }
+        self.count = 0usize;
+        self.tombs = 0usize;
+    }
+}
+
+// A fresh empty `AutoHashMap` bound to region `a`.
+pub auto :: fn($K: type, $V: type, a: *Arena) -> AutoHashMap(K, V) {
+    states: []u8 = alloc(u8, a, INIT_CAP);
+    i: usize = 0usize;
+    while i < INIT_CAP { states[i] = EMPTY; i += 1usize; }
+    r: AutoHashMap(K, V) = .{ a, states, alloc(K, a, INIT_CAP), alloc(V, a, INIT_CAP), 0usize, 0usize };
+    return r;
+}
+
+// StrMap(V) — string keys, hashed and compared by CONTENT
+pub StrMap :: struct($V: type) {
+    region: *Arena,
+    states: []u8,
+    keys:   [][]const u8,
+    vals:   []V,
+    count:  usize,
+    tombs:  usize
+
+    pub len      :: fn(self: *Self) -> usize { return self.count; }
+    pub cap      :: fn(self: *Self) -> usize { return self.states.len; }
+    pub is_empty :: fn(self: *Self) -> bool  { return self.count == 0usize; }
+
+    place :: fn(self: *Self, k: []const u8, v: V) {
+        mask: usize = self.states.len - 1usize;
+        i: usize = (fnv_bytes(k.ptr, k.len) as usize) & mask;
+        tomb: usize = self.states.len;
+        steps: usize = 0usize;
+        while steps <= self.states.len {
+            st: u8 = self.states[i];
+            if st == EMPTY {
+                slot: usize = i;
+                if tomb < self.states.len { slot = tomb; self.tombs -= 1usize; }
+                self.states[slot] = USED;
+                self.keys[slot] = dupe(u8, self.region, k);   // own the key bytes
+                self.vals[slot] = v;
+                self.count += 1usize;
+                return;
+            }
+            if st == TOMB {
+                if tomb == self.states.len { tomb = i; }
+            } else {
+                if self.keys[i] == k { self.vals[i] = v; return; }   // content `==`
+            }
+            i = (i + 1usize) & mask;
+            steps += 1usize;
+        }
+    }
+
+    grow :: fn(self: *Self) {
+        old_states: []u8 = self.states;
+        old_keys: [][]const u8 = self.keys;
+        old_vals: []V = self.vals;
+        new_cap: usize = self.states.len * 2usize;
+        if new_cap < INIT_CAP { new_cap = INIT_CAP; }
+        self.states = alloc(u8, self.region, new_cap);
+        self.keys   = alloc([]const u8, self.region, new_cap);
+        self.vals   = alloc(V, self.region, new_cap);
+        c: usize = 0usize;
+        while c < new_cap { self.states[c] = EMPTY; c += 1usize; }
+        self.count = 0usize;
+        self.tombs = 0usize;
+        j: usize = 0usize;
+        while j < old_states.len {
+            if old_states[j] == USED {
+                // re-place without re-duping: insert the already-owned key.
+                self.place_owned(old_keys[j], old_vals[j]);
+            }
+            j += 1usize;
+        }
+    }
+
+    // Like `place`, but the key is already region-owned (used during grow).
+    place_owned :: fn(self: *Self, k: []const u8, v: V) {
+        mask: usize = self.states.len - 1usize;
+        i: usize = (fnv_bytes(k.ptr, k.len) as usize) & mask;
+        steps: usize = 0usize;
+        while steps <= self.states.len {
+            if self.states[i] == EMPTY {
+                self.states[i] = USED;
+                self.keys[i] = k;
+                self.vals[i] = v;
+                self.count += 1usize;
+                return;
+            }
+            i = (i + 1usize) & mask;
+            steps += 1usize;
+        }
+    }
+
+    pub put :: fn(self: *Self, k: []const u8, v: V) {
+        if (self.count + self.tombs + 1usize) * 4usize >= self.states.len * 3usize {
+            self.grow();
+        }
+        self.place(k, v);
+    }
+
+    find :: fn(self: *Self, k: []const u8) -> usize {
+        mask: usize = self.states.len - 1usize;
+        i: usize = (fnv_bytes(k.ptr, k.len) as usize) & mask;
+        steps: usize = 0usize;
+        while steps <= self.states.len {
+            st: u8 = self.states[i];
+            if st == EMPTY { return self.states.len; }
+            if st == USED {
+                if self.keys[i] == k { return i; }
+            }
+            i = (i + 1usize) & mask;
+            steps += 1usize;
+        }
+        return self.states.len;
+    }
+
+    pub get :: fn(self: *Self, k: []const u8) -> ?V {
+        i: usize = self.find(k);
+        if i == self.states.len { return null; }
+        return self.vals[i];
+    }
+
+    pub contains :: fn(self: *Self, k: []const u8) -> bool {
+        return self.find(k) != self.states.len;
+    }
+
+    pub remove :: fn(self: *Self, k: []const u8) -> bool {
+        i: usize = self.find(k);
+        if i == self.states.len { return false; }
+        self.states[i] = TOMB;
+        self.count -= 1usize;
+        self.tombs += 1usize;
+        return true;
+    }
+
+    pub clear :: fn(self: *Self) {
+        c: usize = 0usize;
+        while c < self.states.len { self.states[c] = EMPTY; c += 1usize; }
+        self.count = 0usize;
+        self.tombs = 0usize;
+    }
+}
+
+// A fresh empty `StrMap` bound to region `a`.
+pub strmap :: fn($V: type, a: *Arena) -> StrMap(V) {
+    states: []u8 = alloc(u8, a, INIT_CAP);
+    i: usize = 0usize;
+    while i < INIT_CAP { states[i] = EMPTY; i += 1usize; }
+    r: StrMap(V) = .{ a, states, alloc([]const u8, a, INIT_CAP), alloc(V, a, INIT_CAP), 0usize, 0usize };
+    return r;
+}

@@ -1,7 +1,7 @@
 # Reflection, Any, and constraints
 
 
-Reflection in Skarn is comptime and runtime, and it threads through generics.
+Reflection in Gabbro is comptime and runtime, and it threads through generics.
 
 At comptime, `type_info(T)` is a matchable value — you `match` on a type's structure
 (struct fields, enum variants, scalar kind). Constraints build on it: built-in
@@ -27,7 +27,7 @@ that don't compose: `#modify` (a code block bolted onto a signature), the
 `get_type_table`, `for_expansion`, `#insert -> string`. Each does its job; together
 they're a grab-bag.
 
-Skarn already has a structural advantage Jai lacks: **the comptime VM executes the
+Gabbro already has a structural advantage Jai lacks: **the comptime VM executes the
 same IR as the runtime backend**, so comptime and runtime behave identically (an
 `#run` FNV-1a hash equals its runtime value bit-for-bit). We lean on that to make
 *one* reflection surface serve both phases.
@@ -53,11 +53,11 @@ out of these — no new directives.
 
 ## 1. `TypeInfo` — reflection as a matchable value
 
-Today Skarn has `type_info(T)` with ad-hoc field access (`.kind`, `.fields[i].name`,
+Today Gabbro has `type_info(T)` with ad-hoc field access (`.kind`, `.fields[i].name`,
 `.bits`). We replace that with a real tagged enum — the same shape as the `ast.*`
 metaprogramming surface, injected as a prelude when reflection is used.
 
-```skarn
+```gabbro
 TypeInfo :: enum {
     void,
     bool,
@@ -81,7 +81,7 @@ VariantInfo :: struct { name: []const u8, payload: ?*TypeInfo, tag: u32 }
 `type_info(T) -> TypeInfo` folds at comptime *and* is available at runtime (see
 §4). Because it's a tagged enum, you inspect it by `match`, not by casting:
 
-```skarn
+```gabbro
 describe :: fn(info: TypeInfo) -> []const u8 {
     match info {
         .int |i|     => return if i.signed { "signed integer" } else { "unsigned integer" };
@@ -93,7 +93,7 @@ describe :: fn(info: TypeInfo) -> []const u8 {
 ```
 
 > **✦ Beyond Jai.** Jai forces `if t.type == .INTEGER { info := cast(*Type_Info_Integer) t; … }`
-> — a tag check followed by an unchecked pointer cast. Skarn's `match info { .int |i| => … }`
+> — a tag check followed by an unchecked pointer cast. Gabbro's `match info { .int |i| => … }`
 > is exhaustive, payload-bound, and impossible to mis-cast. The compiler also
 > checks you handled (or `else`'d) every kind.
 
@@ -107,7 +107,7 @@ describe :: fn(info: TypeInfo) -> []const u8 {
 > `typeid_of(T)` folds per instantiation. Identity tests are a single `usize`
 > compare. `info_of(id)` (the dynamic table lookup) is still design (needs §4).
 
-```skarn
+```gabbro
 typeid_of(T) -> usize        // a stable id (content hash); IMPLEMENTED
 typeid_of(any_value) -> usize   // value form — design (needs Any)
 info_of(id) -> *TypeInfo        // table lookup — design (§4)
@@ -116,7 +116,7 @@ info_of(id) -> *TypeInfo        // table lookup — design (§4)
 Two identical types always share one id, so identity tests are a single integer
 compare:
 
-```skarn
+```gabbro
 if typeid_of(x) == typeid_of(Vector3) { … }
 ```
 
@@ -132,24 +132,24 @@ and the data's type metadata.
 > **Implemented today.** `Any :: struct { data: *const u8, id: usize, name:
 > []const u8 }` (an injected prelude). `any(x)` wraps any value — it spills `x` to
 > a temporary, points at it, and records `typeid_of(T)` and the type's name. The
-> rest is ordinary generic Skarn (so it's all type-safe):
+> rest is ordinary generic Gabbro (so it's all type-safe):
 > `any_as(v, T) -> ?T` (safe downcast, null on mismatch), `any_is(v, T) -> bool`,
 > `any_id(v)`, `any_name(v)`. A value passed to an `Any` parameter and recovered by
 > its real type works end to end; the type *name* is available at runtime on the
-> erased value. **Skarn's twist on the type table:** metadata travels *inline* with
+> erased value. **Gabbro's twist on the type table:** metadata travels *inline* with
 > the value (no central `info_of(id)` table to bake/manage), and it's tree-shaken
 > automatically — only `any()`'d types' names reach the binary. (Auto-wrap of a
 > bare value into an `Any` parameter, and `.field`/`.elem`/`.deref` navigation,
 > are the next steps.)
 
-```skarn
+```gabbro
 Any :: struct { data: *const u8, id: usize, name: []const u8 }   // injected; `any(x)` builds it
 ```
 
 Assigning any value to an `Any` parameter wraps it automatically (the compiler
 spills a temporary and records its `typeid`):
 
-```skarn
+```gabbro
 log :: fn(label: []const u8, v: Any) { … }
 log("count", 42);            // wraps i32
 log("pos", Vector3.{1,2,3}); // wraps Vector3
@@ -157,7 +157,7 @@ log("pos", Vector3.{1,2,3}); // wraps Vector3
 
 Navigation and downcasting are **safe** — they return optionals, never UB:
 
-```skarn
+```gabbro
 v.info() -> TypeInfo                 // the type, as a matchable value
 v.as(T) -> ?T                        // downcast; null if the id doesn't match
 v.field("name") -> ?Any              // a struct field by name, as an Any
@@ -165,7 +165,7 @@ v.elem(i: usize) -> ?Any             // a slice/array element
 v.deref() -> ?Any                    // follow a pointer/optional
 ```
 
-```skarn
+```gabbro
 sum_field :: fn(v: Any) -> i32 {
     if v.field("count").as(i32) |c| { return c; }   // safe: present + right type
     return 0;
@@ -173,7 +173,7 @@ sum_field :: fn(v: Any) -> i32 {
 ```
 
 > **✦ Beyond Jai.** Jai's `Any` is `{ value_pointer, type }` and you cast it
-> yourself (unchecked). Skarn's `.as(T)` is an `?T`, `.field`/`.elem` are bounds- and
+> yourself (unchecked). Gabbro's `.as(T)` is an `?T`, `.field`/`.elem` are bounds- and
 > name-checked, and you pattern-match `.info()`. You cannot read an `Any` as the
 > wrong type without the compiler handing you a `null` to deal with.
 
@@ -181,13 +181,13 @@ sum_field :: fn(v: Any) -> i32 {
 
 Runtime reflection needs `TypeInfo` baked into the binary's data segment. Jai
 bakes **everything** (then offers `runtime_storageless_type_info` to turn it off).
-Skarn inverts the default: a type's info reaches the binary **only if it can be
+Gabbro inverts the default: a type's info reaches the binary **only if it can be
 reached at runtime** — i.e. some runtime code calls `type_info(T)`, takes
 `typeid(T)`, or wraps a `T` into an `Any`. The compiler already tracks the
 comptime/runtime split (the VM vs the LLVM backend), so this is a reachability
 pass over those roots.
 
-```skarn
+```gabbro
 type_table() -> []TypeInfo     // every type that was baked (debuggers, tooling)
 ```
 
@@ -204,7 +204,7 @@ three structs bakes exactly those three (plus their transitive field types).
 Because the same `type_info` walk runs at comptime and runtime, you write a
 serializer **once** and choose where it executes:
 
-```skarn
+```gabbro
 to_json :: fn(v: Any, w: *StringBuilder) {
     match v.info() {
         .bool        => w.str(if v.as(bool)!! { "true" } else { "false" }),
@@ -235,7 +235,7 @@ to_json :: fn(v: Any, w: *StringBuilder) {
   to straight-line field stores with **no runtime reflection cost** — the VM folds
   the `match` and the `for` because `type_info(T)` is constant.
 
-```skarn
+```gabbro
 // zero-reflection, fully specialized serializer for a known type:
 to_json_of :: fn($T: type, v: T, w: *StringBuilder) {
     #for f in type_info(T).struct_.fields {     // unrolled at comptime
@@ -247,7 +247,7 @@ to_json_of :: fn($T: type, v: T, w: *StringBuilder) {
 
 > **✦ Beyond Jai.** Jai makes you pick *up front*: write a string-codegen
 > serializer (`#insert -> string` + `String_Builder`, see its `for_each_member`),
-> **or** walk `Type_Info` at runtime. They're different code. Skarn's single
+> **or** walk `Type_Info` at runtime. They're different code. Gabbro's single
 > `match`-on-`TypeInfo` function *is* both — comptime folds it to specialized code,
 > runtime executes it dynamically, guaranteed identical by the shared IR.
 
@@ -277,7 +277,7 @@ reject).
 A `constraint` is a comptime predicate over a type — first-class, named, and
 composable. Interface conformance becomes *one kind* of constraint.
 
-```skarn
+```gabbro
 Numeric :: constraint($T) {
     match type_info(T) { .int, .float => accept; else => reject("expected a numeric type"); }
 }
@@ -294,13 +294,13 @@ sum :: fn($T: Numeric, xs: []T) -> T {        // `$T: Numeric` is checked at the
 Constraints compose with `&`, and `$T: Writer` (an interface) and `$T: Numeric`
 (a predicate) use the *same* `$T: C` syntax:
 
-```skarn
+```gabbro
 serialize :: fn($T: Struct & HasField("id"), v: T) { … }   // composed
 ```
 
 > **✦ Beyond Jai.** Jai's `#modify` is an anonymous code block (or a proc returning
 > `bool`) glued to one signature — not nameable, not composable, and orthogonal to
-> interface constraints. Skarn makes the predicate a named, reusable, composable
+> interface constraints. Gabbro makes the predicate a named, reusable, composable
 > value, and *unifies* interface conformance with arbitrary predicates. One
 > concept (`$T: C`) instead of two (`#modify` + interface `/Type`).
 
@@ -313,7 +313,7 @@ serialize :: fn($T: Struct & HasField("id"), v: T) { … }   // composed
 > with a custom message, and it may compute **output type params** (`-> $Acc`).
 > Both work end to end:
 >
-> ```skarn
+> ```gabbro
 > // inspect + reject:
 > dbl :: fn(x: $T) -> T
 > where { match type_info(T) { .int => {} .float => {} else => reject("dbl needs a numeric type"); } }
@@ -333,7 +333,7 @@ When you need to *change* the bindings (Jai's `T = s64`) or compute an output
 type, attach a `where` block. It runs once per instantiation, after type matching,
 with the type parameters as mutable comptime values.
 
-```skarn
+```gabbro
 // Sum into a wider accumulator so u8 arrays don't overflow:
 sum :: fn($T: type, xs: []T) -> $Acc
 where {
@@ -357,7 +357,7 @@ where {
   compiler tries the next overload. Only when every candidate rejects does it
   report, listing each reason.
 
-```skarn
+```gabbro
 // Two overloads; `where` disambiguates instead of erroring on ambiguity:
 push :: fn($T: type, xs: *List(T), v: T)        where { … }   { … }
 push :: fn($T: type, xs: *List(T), vs: []T)     where { … }   { … }
@@ -373,7 +373,7 @@ push :: fn($T: type, xs: *List(T), vs: []T)     where { … }   { … }
 
 The predicate runs **during generic resolution**, not after. This dissolves the
 "run comptime code during resolution, but the VM only exists post-sema"
-chicken-and-egg by reusing the same two-pass pipeline Skarn already has for computed
+chicken-and-egg by reusing the same two-pass pipeline Gabbro already has for computed
 `#insert #run` (`pipeline.zig`'s `strictPass`):
 
 1. **Tolerant pass-1 sema** type-checks everything (the `where` blocks included)
@@ -400,15 +400,15 @@ the call's return type *and* the instantiation body both see the computed type.
 heavier `Any`/Phase-4 concern; node ids need zero new VM value machinery.)
 
 **Still design:** **binding rewrite** (`T = u32`) and **overload fallback** (try
-the next candidate on reject). Fallback is moot until Skarn grows same-name
+the next candidate on reject). Fallback is moot until Gabbro grows same-name
 overloading; rewrite is a small extension of the same `evalWhereType` mechanism.
 
-## 7. Where it all pays off (broad feature parity, Skarn-style)
+## 7. Where it all pays off (broad feature parity, Gabbro-style)
 
 The same five primitives subsume the rest of Jai's metaprogramming toolkit —
 without new directives:
 
-| Jai feature | Skarn realization | Improvement |
+| Jai feature | Gabbro realization | Improvement |
 |---|---|---|
 | `for_expansion` (custom iterators) | An `Iter` **interface**: `Iter :: interface { next :: fn(self: *Self) -> ?Elem; }`. `for x in c` desugars to `next()`. | Works at runtime *and* comptime; composes with dynamic dispatch; not a macro you reimplement per container. A `#for_expansion` macro stays available for zero-cost unrolling when you want it. |
 | `#insert -> string` building **struct fields** (SOA, `Matrix(N)`) | `#for f in type_info(T).fields { #emit_field … }` inside a struct body — typed field emission, not string concatenation. | Generated fields are type-checked at the generation site; no `.added_strings.jai` to eyeball. |

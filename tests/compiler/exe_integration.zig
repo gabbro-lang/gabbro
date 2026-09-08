@@ -1,13 +1,13 @@
-/// End-to-end executable tests: compile Skarn → .o → .exe → run → check exit code.
+/// End-to-end executable tests: compile Gabbro → .o → .exe → run → check exit code.
 ///
 /// Requires LLVM (skipped when absent) and Windows (lld-link).
 const std = @import("std");
-const skarn = @import("skarn_compiler");
+const gabbro = @import("gabbro_compiler");
 const builtin = @import("builtin");
 
 /// Compile `src` to an executable and return its exit code.
 fn compileAndRun(allocator: std.mem.Allocator, src: []const u8, label: []const u8) !u32 {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
 
     const io = std.testing.io;
@@ -20,15 +20,15 @@ fn compileAndRun(allocator: std.mem.Allocator, src: []const u8, label: []const u
     const obj_path_z = try allocator.dupeZ(u8, obj_path);
     defer allocator.free(obj_path_z);
 
-    const lib_path = skarn.windows_sdk_lib_path;
+    const lib_path = gabbro.windows_sdk_lib_path;
     const lib_paths: []const []const u8 = if (lib_path.len > 0) &.{lib_path} else &.{};
-    try skarn.compileWithLlvm(allocator, io, .{
+    try gabbro.compileWithLlvm(allocator, io, .{
         .file_name = label,
         .source = src,
         .obj_path = obj_path,
         .exe_path = exe_path,
         .opt_level = 2,
-        .llvm_bin = skarn.llvm_path ++ "/bin",
+        .llvm_bin = gabbro.llvm_path ++ "/bin",
         .lib_paths = lib_paths,
     });
 
@@ -52,25 +52,25 @@ fn compileAndRun(allocator: std.mem.Allocator, src: []const u8, label: []const u
 /// Windows host (cross-link via ld.lld) — no WSL needed, since the assertions
 /// inspect the ELF header rather than executing it. Skips if ld.lld is absent.
 fn compileLinuxElf(allocator: std.mem.Allocator, src: []const u8, label: []const u8) ![]u8 {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     const io = std.testing.io;
     const obj_path = try std.fmt.allocPrint(allocator, ".zig-cache/{s}.o", .{label});
     const exe_path = try std.fmt.allocPrint(allocator, ".zig-cache/{s}.elf", .{label});
-    skarn.compileWithLlvm(allocator, io, .{
+    gabbro.compileWithLlvm(allocator, io, .{
         .file_name = label,
         .source = src,
         .obj_path = obj_path,
         .exe_path = exe_path,
         .opt_level = 2,
-        .llvm_bin = skarn.llvm_path ++ "/bin",
+        .llvm_bin = gabbro.llvm_path ++ "/bin",
         .target_os = .linux,
     }) catch return error.SkipZigTest;
     return std.Io.Dir.cwd().readFileAlloc(io, exe_path, allocator, .unlimited) catch return error.SkipZigTest;
 }
 
 test "exe: cross-compile to a static Linux ELF (format + resolved entry)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -91,7 +91,7 @@ test "exe: cross-compile to a static Linux ELF (format + resolved entry)" {
 }
 
 test "exe: main returning 0 exits cleanly" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -102,7 +102,7 @@ test "exe: main returning 0 exits cleanly" {
 }
 
 test "exe: mutable top-level globals (read/write/compound, shared across fns)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -125,7 +125,7 @@ test "exe: mutable top-level globals (read/write/compound, shared across fns)" {
 }
 
 test "exe: `<literal> as <type>` casts and suffixed float literals" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -147,13 +147,13 @@ test "exe: `<literal> as <type>` casts and suffixed float literals" {
 }
 
 test "exe: `Any` — wrap a value, dispatch on its runtime type, safe downcast" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     // `core::any(x)` wraps any value into a type-erased Any; `any_as(v, T) -> ?T` is a
     // safe downcast (null on type mismatch), `any_is(v, T)` an identity test —
-    // both ordinary generic Skarn over `typeid_of`. Verified across a value passed
+    // both ordinary generic Gabbro over `typeid_of`. Verified across a value passed
     // through an `Any` parameter and recovered by its real type.
     const code = try compileAndRun(arena.allocator(),
         \\describe :: fn(v: Any) -> i32 {
@@ -175,7 +175,7 @@ test "exe: `Any` — wrap a value, dispatch on its runtime type, safe downcast" 
 }
 
 test "exe: recursive `Any` field navigation (reflection-driven struct walk)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -207,7 +207,7 @@ test "exe: recursive `Any` field navigation (reflection-driven struct walk)" {
 }
 
 test "exe: `info_of` (type_name_of/type_size_of) from a bare typeid + Any auto-wrap" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -229,7 +229,7 @@ test "exe: `info_of` (type_name_of/type_size_of) from a bare typeid + Any auto-w
 }
 
 test "exe: `Any` slice navigation (any_elem) through a generic walker" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -264,7 +264,7 @@ test "exe: `Any` slice navigation (any_elem) through a generic walker" {
 }
 
 test "exe: `Any` pointer navigation (any_deref) through a generic walker" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -296,7 +296,7 @@ test "exe: `Any` pointer navigation (any_deref) through a generic walker" {
 }
 
 test "exe: reflection-driven scalar serialization + any_at in-place wrap" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -323,7 +323,7 @@ test "exe: reflection-driven scalar serialization + any_at in-place wrap" {
 }
 
 test "exe: `core::type_id(T)` is a stable runtime type identity" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -347,7 +347,7 @@ test "exe: `core::type_id(T)` is a stable runtime type identity" {
 }
 
 test "exe: `core::type_name(T)` returns the type's name at runtime" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -368,7 +368,7 @@ test "exe: `core::type_name(T)` returns the type's name at runtime" {
 }
 
 test "exe: `.len` read INLINE on a folded string constant (type_name / literal)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -392,7 +392,7 @@ test "exe: `.len` read INLINE on a folded string constant (type_name / literal)"
 }
 
 test "exe: `where` output type param `-> $Acc` runs end to end" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -408,7 +408,7 @@ test "exe: `where` output type param `-> $Acc` runs end to end" {
 }
 
 test "exe: a function passed as a function-pointer value is called" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -424,7 +424,7 @@ test "exe: a function passed as a function-pointer value is called" {
 }
 
 test "exe: a top-level string constant and field access on a global work" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -440,7 +440,7 @@ test "exe: a top-level string constant and field access on a global work" {
 }
 
 test "build: the expanded std.build API runs through the build hook" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -455,7 +455,7 @@ test "build: the expanded std.build API runs through the build hook" {
         \\build :: fn(b: Build) {
         \\    b.workspace("t");
         \\    b.out_root("bin");
-        \\    app := b.executable("app", "src/main.sk");
+        \\    app := b.executable("app", "src/main.gab");
         \\    app.optimize(.release_fast);
         \\    app.windowed();
         \\    app.entry("mainCRTStartup");
@@ -479,9 +479,9 @@ test "build: the expanded std.build API runs through the build hook" {
         \\    b.summary();
         \\}
     ;
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/build.sk", .data = build_src });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/build.gab", .data = build_src });
 
-    try skarn.build_driver.run(arena.allocator(), io, dir ++ "/build.sk", .{
+    try gabbro.build_driver.run(arena.allocator(), io, dir ++ "/build.gab", .{
         .list = true,
         .quiet = true,
         .options = &.{ "fast", "name=cool" },
@@ -489,7 +489,7 @@ test "build: the expanded std.build API runs through the build hook" {
 }
 
 test "build: a test_dir step compiles+runs tests and fails on a failing one" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -497,32 +497,32 @@ test "build: a test_dir step compiles+runs tests and fails on a failing one" {
 
     const dir = ".zig-cache/bt_test";
     std.Io.Dir.cwd().createDirPath(io, dir ++ "/tests") catch {};
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/p1.sk", .data = "main :: fn() -> i32 { return 0; }\n" });
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/p2.sk", .data = "main :: fn() -> i32 { return 0; }\n" });
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/f1.sk", .data = "main :: fn() -> i32 { return 3; }\n" });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/p1.gab", .data = "main :: fn() -> i32 { return 0; }\n" });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/p2.gab", .data = "main :: fn() -> i32 { return 0; }\n" });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/tests/f1.gab", .data = "main :: fn() -> i32 { return 3; }\n" });
     const build_src =
         \\#import std.build.{ Build, Artifact };
         \\build :: fn(b: Build) {
-        \\    app := b.executable("app", "tests/p1.sk");
+        \\    app := b.executable("app", "tests/p1.gab");
         \\    b.test_dir("test", "tests");
         \\    b.default(app);
         \\}
     ;
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/build.sk", .data = build_src });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dir ++ "/build.gab", .data = build_src });
 
-    const lp = skarn.windows_sdk_lib_path;
+    const lp = gabbro.windows_sdk_lib_path;
     const lib_paths: []const []const u8 = if (lp.len > 0) &.{lp} else &.{};
     // One test exits non-zero, so the test step must fail.
-    try std.testing.expectError(error.RunFailed, skarn.build_driver.run(arena.allocator(), io, dir ++ "/build.sk", .{
+    try std.testing.expectError(error.RunFailed, gabbro.build_driver.run(arena.allocator(), io, dir ++ "/build.gab", .{
         .target = "test",
         .quiet = true,
-        .llvm_bin = skarn.llvm_path ++ "/bin",
+        .llvm_bin = gabbro.llvm_path ++ "/bin",
         .lib_paths = lib_paths,
     }));
 }
 
 test "exe: error payload recovered via catch binding" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -540,7 +540,7 @@ test "exe: error payload recovered via catch binding" {
 }
 
 test "exe: #insert literal #quote splices and runs" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -559,7 +559,7 @@ test "exe: #insert literal #quote splices and runs" {
 }
 
 test "exe: block macro splices an argument body twice" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -582,7 +582,7 @@ test "exe: block macro splices an argument body twice" {
 }
 
 test "exe: macro local is hygienic (no capture of caller's name)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -608,7 +608,7 @@ test "exe: macro local is hygienic (no capture of caller's name)" {
 }
 
 test "exe: #for unrolls a comptime loop, baking the index" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -626,7 +626,7 @@ test "exe: #for unrolls a comptime loop, baking the index" {
 }
 
 test "exe: #for generatively initializes an array" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -644,7 +644,7 @@ test "exe: #for generatively initializes an array" {
 }
 
 test "exe: generative macro unrolls a parameterized #for" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -667,7 +667,7 @@ test "exe: generative macro unrolls a parameterized #for" {
 }
 
 test "exe: #insert #run gen() — VM-generated code compiled into the binary" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -691,7 +691,7 @@ test "exe: #insert #run gen() — VM-generated code compiled into the binary" {
 }
 
 test "exe: generated while-loop with conditional compiles and runs" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -718,7 +718,7 @@ test "exe: generated while-loop with conditional compiles and runs" {
 }
 
 test "exe: generated for-range loop + typed local compiles and runs" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -741,7 +741,7 @@ test "exe: generated for-range loop + typed local compiles and runs" {
 }
 
 test "exe: generated match + cast compiles and runs" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -767,13 +767,13 @@ test "exe: generated match + cast compiles and runs" {
 }
 
 test "exe: comptime FFI from a pure #run is rejected (capability)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     // A bare `#run` carries no `ffi` capability, so reaching kernel32!MulDiv at
     // compile time must be denied — this is the build.rs surface, closed. (Only
-    // `build.sk` is granted FFI.)
+    // `build.gab` is granted FFI.)
     if (compileAndRun(arena.allocator(),
         \\#extern("kernel32", "MulDiv")
         \\mul_div :: fn(a: i32, b: i32, c: i32) -> i32;
@@ -785,7 +785,7 @@ test "exe: comptime FFI from a pure #run is rejected (capability)" {
 }
 
 test "exe: comptime FFI with a string arg is rejected from #run too" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -800,7 +800,7 @@ test "exe: comptime FFI with a string arg is rejected from #run too" {
 }
 
 test "exe: main returning 42 propagates exit code" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -811,7 +811,7 @@ test "exe: main returning 42 propagates exit code" {
 }
 
 test "exe: @panic exits with panic status" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -823,7 +823,7 @@ test "exe: @panic exits with panic status" {
 }
 
 test "exe: assert(false) panics" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -834,7 +834,7 @@ test "exe: assert(false) panics" {
 }
 
 test "exe: assert(true) does not panic" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -845,19 +845,19 @@ test "exe: assert(true) does not panic" {
 }
 
 test "exe: runtime write reports bytes written" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const code = try compileAndRun(arena.allocator(),
-        \\main :: fn() -> i32 { return write_stdout("Skarn") as i32; }
+        \\main :: fn() -> i32 { return write_stdout("Gabbro") as i32; }
     , "exe_runtime_write");
-    // "Skarn" is 5 bytes (was "K2" = 2 pre-rename); write_stdout returns the count.
+    // "Gabbro" is 5 bytes (was "K2" = 2 pre-rename); write_stdout returns the count.
     try std.testing.expectEqual(@as(u32, 5), code);
 }
 
 test "exe: runtime exit terminates with requested status" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -868,7 +868,7 @@ test "exe: runtime exit terminates with requested status" {
 }
 
 test "exe: fallible ? propagates error to caller, fallback returns sentinel" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -888,7 +888,7 @@ test "exe: fallible ? propagates error to caller, fallback returns sentinel" {
 }
 
 test "exe: catch executes its error handler" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -905,7 +905,7 @@ test "exe: catch executes its error handler" {
 }
 
 test "exe: plain value coerces to optional parameter" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -921,7 +921,7 @@ test "exe: plain value coerces to optional parameter" {
 }
 
 test "exe: arena allocations are writable and cleaned on exit" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -941,7 +941,7 @@ test "exe: arena allocations are writable and cleaned on exit" {
 }
 
 test "exe: zone allocation can be used through a borrow parameter" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -961,7 +961,7 @@ test "exe: zone allocation can be used through a borrow parameter" {
 }
 
 test "exe: sizeof returns the actual size of its type argument" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -978,7 +978,7 @@ test "exe: sizeof returns the actual size of its type argument" {
 }
 
 test "exe: sizeof on pointer types returns pointer width" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -993,7 +993,7 @@ test "exe: sizeof on pointer types returns pointer width" {
 }
 
 test "exe: 0b binary integer literals parse to their numeric value" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1008,7 +1008,7 @@ test "exe: 0b binary integer literals parse to their numeric value" {
 }
 
 test "exe: dereference-load reads through a pointer" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1031,7 +1031,7 @@ test "exe: dereference-load reads through a pointer" {
 }
 
 test "exe: fallible return type works inside generics" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1061,7 +1061,7 @@ test "exe: fallible return type works inside generics" {
 }
 
 test "exe: core::sizeof(T) and core::slice_raw(T) work inside generics" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1087,7 +1087,7 @@ test "exe: core::sizeof(T) and core::slice_raw(T) work inside generics" {
 }
 
 test "exe: usize const wider than 32 bits keeps its full width" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1107,7 +1107,7 @@ test "exe: usize const wider than 32 bits keeps its full width" {
 }
 
 test "exe: dynamic dispatch through an interface method that takes another interface pointer" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1154,7 +1154,7 @@ test "exe: dynamic dispatch through an interface method that takes another inter
 }
 
 test "exe: nested dynamic dispatch on a parameter of an interface method" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1188,7 +1188,7 @@ test "exe: nested dynamic dispatch on a parameter of an interface method" {
 }
 
 test "exe: generic List(T) backed by Arena, with generic methods" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1223,7 +1223,7 @@ test "exe: generic List(T) backed by Arena, with generic methods" {
 }
 
 test "exe: wrapping arithmetic wraps instead of trapping" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1242,7 +1242,7 @@ test "exe: wrapping arithmetic wraps instead of trapping" {
 }
 
 test "exe: a wrapping-hash constant matches its runtime value (comptime == runtime)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1266,7 +1266,7 @@ test "exe: a wrapping-hash constant matches its runtime value (comptime == runti
 }
 
 test "exe: build AST programmatically (no #quote) and #insert it" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1288,7 +1288,7 @@ test "exe: build AST programmatically (no #quote) and #insert it" {
 }
 
 test "exe: enum variant construction with payload (construct, then match)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1313,7 +1313,7 @@ test "exe: enum variant construction with payload (construct, then match)" {
 }
 
 test "exe: a zone handle is a real std.heap.Arena (full library API)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1342,7 +1342,7 @@ test "exe: a zone handle is a real std.heap.Arena (full library API)" {
 }
 
 test "exe: a local shadows a top-level function of the same name" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1359,7 +1359,7 @@ test "exe: a local shadows a top-level function of the same name" {
 }
 
 test "exe: a local inferred from a usize const stays integer-typed" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1377,7 +1377,7 @@ test "exe: a local inferred from a usize const stays integer-typed" {
 }
 
 test "exe: macro templates substitute splices through match/for/compound/type" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1407,7 +1407,7 @@ test "exe: macro templates substitute splices through match/for/compound/type" {
 }
 
 test "exe: macro locals are hygienic (don't capture the caller's same-named local)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1434,7 +1434,7 @@ test "exe: macro locals are hygienic (don't capture the caller's same-named loca
 }
 
 test "exe: match as an expression (enum/int subjects, payload, positions)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1458,7 +1458,7 @@ test "exe: match as an expression (enum/int subjects, payload, positions)" {
 }
 
 test "exe: match range patterns, guards, and binding catch-all" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1484,7 +1484,7 @@ test "exe: match range patterns, guards, and binding catch-all" {
 }
 
 test "exe: match string patterns (grouped, safe on shorter subject)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1507,7 +1507,7 @@ test "exe: match string patterns (grouped, safe on shorter subject)" {
 }
 
 test "exe: match-expression threads the expected type into `.{ }` arms" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1525,7 +1525,7 @@ test "exe: match-expression threads the expected type into `.{ }` arms" {
 }
 
 test "exe: `#compiler` hook derives code from struct fields (R1c)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1562,7 +1562,7 @@ test "exe: `#compiler` hook derives code from struct fields (R1c)" {
 }
 
 test "exe: `core::` builtin namespace works at runtime" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1583,7 +1583,7 @@ test "exe: `core::` builtin namespace works at runtime" {
 }
 
 test "exe: `core::` math + bit + location builtins (Phase 2)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1601,7 +1601,7 @@ test "exe: `core::` math + bit + location builtins (Phase 2)" {
 }
 
 test "exe: `core::` memcpy + memset + float math (Phase 2)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1623,7 +1623,7 @@ test "exe: `core::` memcpy + memset + float math (Phase 2)" {
 }
 
 test "exe: a `#compiler` hook REPLACES an existing decl by name (R1b-B)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1638,11 +1638,11 @@ test "exe: a `#compiler` hook REPLACES an existing decl by name (R1b-B)" {
     try std.testing.expectEqual(@as(u32, 42), code);
 }
 
-/// Compile a Skarn source FILE (resolving its `#import`s from disk) to an exe and
+/// Compile a Gabbro source FILE (resolving its `#import`s from disk) to an exe and
 /// return its exit code. Unlike `compileAndRun`, this exercises cross-module
 /// lowering (the std library, user modules, …).
 fn compileFileAndRun(allocator: std.mem.Allocator, file_name: []const u8, label: []const u8) !u32 {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
 
     const io = std.testing.io;
@@ -1651,15 +1651,15 @@ fn compileFileAndRun(allocator: std.mem.Allocator, file_name: []const u8, label:
     const exe_path = try std.fmt.allocPrint(allocator, ".zig-cache/{s}.exe", .{label});
     defer allocator.free(exe_path);
 
-    const lib_path = skarn.windows_sdk_lib_path;
+    const lib_path = gabbro.windows_sdk_lib_path;
     const lib_paths: []const []const u8 = if (lib_path.len > 0) &.{lib_path} else &.{};
-    try skarn.compileFileWithLlvm(allocator, io, .{
+    try gabbro.compileFileWithLlvm(allocator, io, .{
         .file_name = file_name,
         .source = "",
         .obj_path = obj_path,
         .exe_path = exe_path,
         .opt_level = 2,
-        .llvm_bin = skarn.llvm_path ++ "/bin",
+        .llvm_bin = gabbro.llvm_path ++ "/bin",
         .lib_paths = lib_paths,
     });
 
@@ -1678,7 +1678,7 @@ fn compileFileAndRun(allocator: std.mem.Allocator, file_name: []const u8, label:
 }
 
 test "exe: std.path / std.time / std.crypto / std.serde run correctly cross-module" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1686,24 +1686,24 @@ test "exe: std.path / std.time / std.crypto / std.serde run correctly cross-modu
     // (path: query/join; time: UTC calendar + live clocks; crypto: crc32/fnv;
     // serde: reflection-driven JSON for scalars/strings/nested structs/all widths).
     inline for (.{
-        .{ "tests/fixtures/stdlib/path_app.sk", "exe_path_app" },
-        .{ "tests/fixtures/stdlib/time_app.sk", "exe_time_app" },
-        .{ "tests/fixtures/stdlib/crypto_app.sk", "exe_crypto_app" },
-        .{ "tests/fixtures/stdlib/serde_app.sk", "exe_serde_app" },
-        .{ "tests/fixtures/stdlib/slice_app.sk", "exe_slice_app" },
-        .{ "tests/fixtures/stdlib/atomics_app.sk", "exe_atomics_app" },
-        .{ "tests/fixtures/stdlib/atomics_thread_app.sk", "exe_atomics_thread_app" },
-        .{ "tests/fixtures/stdlib/atomic_cell_app.sk", "exe_atomic_cell_app" },
-        .{ "tests/fixtures/stdlib/atomic_qualified_app.sk", "exe_atomic_qualified_app" },
-        .{ "tests/fixtures/lang/struct_methods_app.sk", "exe_struct_methods_app" },
-        .{ "tests/fixtures/lang/extern_fnptr_app.sk", "exe_extern_fnptr_app" },
-        .{ "tests/fixtures/lang/derive_eq_app.sk", "exe_derive_eq_app" },
-        .{ "tests/fixtures/lang/user_derive_app.sk", "exe_user_derive_app" },
-        .{ "tests/fixtures/stdlib/thread_app.sk", "exe_thread_app" },
-        .{ "tests/fixtures/stdlib/net_addr_app.sk", "exe_net_addr_app" },
-        .{ "tests/fixtures/stdlib/vec_app.sk", "exe_vec_app" },
-        .{ "tests/fixtures/stdlib/map_app.sk", "exe_map_app" },
-        .{ "tests/fixtures/stdlib/env_app.sk", "exe_env_app" },
+        .{ "tests/fixtures/stdlib/path_app.gab", "exe_path_app" },
+        .{ "tests/fixtures/stdlib/time_app.gab", "exe_time_app" },
+        .{ "tests/fixtures/stdlib/crypto_app.gab", "exe_crypto_app" },
+        .{ "tests/fixtures/stdlib/serde_app.gab", "exe_serde_app" },
+        .{ "tests/fixtures/stdlib/slice_app.gab", "exe_slice_app" },
+        .{ "tests/fixtures/stdlib/atomics_app.gab", "exe_atomics_app" },
+        .{ "tests/fixtures/stdlib/atomics_thread_app.gab", "exe_atomics_thread_app" },
+        .{ "tests/fixtures/stdlib/atomic_cell_app.gab", "exe_atomic_cell_app" },
+        .{ "tests/fixtures/stdlib/atomic_qualified_app.gab", "exe_atomic_qualified_app" },
+        .{ "tests/fixtures/lang/struct_methods_app.gab", "exe_struct_methods_app" },
+        .{ "tests/fixtures/lang/extern_fnptr_app.gab", "exe_extern_fnptr_app" },
+        .{ "tests/fixtures/lang/derive_eq_app.gab", "exe_derive_eq_app" },
+        .{ "tests/fixtures/lang/user_derive_app.gab", "exe_user_derive_app" },
+        .{ "tests/fixtures/stdlib/thread_app.gab", "exe_thread_app" },
+        .{ "tests/fixtures/stdlib/net_addr_app.gab", "exe_net_addr_app" },
+        .{ "tests/fixtures/stdlib/vec_app.gab", "exe_vec_app" },
+        .{ "tests/fixtures/stdlib/map_app.gab", "exe_map_app" },
+        .{ "tests/fixtures/stdlib/env_app.gab", "exe_env_app" },
     }) |c| {
         const code = try compileFileAndRun(arena.allocator(), c[0], c[1]);
         try std.testing.expectEqual(@as(u32, 42), code);
@@ -1711,7 +1711,7 @@ test "exe: std.path / std.time / std.crypto / std.serde run correctly cross-modu
 }
 
 test "exe: two generic structs sharing a method name + type arg don't collide" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1734,7 +1734,7 @@ test "exe: two generic structs sharing a method name + type arg don't collide" {
 }
 
 test "exe: UFCS method call on a temporary receiver (chaining)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1760,7 +1760,7 @@ test "exe: UFCS method call on a temporary receiver (chaining)" {
 }
 
 test "exe: fallible tail-forward + qualified `! ns::Error` return type" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1769,12 +1769,12 @@ test "exe: fallible tail-forward + qualified `! ns::Error` return type" {
     // qualifies an error type from another module without a dual-import. (A fixture
     // because both features need a real cross-module import.)
     const code = try compileFileAndRun(arena.allocator(),
-        "tests/fixtures/lang/fallible_forward_app.sk", "exe_fallible_forward_qualerr");
+        "tests/fixtures/lang/fallible_forward_app.gab", "exe_fallible_forward_qualerr");
     try std.testing.expectEqual(@as(u32, 42), code);
 }
 
 test "exe: if-expressions (value position, else-if, bidirectional typing)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1796,7 +1796,7 @@ test "exe: if-expressions (value position, else-if, bidirectional typing)" {
 }
 
 test "exe: compound literal `.{…}` as a function argument (slice + generic key)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1825,7 +1825,7 @@ test "exe: compound literal `.{…}` as a function argument (slice + generic key
 }
 
 test "exe: std.net layered TCP + UDP loopback round-trips (os/socket/tcp/udp)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1835,23 +1835,23 @@ test "exe: std.net layered TCP + UDP loopback round-trips (os/socket/tcp/udp)" {
     //   udp: bind / recv_from / send_to / connected connect+send+recv
     // Each returns 42 iff the bytes echoed back intact.
     inline for (.{
-        .{ "tests/fixtures/stdlib/net_echo_app.sk", "exe_net_echo_app" },
-        .{ "tests/fixtures/stdlib/net_udp_app.sk", "exe_net_udp_app" },
+        .{ "tests/fixtures/stdlib/net_echo_app.gab", "exe_net_echo_app" },
+        .{ "tests/fixtures/stdlib/net_udp_app.gab", "exe_net_udp_app" },
     }) |c| {
         const code = try compileFileAndRun(arena.allocator(), c[0], c[1]);
         try std.testing.expectEqual(@as(u32, 42), code);
     }
 }
 
-test "exe: #extern links against its C symbol (2nd arg), not its skarn name" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+test "exe: #extern links against its C symbol (2nd arg), not its gabbro name" {
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    // Regression: an `#extern("lib", "CSym")` used to emit its skarn declaration name
+    // Regression: an `#extern("lib", "CSym")` used to emit its gabbro declaration name
     // as the link symbol (so `mul_div` → undefined symbol `mul_div`). The 2nd
-    // `#extern` arg is now the real link name, so the skarn name is free to differ.
-    // Also: two externs with DIFFERENT skarn names may bind the SAME C symbol without
+    // `#extern` arg is now the real link name, so the gabbro name is free to differ.
+    // Also: two externs with DIFFERENT gabbro names may bind the SAME C symbol without
     // colliding (distinct scope keys; LLVM dedups the one external decl).
     const code = try compileAndRun(arena.allocator(),
         \\#extern("kernel32", "MulDiv") mul_div :: fn(a: i32, b: i32, c: i32) -> i32;
@@ -1868,7 +1868,7 @@ test "exe: #extern links against its C symbol (2nd arg), not its skarn name" {
 }
 
 test "exe: generic fn instantiated for two distinct struct types stays distinct" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1893,7 +1893,7 @@ test "exe: generic fn instantiated for two distinct struct types stays distinct"
 }
 
 test "exe: same-named local of different types across disjoint scopes stays distinct" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1924,7 +1924,7 @@ test "exe: same-named local of different types across disjoint scopes stays dist
 }
 
 test "exe: match on a by-value enum field of a struct (simple + payloaded)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1953,7 +1953,7 @@ test "exe: match on a by-value enum field of a struct (simple + payloaded)" {
 }
 
 test "exe: `[N]T = .{}` actually zero-inits the whole array (issue #7)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -1978,7 +1978,7 @@ test "exe: `[N]T = .{}` actually zero-inits the whole array (issue #7)" {
 }
 
 test "exe: compound-lvalue field assignment lands (a.b.c, arr[i].f) (issue #8)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2000,7 +2000,7 @@ test "exe: compound-lvalue field assignment lands (a.b.c, arr[i].f) (issue #8)" 
 }
 
 test "exe: `[N]T` with a named-const size has the right length (issue #9)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2018,7 +2018,7 @@ test "exe: `[N]T` with a named-const size has the right length (issue #9)" {
 }
 
 test "exe: a nested `#run` in a top-level const folds (issue #4)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2034,7 +2034,7 @@ test "exe: a nested `#run` in a top-level const folds (issue #4)" {
 }
 
 test "exe: for-in over an iterator (next protocol)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2057,7 +2057,7 @@ test "exe: for-in over an iterator (next protocol)" {
 }
 
 test "exe: lambdas — inline, in a local, and a fn value held in a local" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2080,7 +2080,7 @@ test "exe: lambdas — inline, in a local, and a fn value held in a local" {
 }
 
 test "exe: a lambda captures enclosing locals by value (closure env)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2100,7 +2100,7 @@ test "exe: a lambda captures enclosing locals by value (closure env)" {
 }
 
 test "exe: a capturing closure's environment lives on the enclosing zone" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2123,7 +2123,7 @@ test "exe: a capturing closure's environment lives on the enclosing zone" {
 }
 
 test "exe: a fn-ptr struct field is a thin C pointer, not a fat closure" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2142,7 +2142,7 @@ test "exe: a fn-ptr struct field is a thin C pointer, not a fat closure" {
 }
 
 test "exe: a function pointer stored in a struct field can be called" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2160,7 +2160,7 @@ test "exe: a function pointer stored in a struct field can be called" {
 }
 
 test "exe: a factory returns escaping closures whose env lives in the caller's Arena" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2185,7 +2185,7 @@ test "exe: a factory returns escaping closures whose env lives in the caller's A
 }
 
 test "exe: a non-capturing closure folds at compile time in #run" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2201,7 +2201,7 @@ test "exe: a non-capturing closure folds at compile time in #run" {
 }
 
 test "exe: a capturing closure folds at compile time in #run" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2221,7 +2221,7 @@ test "exe: a capturing closure folds at compile time in #run" {
 }
 
 test "exe: while opt |x| walks an optional chain" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2243,7 +2243,7 @@ test "exe: while opt |x| walks an optional chain" {
 }
 
 test "exe: else-if chains pick the right branch" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2260,7 +2260,7 @@ test "exe: else-if chains pick the right branch" {
 }
 
 test "exe: character literals decode to their code points" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2283,7 +2283,7 @@ test "exe: character literals decode to their code points" {
 }
 
 test "exe: a large stack frame links and runs (provides __chkstk)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2298,7 +2298,7 @@ test "exe: a large stack frame links and runs (provides __chkstk)" {
 }
 
 test "exe: std.list works cross-module (issue #6 + generic collision/realloc fixes)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2308,14 +2308,14 @@ test "exe: std.list works cross-module (issue #6 + generic collision/realloc fix
     // module that defines `List`.
     const code = try compileFileAndRun(
         arena.allocator(),
-        "tests/fixtures/stdlib/list_app.sk",
+        "tests/fixtures/stdlib/list_app.gab",
         "exe_list_app",
     );
     try std.testing.expectEqual(@as(u32, 42), code);
 }
 
 test "exe: generic struct built inside a generic body resolves the concrete instance (issue #6)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2334,7 +2334,7 @@ test "exe: generic struct built inside a generic body resolves the concrete inst
 }
 
 test "exe: generic-struct compound literal at a concrete instantiation in a non-generic fn" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2359,7 +2359,7 @@ test "exe: generic-struct compound literal at a concrete instantiation in a non-
 }
 
 test "exe: `==`/`!=` on `[]const u8` compares contents" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2394,7 +2394,7 @@ test "exe: `==`/`!=` on `[]const u8` compares contents" {
 }
 
 test "exe: `[]const u8` `==` folds at compile time (`#run` / `#compiler` use)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2425,7 +2425,7 @@ test "exe: `[]const u8` `==` folds at compile time (`#run` / `#compiler` use)" {
 // Comptime test lane (#test)
 
 test "exe: passing #test compiles and the program runs" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2445,7 +2445,7 @@ test "exe: passing #test compiles and the program runs" {
 }
 
 test "exe: failing #test fails the build" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2461,7 +2461,7 @@ test "exe: failing #test fails the build" {
 }
 
 test "exe: t.fatal fails the build with its message" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2475,7 +2475,7 @@ test "exe: t.fatal fails the build with its message" {
 }
 
 test "exe: t.eq/t.ne compare []const u8 contents at comptime" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2493,7 +2493,7 @@ test "exe: t.eq/t.ne compare []const u8 contents at comptime" {
 }
 
 test "exe: a wrong comptime string t.eq fails the build" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2505,7 +2505,7 @@ test "exe: a wrong comptime string t.eq fails the build" {
 }
 
 test "exe: generic []const u8 == folds in a #run (binding-resolved)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2529,7 +2529,7 @@ test "exe: generic []const u8 == folds in a #run (binding-resolved)" {
 // Named struct literals + default field values
 
 test "exe: named struct literal, fields out of order" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2541,7 +2541,7 @@ test "exe: named struct literal, fields out of order" {
 }
 
 test "exe: named literal omits a defaulted field" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2553,7 +2553,7 @@ test "exe: named literal omits a defaulted field" {
 }
 
 test "exe: default fields fill .{} and trailing positions" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2566,7 +2566,7 @@ test "exe: default fields fill .{} and trailing positions" {
 }
 
 test "exe: unknown field in a struct literal fails the build" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2577,7 +2577,7 @@ test "exe: unknown field in a struct literal fails the build" {
 }
 
 test "exe: missing required field (no default) fails the build" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2590,7 +2590,7 @@ test "exe: missing required field (no default) fails the build" {
 // Calling interface methods on the implementing / constrained type
 
 test "exe: interface method called directly on the implementing type" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2607,7 +2607,7 @@ test "exe: interface method called directly on the implementing type" {
 }
 
 test "exe: interface method on a $T: Iface-constrained generic" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2622,7 +2622,7 @@ test "exe: interface method on a $T: Iface-constrained generic" {
 }
 
 test "exe: where T: Iface clause (single + multiple bounds)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2640,7 +2640,7 @@ test "exe: where T: Iface clause (single + multiple bounds)" {
 }
 
 test "exe: where T: Iface rejects a non-conforming type" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2653,7 +2653,7 @@ test "exe: where T: Iface rejects a non-conforming type" {
 }
 
 test "exe: $T: Iface still rejects a non-conforming type" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2668,7 +2668,7 @@ test "exe: $T: Iface still rejects a non-conforming type" {
 // Struct equality + interface-through-interface dispatch
 
 test "exe: struct == compares field by field (nested + string fields)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2688,7 +2688,7 @@ test "exe: struct == compares field by field (nested + string fields)" {
 }
 
 test "exe: struct == folds at comptime (#run)" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2702,7 +2702,7 @@ test "exe: struct == folds at comptime (#run)" {
 }
 
 test "exe: interface-through-interface dispatch" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2727,7 +2727,7 @@ test "exe: interface-through-interface dispatch" {
 }
 
 test "exe: array and slice == compare elementwise" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2749,7 +2749,7 @@ test "exe: array and slice == compare elementwise" {
 }
 
 test "exe: payload-enum == .variant dispatches by discriminant" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2766,7 +2766,7 @@ test "exe: payload-enum == .variant dispatches by discriminant" {
 }
 
 test "exe: two payload-enum values compare by variant + scalar payload" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2783,7 +2783,7 @@ test "exe: two payload-enum values compare by variant + scalar payload" {
 }
 
 test "exe: comparing enum values with non-scalar payloads is a clean error" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2797,7 +2797,7 @@ test "exe: comparing enum values with non-scalar payloads is a clean error" {
 // Operator precedence & chaining (locked for 0.1.0)
 
 test "exe: operator precedence ladder is stable" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2814,7 +2814,7 @@ test "exe: operator precedence ladder is stable" {
 }
 
 test "exe: chained comparison is rejected, not silently misparsed" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2826,7 +2826,7 @@ test "exe: chained comparison is rejected, not silently misparsed" {
 }
 
 test "exe: a const with an expression initializer folds to its value" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2852,7 +2852,7 @@ test "exe: a const with an expression initializer folds to its value" {
 }
 
 test "exe: constants fold through a chain of constants" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -2887,7 +2887,7 @@ test "exe: constants fold through a chain of constants" {
 }
 
 test "exe: a bare `.variant` in a struct literal keeps its variant" {
-    if (comptime !skarn.llvm_enabled) return error.SkipZigTest;
+    if (comptime !gabbro.llvm_enabled) return error.SkipZigTest;
     if (comptime builtin.os.tag != .windows) return error.SkipZigTest;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

@@ -1,0 +1,34 @@
+// std.strings showcase: a growable StringBuilder + byte-string utilities.
+// Build:  gabbro build examples/strings_demo.gab && strings_demo.exe
+
+#import std.heap;
+#import std.strings;
+#import std.io;
+
+main :: fn() -> i32 {
+    a := heap::make();
+
+    // StringBuilder: append text + formatted numbers (grows on demand)
+    sb := strings::builder(&a);
+    sb.append("count=");
+    sb.append_u64(7u64);
+    sb.append(" hex=");
+    sb.append_hex(3735928559u64);     // deadbeef
+    sb.append(" bin=");
+    sb.append_bin(10u64);             // 1010
+    sb.append(" base36=");
+    sb.append_base(1295u64, 36u8);    // zz
+    sb.append_byte(10u8);
+    io::print(sb.str());
+
+    // utilities: trim, transform, search
+    raw := "  Hello, World!  ";
+    trimmed := strings::str_trim(raw);
+    io::print(strings::str_upper(&a, trimmed));   // HELLO, WORLD!
+    io::print("\n");
+    io::print(strings::str_concat(&a, "joined: ", trimmed));
+    io::print("\n");
+
+    heap::deinit(&a);
+    return strings::str_count_byte(trimmed, 108u8) as i32;   // 'l' count → 3
+}

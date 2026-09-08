@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Smoke-test the `skarn lsp` language server over stdio (no editor needed).
+"""Smoke-test the `gabbro lsp` language server over stdio (no editor needed).
 
 Drives a full initialize -> didOpen -> completion / hover / definition /
 documentSymbol exchange against the built binary and prints the results.
 
-    python tests/lsp_smoke.py [path-to-skarn.exe]
+    python tests/lsp_smoke.py [path-to-gabbro.exe]
 """
 import subprocess, json, sys, os
 
 EXE = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(__file__), "..", "zig-out", "bin", "skarn.exe")
+    os.path.dirname(__file__), "..", "zig-out", "bin", "gabbro.exe")
 
 
 def frame(msg):
@@ -24,14 +24,14 @@ SRC = (
     "\n"
     "main :: fn() -> i32 { v: u128 = 0u64; return add(1, 2); }\n"
 )
-URI = "file:///smoke.sk"
+URI = "file:///smoke.gab"
 add_call_col = SRC.splitlines()[4].index("add(") + 1  # cursor on the `add` call
 
 MSGS = [
     {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"capabilities": {}}},
     {"jsonrpc": "2.0", "method": "initialized", "params": {}},
     {"jsonrpc": "2.0", "method": "textDocument/didOpen",
-     "params": {"textDocument": {"uri": URI, "languageId": "skarn", "version": 1, "text": SRC}}},
+     "params": {"textDocument": {"uri": URI, "languageId": "gabbro", "version": 1, "text": SRC}}},
     {"jsonrpc": "2.0", "id": 2, "method": "textDocument/completion",
      "params": {"textDocument": {"uri": URI}, "position": {"line": 4, "character": 0}}},
     {"jsonrpc": "2.0", "id": 3, "method": "textDocument/hover",

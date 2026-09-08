@@ -1,0 +1,69 @@
+// hexdump — a classic xxd-style hex viewer.
+//
+//   hexdump [file]     16 bytes/line: offset | hex | ascii  (default: build.gab)
+
+#import std.fs;
+#import std.heap.{ make };
+#import std.io.{ print };
+#import std.strings.{ StringBuilder, builder, str, clear, append, append_byte, append_hex_byte };
+#import std.process;
+
+hex_pad :: fn(sb: *StringBuilder, v: u64, digits: usize) {
+    i: usize = digits;
+    while i > 0usize {
+        i -= 1usize;
+        nib: u8 = ((v >> (i * 4usize)) & 0xFu64) as u8;
+        if nib < 10u8 { append_byte(sb, 48u8 + nib); }       // '0'..'9'
+        else { append_byte(sb, 87u8 + nib); }                // 'a'..'f'
+    }
+}
+
+first_arg :: fn(line: []const u8, def: []const u8) -> []const u8 {
+    i: usize = 0usize;
+    if line.len > 0usize {
+        if line[0] == 34u8 { i = 1usize; while i < line.len { stop: bool = line[i] == 34u8; i += 1usize; if stop { break; } } }
+        else { while i < line.len { if line[i] == 32u8 { break; } i += 1usize; } }
+    }
+    while i < line.len { if line[i] != 32u8 { break; } i += 1usize; }
+    if i >= line.len { return def; }
+    start: usize = i;
+    while i < line.len { if line[i] == 32u8 { break; } i += 1usize; }
+    return line[start..i];
+}
+
+#entry
+main :: fn() -> i32 {
+    a := make();
+    line_buf: [1024]u8 = .{};
+    path := first_arg(process::command_line(line_buf[:]), "build.gab");
+
+    bytes := fs::read_all(path, &a) catch err { print("hexdump: cannot read "); print(path); print("\n"); return 1; };
+    sb := builder(&a);
+    off: usize = 0usize;
+    while off < bytes.len {
+        clear(&sb);
+        hex_pad(&sb, off as u64, 8usize);
+        append(&sb, "  ");
+        j: usize = 0usize;
+        while j < 16usize {
+            if off + j < bytes.len { append_hex_byte(&sb, bytes[off + j]); append_byte(&sb, 32u8); }
+            else { append(&sb, "   "); }
+            if j == 7usize { append_byte(&sb, 32u8); }     // gap after 8 bytes
+            j += 1usize;
+        }
+        append(&sb, " |");
+        j = 0usize;
+        while j < 16usize {
+            if off + j < bytes.len {
+                c: u8 = bytes[off + j];
+                printable: bool = c >= 32u8 && c < 127u8;
+                if printable { append_byte(&sb, c); } else { append_byte(&sb, 46u8); }
+            }
+            j += 1usize;
+        }
+        append(&sb, "|");
+        print(str(&sb)); print("\n");
+        off += 16usize;
+    }
+    return 0;
+}

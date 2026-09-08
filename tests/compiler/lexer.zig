@@ -1,6 +1,6 @@
 const std = @import("std");
-const skarn = @import("skarn_compiler");
+const gabbro = @import("gabbro_compiler");
 
-test "skarn mod import test" {
-    try std.testing.expect(@hasDecl(skarn, "TokenKind"));
+test "gabbro mod import test" {
+    try std.testing.expect(@hasDecl(gabbro, "TokenKind"));
 }

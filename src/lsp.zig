@@ -1,4 +1,4 @@
-//! skarn language server — `skarn lsp`.
+//! gabbro language server — `gabbro lsp`.
 //!
 //! A minimal LSP server over stdio (JSON-RPC). It is a *thin* layer over the
 //! compiler frontend: every request is answered from a per-document analysis
@@ -285,7 +285,7 @@ const keywords = [_][]const u8{
 
 fn handleInitialize(self: *Server, id: ?json.Value) void {
     sendResult(self, id,
-        \\{"capabilities":{"textDocumentSync":1,"completionProvider":{"triggerCharacters":[".",":"]},"hoverProvider":true,"definitionProvider":true,"documentSymbolProvider":true},"serverInfo":{"name":"skarn-lsp","version":"0.1.0"}}
+        \\{"capabilities":{"textDocumentSync":1,"completionProvider":{"triggerCharacters":[".",":"]},"hoverProvider":true,"definitionProvider":true,"documentSymbolProvider":true},"serverInfo":{"name":"gabbro-lsp","version":"0.1.0"}}
     );
 }
 
@@ -309,7 +309,7 @@ fn publishDiagnostics(self: *Server, doc: *Doc) void {
             .note => 3,
             else => 1,
         };
-        b.print(self.gpa, "{{\"range\":{{\"start\":{{\"line\":{d},\"character\":{d}}},\"end\":{{\"line\":{d},\"character\":{d}}}}},\"severity\":{d},\"source\":\"skarn\",\"message\":\"", .{ s.line, s.char, e.line, e.char, severity }) catch {};
+        b.print(self.gpa, "{{\"range\":{{\"start\":{{\"line\":{d},\"character\":{d}}},\"end\":{{\"line\":{d},\"character\":{d}}}}},\"severity\":{d},\"source\":\"gabbro\",\"message\":\"", .{ s.line, s.char, e.line, e.char, severity }) catch {};
         escapeInto(&b, self.gpa, d.message);
         b.appendSlice(self.gpa, "\"}") catch {};
     }
@@ -402,7 +402,7 @@ fn handleHover(self: *Server, id: ?json.Value, params: json.Value) void {
 
     var b = std.ArrayList(u8).empty;
     defer b.deinit(self.gpa);
-    b.appendSlice(self.gpa, "{\"contents\":{\"kind\":\"markdown\",\"value\":\"```skarn\\n") catch {};
+    b.appendSlice(self.gpa, "{\"contents\":{\"kind\":\"markdown\",\"value\":\"```gabbro\\n") catch {};
     escapeInto(&b, self.gpa, sym.kind.label());
     b.appendSlice(self.gpa, " ") catch {};
     escapeInto(&b, self.gpa, sym.name);

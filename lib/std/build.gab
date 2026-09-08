@@ -1,0 +1,264 @@
+// SPDX-License-Identifier: Apache-2.0
+// std.build — Gabbro's build system. A project's build.gab defines `build :: fn(b: Build)`.
+// `gabbro build` runs it in the comptime VM; each builder call records into the build
+// plan via a __build_* intrinsic, then the driver compiles + links each artifact with
+// gabld.
+//
+//   build :: fn(b: Build) {
+//       b.workspace("my-game");
+//       game := b.executable("game", "src/main.gab");
+//       game.release_fast();
+//       game.link("raylib");
+//       game.install();
+//       b.run_step("run", game);
+//       b.default(game);
+//   }
+//
+// Build/Artifact are tiny id-carrying handles; the real state lives in the compiler.
+// See docs/10_build_system.md for the full design.
+
+// Handles
+
+pub Build    :: struct { id: i32 }
+pub Artifact :: struct { id: i32 }
+
+// Enums (public API)
+
+pub Optimize  :: enum { debug, release_safe, release_fast, release_small }
+pub Subsystem :: enum { console, windows }
+
+// Artifact-kind codes passed to __build_artifact:
+//   0 executable · 1 shared_library (.dll) · 2 static_library (.lib) · 3 object
+
+// Artifact declarations
+
+// Declare an executable with entry source `root`.
+pub executable :: fn(self: Build, name: []const u8, root: []const u8) -> Artifact {
+    return .{ __build_artifact(name, root, 0) };
+}
+
+// Declare a shared library (.dll).
+pub shared :: fn(self: Build, name: []const u8, root: []const u8) -> Artifact {
+    return .{ __build_artifact(name, root, 1) };
+}
+
+// Declare a static library (.lib).
+pub static :: fn(self: Build, name: []const u8, root: []const u8) -> Artifact {
+    return .{ __build_artifact(name, root, 2) };
+}
+
+// Declare an object file (.o), no link step.
+pub object :: fn(self: Build, name: []const u8, root: []const u8) -> Artifact {
+    return .{ __build_artifact(name, root, 3) };
+}
+
+// Optimization
+
+pub optimize :: fn(self: Artifact, level: Optimize) {
+    match level {
+        .debug         => { __build_opt(self.id, 0); }
+        .release_safe  => { __build_opt(self.id, 1); }
+        .release_fast  => { __build_opt(self.id, 2); }
+        .release_small => { __build_opt(self.id, 3); }
+    }
+}
+
+// Shorthands — `game.release_fast()` reads nicer than `game.optimize(.release_fast)`.
+pub debug         :: fn(self: Artifact) { __build_opt(self.id, 0); }
+pub release_safe  :: fn(self: Artifact) { __build_opt(self.id, 1); }
+pub release_fast  :: fn(self: Artifact) { __build_opt(self.id, 2); }
+pub release       :: fn(self: Artifact) { __build_opt(self.id, 2); } // alias for release_fast
+pub release_small :: fn(self: Artifact) { __build_opt(self.id, 3); }
+
+// Linking
+
+// Link a system / import library by name (no extension): "raylib", "user32".
+// Call it once per library.
+pub link :: fn(self: Artifact, lib: []const u8) {
+    __build_link(self.id, lib);
+}
+
+// `system_library` is a readability alias for `link` (matches the source directive).
+pub system_library :: fn(self: Artifact, name: []const u8) {
+    __build_link(self.id, name);
+}
+
+// Add a library search directory.
+pub lib_path :: fn(self: Artifact, dir: []const u8) {
+    __build_libpath(self.id, dir);
+}
+
+// Pass a raw flag straight to the linker (escape hatch), e.g. "/DEBUG".
+pub link_flag :: fn(self: Artifact, flag: []const u8) {
+    __build_linkflag(self.id, flag);
+}
+
+// Link the host's libc — the portable "I need a C runtime" switch. Needed when
+// linking a C library that calls into libc (e.g. a static raylib.lib using
+// malloc/free, which Gabbro's libc-less link doesn't provide). Resolved per host:
+//   Windows → the UCRT (malloc/free/…) + VC runtime (__chkstk/…); the matching
+//             search paths are added automatically.
+//   Linux   → glibc: a dynamically-linked `libc.so.6` and the glibc entry point,
+//             so `#extern("c", …)` resolves and the C runtime is initialized.
+// (Same as `gabbro build --libc`, and the CLI `--libc` / `--target *-gnu` for a
+//  single-file build.)
+pub link_libc :: fn(self: Artifact) {
+    __build_linklibc(self.id);
+}
+
+// How C libraries are linked. `.dynamic` (the default) links the platform's
+// import/shared library and you ship the runtime library (see `runtime_file`).
+// `.static` links the archive and auto-links the C runtime (a static C lib
+// brings its code but not the CRT it depends on). The library NAME you pass to
+// `link()` stays the same either way — only the search path + this mode differ,
+// which keeps a build.gab portable across static/dynamic and (later) platforms.
+pub LinkMode :: enum { dynamic, static }
+
+pub link_mode :: fn(self: Artifact, mode: LinkMode) {
+    match mode {
+        .dynamic => { __build_linkmode(self.id, 0); }
+        .static  => { __build_linkmode(self.id, 1); }
+    }
+}
+
+// Shorthands: `app.dynamic()` / `app.static_link()`.
+pub dynamic :: fn(self: Artifact) { __build_linkmode(self.id, 0); }
+pub static_link :: fn(self: Artifact) { __build_linkmode(self.id, 1); }
+
+// Copy a runtime dependency (e.g. a `.dll`) next to the output after building,
+// so a dynamically-linked program runs without manually shipping its DLLs.
+pub runtime_file :: fn(self: Artifact, path: []const u8) {
+    __build_runtimefile(self.id, path);
+}
+
+// When a static C library is linked, Gabbro honors that library's OWN `/DEFAULTLIB`
+// directives by default, so its system dependencies (opengl32, gdi32, winmm, …)
+// are pulled in automatically — you don't list them. Call `no_default_libs()` to
+// opt out: keep the strict, minimal-runtime linking and specify every system
+// dependency yourself with `link(...)`.
+pub no_default_libs :: fn(self: Artifact) {
+    __build_nodefaultlibs(self.id);
+}
+
+// Executable settings
+
+// Choose the PE subsystem (console window or not).
+pub subsystem :: fn(self: Artifact, sub: Subsystem) {
+    match sub {
+        .console => { __build_subsystem(self.id, 0); }
+        .windows => { __build_subsystem(self.id, 1); }
+    }
+}
+
+// A console app (terminal window). This is the default.
+pub console :: fn(self: Artifact) { __build_subsystem(self.id, 0); }
+
+// A windowed/GUI app — no console window pops up (what a game wants).
+pub windowed :: fn(self: Artifact) { __build_subsystem(self.id, 1); }
+
+// Override the linker entry symbol (default: the runtime's `mainCRTStartup`).
+pub entry :: fn(self: Artifact, symbol: []const u8) {
+    __build_entry(self.id, symbol);
+}
+
+// Reserve a custom stack size (bytes).
+pub stack_size :: fn(self: Artifact, bytes: u64) {
+    __build_stack(self.id, bytes as i64);
+}
+
+// Output
+
+// Set the output path explicitly (default: derived from the name).
+pub output :: fn(self: Artifact, path: []const u8) {
+    __build_output(self.id, path);
+}
+
+// Put this artifact's output in `dir` (overrides the workspace out_root).
+pub out_dir :: fn(self: Artifact, dir: []const u8) {
+    __build_outdir(self.id, dir);
+}
+
+// Metadata
+
+// Record a semantic version (shown in the build summary).
+pub version :: fn(self: Artifact, v: []const u8) {
+    __build_version(self.id, v);
+}
+
+// A human-readable description (shown by `--list`).
+pub description :: fn(self: Artifact, text: []const u8) {
+    __build_desc(self.id, text);
+}
+
+// Mark this artifact for installation (flagged in the build summary).
+pub install :: fn(self: Artifact) {
+    __build_install(self.id);
+}
+
+// Inject a comptime constant into this build (a `#provided`-style override).
+pub define :: fn(self: Artifact, key: []const u8, val: []const u8) {
+    __build_define(self.id, key, val);
+}
+
+// Dependencies
+
+// A dependency resolved from a local directory (its own build.gab runs sandboxed).
+pub require_path :: fn(self: Build, name: []const u8, dir: []const u8) -> i32 {
+    return __build_require(name, dir, 0);
+}
+
+// A dependency fetched from git (revision pinning lands with the fetcher).
+pub require_git :: fn(self: Build, name: []const u8, url: []const u8) -> i32 {
+    return __build_require(name, url, 1);
+}
+
+// Record that `self` depends on dependency `dep` (the id from require_*).
+pub depend :: fn(self: Artifact, dep: i32) {
+    __build_depend(self.id, dep);
+}
+
+// Workspace
+
+// Name the workspace (shown in the build summary).
+pub workspace :: fn(self: Build, name: []const u8) {
+    __build_workspace(name);
+}
+
+// Default output directory for every artifact (a per-artifact `out_dir` wins).
+pub out_root :: fn(self: Build, dir: []const u8) {
+    __build_outroot(dir);
+}
+
+// Print a summary of every artifact after the build.
+pub summary :: fn(self: Build) {
+    __build_summary(1);
+}
+
+// Build options (`gabbro build -Dname` / `-Dname=value`)
+
+// True if `-Dname` was passed on the command line.
+pub option :: fn(self: Build, name: []const u8) -> bool {
+    return __build_optionflag(name) != 0;
+}
+
+// The value of `-Dname=value`, or `default` if not given.
+pub option_str :: fn(self: Build, name: []const u8, default: []const u8) -> []const u8 {
+    return __build_optionstr(name, default);
+}
+
+// Steps & default
+
+// A run step: `gabbro build <name>` builds `target`, then runs it.
+pub run_step :: fn(self: Build, name: []const u8, target: Artifact) {
+    __build_run(name, target.id);
+}
+
+// A test step: build + run every test under `dir`.
+pub test_dir :: fn(self: Build, name: []const u8, dir: []const u8) {
+    __build_test(name, dir);
+}
+
+// Set which artifact bare `gabbro build` produces.
+pub default :: fn(self: Build, target: Artifact) {
+    __build_default(target.id);
+}

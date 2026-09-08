@@ -1,8 +1,0 @@
-#import std.build.{ Build, executable, release, run_step, default };
-
-build :: fn(b: Build) {
-    app := b.executable("du", "main.sk");
-    app.release();            // -O2 native code
-    b.run_step("run", app);
-    b.default(app);
-}

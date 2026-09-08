@@ -1,15 +1,15 @@
-# Skarn Modules
+# Gabbro Modules
 
-This directory contains Skarn's standard-library and future package modules.
+This directory contains Gabbro's standard-library and future package modules.
 
 The compiler resolves:
 
-```skarn
+```gabbro
 #import std.mem;
 ```
 
-to `std/mem.sk` beneath its configured modules root. The compiler defaults to
-this sibling `skarn-modules` directory; use `-Dstdlib-root=<path>` when building the
+to `std/mem.gab` beneath its configured modules root. The compiler defaults to
+this sibling `gabbro-modules` directory; use `-Dstdlib-root=<path>` when building the
 compiler to choose another location.
 
 ## std.mem
@@ -18,7 +18,7 @@ compiler to choose another location.
 an import-scoped extension method because its first value parameter is named
 `self`:
 
-```skarn
+```gabbro
 #import std.mem.{copy, eql_bytes, fill, index_of, zero};
 
 copy(u8, destination, source);

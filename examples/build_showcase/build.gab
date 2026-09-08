@@ -1,0 +1,41 @@
+// A tour of the std.build API. Run from this directory:
+//
+//   gabbro build                 # build the default artifact into bin/
+//   gabbro build run             # build, then run it
+//   gabbro build --list          # list artifacts and steps
+//   gabbro build -Dtrace         # enable the `trace` build option
+//   gabbro build --release        # force release optimization
+//
+#import std.build.{ Build, Artifact };
+
+build :: fn(b: Build) {
+    b.workspace("showcase");
+    b.out_root("bin");                 // every artifact goes in bin/
+
+    // A GUI executable
+    app := b.executable("app", "src/main.gab");
+    app.release_fast();                // optimize for speed
+    app.windowed();                    // GUI subsystem: no console window
+    app.stack_size(8 * 1024 * 1024);   // 8 MiB stack
+    app.version("1.0.0");
+    app.description("the showcase app");
+    app.install();
+
+    // Link libraries (one call each) + a raw linker flag escape hatch.
+    app.link("user32");
+    app.link_flag("/DEBUG:NONE");
+
+    // A configurable build option: `gabbro build -Dtrace`.
+    if b.option("trace") {
+        app.define("TRACE", "1");
+    }
+
+    // A companion shared library
+    plugin := b.shared("plugin", "src/plugin.gab");
+    plugin.release_small();
+
+    // Steps & default
+    b.run_step("run", app);
+    b.default(app);
+    b.summary();                       // print a summary when done
+}

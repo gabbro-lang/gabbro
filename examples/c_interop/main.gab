@@ -1,0 +1,44 @@
+// Calling a C library from Gabbro with by-value structs (the raylib pattern).
+//
+// The structs are declared on the Gabbro side to match the C layout; `#extern`
+// binds each C function and pulls `cabi.lib` into the link. On Win64 the
+// compiler coerces small structs (Vector2, Color) into registers and passes
+// large ones (Rectangle) by pointer — automatically, matching the C ABI.
+//
+//   gabbro build main.gab -o demo.exe --lib-path .
+//   ./demo.exe   # exit code 132
+//
+// See README.md for the full build (compiling cabi.c first).
+
+Vector2   :: struct { x: f32, y: f32 }
+Color     :: struct { r: u8, g: u8, b: u8, a: u8 }
+Rectangle :: struct { x: f32, y: f32, w: f32, h: f32 }
+
+#extern("cabi", "vec2_sum_i")
+vec2_sum_i :: fn(v: Vector2) -> i32;
+#extern("cabi", "color_sum")
+color_sum :: fn(c: Color) -> i32;
+#extern("cabi", "rect_sum_i")
+rect_sum_i :: fn(r: Rectangle) -> i32;
+#extern("cabi", "make_vec")
+make_vec :: fn(a: f32, b: f32) -> Vector2;
+#extern("cabi", "make_rect")
+make_rect :: fn(a: f32, b: f32, c: f32, d: f32) -> Rectangle;
+
+main :: fn() -> i32 {
+    v: Vector2 = .{ 3.0, 4.0 };
+    c: Color = .{ 10, 20, 30, 40 };
+    r: Rectangle = .{ 1.0, 2.0, 3.0, 4.0 };
+
+    s := vec2_sum_i(v);                  // 7
+    s = s + color_sum(c);                // +100 -> 107
+    s = s + rect_sum_i(r);               // +10  -> 117
+
+    v2 := make_vec(5.0, 6.0);            // {5, 6}  (8-byte struct returned in a register)
+    s = s + vec2_sum_i(v2);              // +11  -> 128
+
+    r2 := make_rect(1.0, 1.0, 1.0, 1.0); // {1,1,1,1} (16-byte struct returned via sret)
+    s = s + rect_sum_i(r2);              // +4   -> 132
+
+    return s;                            // 132
+}

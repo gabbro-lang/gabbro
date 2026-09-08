@@ -1,0 +1,121 @@
+// loc — a recursive lines-of-code counter for Windows.
+//
+//   loc [dir]      count .gab/.zig/.c/.h files under `dir` (default: current dir)
+//
+// Walks the directory tree with std.fs's FindFirstFile iterator, reads each
+// source file with fs::read_all, and tallies total / code / comment / blank
+// lines. A real CLI tool — no per-line allocation, just slices over the bytes.
+
+#import std.fs;
+#import std.heap.{ Arena, make };
+#import std.io.{ print, print_u64 };
+#import std.strings.{ str_concat, str_ends_with, str_eq, str_starts_with, str_trim };
+#import std.process;
+
+Counts :: struct { files: u64, total: u64, code: u64, comment: u64, blank: u64 }
+
+is_code_file :: fn(name: []const u8) -> bool {
+    if str_ends_with(name, ".gab")  { return true; }
+    if str_ends_with(name, ".zig") { return true; }
+    if str_ends_with(name, ".c")   { return true; }
+    if str_ends_with(name, ".h")   { return true; }
+    return false;
+}
+
+classify_line :: fn(line: []const u8, c: *Counts) {
+    c.total += 1u64;
+    t := str_trim(line);
+    if t.len == 0usize { c.blank += 1u64; }
+    else {
+        if str_starts_with(t, "//") { c.comment += 1u64; }
+        else { c.code += 1u64; }
+    }
+}
+
+count_file :: fn(path: []const u8, a: *Arena, c: *Counts) {
+    bytes := fs::read_all(path, a) catch err { return; };
+    c.files += 1u64;
+    line_start: usize = 0usize;
+    i: usize = 0usize;
+    while i < bytes.len {
+        if bytes[i] == 10u8 {                       // '\n' ends a line
+            classify_line(bytes[line_start..i], c);
+            line_start = i + 1usize;
+        }
+        i += 1usize;
+    }
+    if line_start < bytes.len { classify_line(bytes[line_start..bytes.len], c); }
+}
+
+walk :: fn(dir: []const u8, a: *Arena, c: *Counts) {
+    pattern := str_concat(a, dir, "\\*");
+    it := fs::open_dir(pattern) catch err { return; };
+    cont: bool = true;
+    while cont {
+        if (&it).dir_next() |name| {
+            skip: bool = str_eq(name, ".") || str_eq(name, "..");
+            if !skip {
+                full := str_concat(a, str_concat(a, dir, "\\"), name);
+                if (&it).dir_is_dir() { walk(full, a, c); }
+                else {
+                    if is_code_file(name) { count_file(full, a, c); }
+                }
+            }
+        } else { cont = false; }
+    }
+    (&it).dir_close();
+}
+
+// Extract the first CLI argument (after the program path), or `def`.
+first_arg :: fn(line: []const u8, def: []const u8) -> []const u8 {
+    i: usize = 0usize;
+    if line.len > 0usize {
+        if line[0] == 34u8 {                        // quoted exe path
+            i = 1usize;
+            while i < line.len {
+                stop: bool = line[i] == 34u8;
+                i += 1usize;
+                if stop { break; }
+            }
+        } else {
+            while i < line.len {
+                if line[i] == 32u8 { break; }
+                i += 1usize;
+            }
+        }
+    }
+    while i < line.len {
+        if line[i] != 32u8 { break; }
+        i += 1usize;
+    }
+    if i >= line.len { return def; }
+    start: usize = i;
+    while i < line.len {
+        if line[i] == 32u8 { break; }
+        i += 1usize;
+    }
+    return line[start..i];
+}
+
+row :: fn(label: []const u8, n: u64) {
+    print("  "); print(label); print_u64(n); print("\n");
+}
+
+#entry
+main :: fn() -> i32 {
+    a := make();
+    line_buf: [1024]u8 = .{};
+    line := process::command_line(line_buf[:]);
+    dir := first_arg(line, ".");
+
+    c: Counts = .{ 0u64, 0u64, 0u64, 0u64, 0u64 };
+    walk(dir, &a, &c);
+
+    print("LOC report for: "); print(dir); print("\n");
+    row("files:   ", c.files);
+    row("total:   ", c.total);
+    row("code:    ", c.code);
+    row("comment: ", c.comment);
+    row("blank:   ", c.blank);
+    return 0;
+}

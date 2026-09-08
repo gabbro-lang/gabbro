@@ -215,7 +215,7 @@ test "free variables: a param and a body local are bound, an outer name is free"
         \\m :: fn() -> i32 { f := fn(x: i32) -> i32 { tmp := x + outer; _ := tmp; return tmp; }; return f(1); }
         \\
     ;
-    var p = try parser.Parser.init(a, "fv.sk", src, 1);
+    var p = try parser.Parser.init(a, "fv.gab", src, 1);
     const module = try p.parseModule();
     // The lifted lambda is appended after `m`.
     var lambda: ?ast.FunctionDecl = null;

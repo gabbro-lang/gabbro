@@ -1,6 +1,6 @@
 const std = @import("std");
-const skarn = @import("skarn_compiler");
-const ir = @import("skarn_compiler").ir_mod;
+const gabbro = @import("gabbro_compiler");
+const ir = @import("gabbro_compiler").ir_mod;
 
 test "comptime: #if with TARGET.os compiles both branches" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -15,10 +15,10 @@ test "comptime: #if with TARGET.os compiles both branches" {
         \\    }
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "ct.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "ct.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 }
 
 test "comptime: #run expression as value" {
@@ -29,10 +29,10 @@ test "comptime: #run expression as value" {
         \\double :: fn(x: i32) -> i32 { return x * 2; }
         \\ANSWER :: #run double(21);
     ;
-    var fe = try skarn.compile(arena.allocator(), "ct2.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "ct2.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 }
 
 test "comptime: #run block at statement level" {
@@ -50,10 +50,10 @@ test "comptime: #run block at statement level" {
         \\    return result;
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "ct3.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "ct3.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 }
 
 test "#run: constant computed at compile time, not runtime" {
@@ -75,10 +75,10 @@ test "#run: constant computed at compile time, not runtime" {
         \\    return FIB_10 + FIB_7;   // 55 + 13 = 68
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "fib_ct.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "fib_ct.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     // The globals should be initialised with COMPILE-TIME constants, not function calls.
     var found_fib10 = false;
@@ -120,10 +120,10 @@ test "#run: string .len and enum-payload construction fold on the VM" {
         \\EP  :: #run enum_payload();  // 21
         \\SP  :: #run str_payload();   // 4
     ;
-    var fe = try skarn.compile(arena.allocator(), "vmstr.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "vmstr.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     var got: usize = 0;
     for (m.globals) |g| {
@@ -166,10 +166,10 @@ test "#run: taking the address of a scalar local folds on the VM" {
         \\R1 :: #run bump();          // 6
         \\R2 :: #run via_param(1);    // 11
     ;
-    var fe = try skarn.compile(arena.allocator(), "addr_ct.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "addr_ct.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     var r1: bool = false;
     var r2: bool = false;
@@ -198,9 +198,9 @@ test "#run: an un-foldable constant fails with a diagnostic, not silent garbage"
         \\make_p :: fn() -> P { return .{ 1, 2 }; }
         \\BAD :: #run make_p();
     ;
-    var fe = try skarn.compile(arena.allocator(), "bad_ct.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "bad_ct.gab", src);
     defer fe.deinit(arena.allocator());
-    try std.testing.expectError(error.LoweringFailed, skarn.lowerFrontend(arena.allocator(), fe));
+    try std.testing.expectError(error.LoweringFailed, gabbro.lowerFrontend(arena.allocator(), fe));
 }
 
 test "#run: a comptime @panic halts the build with its message (#2)" {
@@ -215,9 +215,9 @@ test "#run: a comptime @panic halts the build with its message (#2)" {
         \\boom :: fn() -> i32 { @panic("explicit comptime panic"); return 0; }
         \\BAD :: #run boom();
     ;
-    var fe = try skarn.compile(arena.allocator(), "panic_ct.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "panic_ct.gab", src);
     defer fe.deinit(arena.allocator());
-    try std.testing.expectError(error.LoweringFailed, skarn.lowerFrontend(arena.allocator(), fe));
+    try std.testing.expectError(error.LoweringFailed, gabbro.lowerFrontend(arena.allocator(), fe));
 }
 
 test "#if: only live branch emitted to IR" {
@@ -233,10 +233,10 @@ test "#if: only live branch emitted to IR" {
         \\    }
         \\}
     ;
-    var fe = try skarn.compile(arena.allocator(), "platform.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "platform.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     // Find platform_id and verify it compiled (the #if selected a branch)
     const fn_ = for (m.functions) |f| {
@@ -276,10 +276,10 @@ test "comptime: matchable TypeInfo — scalar kinds + fields" {
         \\U8_SIGNED  :: #run is_signed(u8);
         \\BOOL_IS    :: #run is_bool(bool);
     ;
-    var fe = try skarn.compile(arena.allocator(), "ti1.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "ti1.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     try expectGlobalInt(m, "I32_BITS", 32);
     try expectGlobalInt(m, "U8_BITS", 8);
@@ -304,10 +304,10 @@ test "comptime: matchable TypeInfo — struct fields (iterate names + types)" {
         \\NAME_SUM :: #run namesum(Point);
         \\INT_FIELDS :: #run int_flds(Point);
     ;
-    var fe = try skarn.compile(arena.allocator(), "ti2.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "ti2.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     try expectGlobalInt(m, "FIELD_COUNT", 3);
     try expectGlobalInt(m, "STRUCT_NAMELEN", 5); // "Point"
@@ -329,10 +329,10 @@ test "comptime: matchable TypeInfo — pointer/slice/optional + element navigati
         \\IS_OPT   :: #run is_opt(?i32);
         \\ELEM_BITS :: #run elem_bits([]u8);
     ;
-    var fe = try skarn.compile(arena.allocator(), "ti3.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "ti3.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     try expectGlobalInt(m, "IS_PTR", 1);
     try expectGlobalInt(m, "IS_SLICE", 1);
@@ -347,10 +347,10 @@ test "comptime: type_name returns mangled type name" {
     const src =
         \\NAME :: #run core::type_name(i32);
     ;
-    var fe = try skarn.compile(arena.allocator(), "tn1.sk", src);
+    var fe = try gabbro.compile(arena.allocator(), "tn1.gab", src);
     defer fe.deinit(arena.allocator());
-    const m = try skarn.lowerFrontend(arena.allocator(), fe);
-    try skarn.ir_mod.validateModule(m);
+    const m = try gabbro.lowerFrontend(arena.allocator(), fe);
+    try gabbro.ir_mod.validateModule(m);
 
     var found = false;
     for (m.globals) |g| {

@@ -5,7 +5,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-// In-process LLD via skarnlld.dll (built with `-Din-process-lld`). Loaded
+// In-process LLD via gabbrolld.dll (built with `-Din-process-lld`). Loaded
 // dynamically, so when the DLL is absent we transparently fall back to spawning
 // lld-link.exe. The DLL exports a single C entry point; loading it lazily avoids
 // any build-time dependency.
@@ -17,33 +17,33 @@ const win = struct {
 
 const LldLinkFn = *const fn (argc: c_int, argv: [*]const [*:0]const u8) callconv(.c) c_int;
 
-// The Skarn-written linker (skarnld.dll), exporting `skarn_link(in_obj, out_exe) -> int`.
-const SkarnLinkFn = *const fn (in_path: [*:0]const u8, out_path: [*:0]const u8) callconv(.c) c_int;
+// The Gabbro-written linker (gabld.dll), exporting `gabbro_link(in_obj, out_exe) -> int`.
+const GabbroLinkFn = *const fn (in_path: [*:0]const u8, out_path: [*:0]const u8) callconv(.c) c_int;
 
-/// skarnld links a single COFF object into an exe or DLL. It reads the compiler's
+/// gabld links a single COFF object into an exe or DLL. It reads the compiler's
 /// `.skimp`/`.skexp` maps (so it needs no `.lib`), handles any DLL set, subsystem,
 /// entry, stack, and DLL output. It bails (→ LLD) only on multiple objects,
 /// arbitrary linker flags, or a C library's `/DEFAULTLIB` (static-CRT objects).
-fn skarnldEligible(opts: WindowsLinkOptions) bool {
+fn gabldEligible(opts: WindowsLinkOptions) bool {
     if (opts.obj_files.len != 1) return false;
     if (opts.extra_flags.len != 0) return false;
     if (opts.honor_defaultlibs) return false;
     return true;
 }
 
-/// Try the Skarn-written linker (skarnld.dll) — the self-hosted fast path. Returns
+/// Try the Gabbro-written linker (gabld.dll) — the self-hosted fast path. Returns
 /// null when unavailable/ineligible (use LLD), true on success, false on a
 /// reported link failure (also falls back to LLD).
-fn trySkarnld(allocator: std.mem.Allocator, opts: WindowsLinkOptions) ?bool {
+fn tryGabld(allocator: std.mem.Allocator, opts: WindowsLinkOptions) ?bool {
     if (builtin.os.tag != .windows) return null;
-    if (!skarnldEligible(opts)) return null;
-    // The file entry point (`skarn_link`) uses default console-exe settings — a DLL /
+    if (!gabldEligible(opts)) return null;
+    // The file entry point (`gabbro_link`) uses default console-exe settings — a DLL /
     // GUI / custom entry / stack build must go through the in-memory path
-    // (`skarn_link_mem`), which carries those. Fall to LLD here.
+    // (`gabbro_link_mem`), which carries those. Fall to LLD here.
     if (opts.dll or opts.subsystem != .console or opts.entry != null or opts.stack_reserve != 0) return null;
-    const module = win.LoadLibraryA("skarnld.dll") orelse return null;
-    const proc = win.GetProcAddress(module, "skarn_link") orelse return null;
-    const link_fn: SkarnLinkFn = @ptrCast(proc);
+    const module = win.LoadLibraryA("gabld.dll") orelse return null;
+    const proc = win.GetProcAddress(module, "gabbro_link") orelse return null;
+    const link_fn: GabbroLinkFn = @ptrCast(proc);
     const obj_z = allocator.dupeZ(u8, opts.obj_files[0]) catch return false;
     defer allocator.free(obj_z);
     const out_z = allocator.dupeZ(u8, opts.output) catch return false;
@@ -51,9 +51,9 @@ fn trySkarnld(allocator: std.mem.Allocator, opts: WindowsLinkOptions) ?bool {
     return link_fn(obj_z.ptr, out_z.ptr) == 0;
 }
 
-// In-memory variant: skarnld reads the object bytes directly — no .obj on disk —
+// In-memory variant: gabld reads the object bytes directly — no .obj on disk —
 // plus the PE settings (subsystem / entry / stack / DLL) the compiler knows.
-const SkarnLinkMemFn = *const fn (
+const GabbroLinkMemFn = *const fn (
     obj_ptr: [*]const u8,
     obj_len: usize,
     out_path: [*:0]const u8,
@@ -63,22 +63,22 @@ const SkarnLinkMemFn = *const fn (
     is_dll: u32,
 ) callconv(.c) c_int;
 
-// When skarnld is statically linked into skarn.exe (`-Dembed-linker`), it is exported
+// When gabld is statically linked into gabbro.exe (`-Dembed-linker`), it is exported
 // from the exe itself, so we find it with GetProcAddress on our own module; else
-// we load `skarnld.dll`. (A weak `@extern` would be cleaner but COFF weak externs
+// we load `gabld.dll`. (A weak `@extern` would be cleaner but COFF weak externs
 // don't null-check reliably in Zig — they resolve to a 0 we'd call.)
-fn resolveSkarnld() ?SkarnLinkMemFn {
+fn resolveGabld() ?GabbroLinkMemFn {
     const self = win.GetModuleHandleA(null) orelse return null;
-    if (win.GetProcAddress(self, "skarn_link_mem")) |p| return @ptrCast(p); // embedded
-    const dll = win.LoadLibraryA("skarnld.dll") orelse return null;
-    const proc = win.GetProcAddress(dll, "skarn_link_mem") orelse return null;
+    if (win.GetProcAddress(self, "gabbro_link_mem")) |p| return @ptrCast(p); // embedded
+    const dll = win.LoadLibraryA("gabld.dll") orelse return null;
+    const proc = win.GetProcAddress(dll, "gabbro_link_mem") orelse return null;
     return @ptrCast(proc);
 }
 
-fn trySkarnldMem(allocator: std.mem.Allocator, obj_bytes: []const u8, opts: WindowsLinkOptions) ?bool {
+fn tryGabldMem(allocator: std.mem.Allocator, obj_bytes: []const u8, opts: WindowsLinkOptions) ?bool {
     if (builtin.os.tag != .windows) return null;
-    if (!skarnldEligible(opts)) return null;
-    const link_fn = resolveSkarnld() orelse return null;
+    if (!gabldEligible(opts)) return null;
+    const link_fn = resolveGabld() orelse return null;
     const out_z = allocator.dupeZ(u8, opts.output) catch return false;
     defer allocator.free(out_z);
     const entry_z = allocator.dupeZ(u8, opts.entry orelse "") catch return false;
@@ -91,12 +91,12 @@ fn trySkarnldMem(allocator: std.mem.Allocator, obj_bytes: []const u8, opts: Wind
     return link_fn(obj_bytes.ptr, obj_bytes.len, out_z.ptr, subsystem, entry_z.ptr, @intCast(opts.stack_reserve), is_dll) == 0;
 }
 
-/// Try the in-process linker. Returns null if skarnlld.dll is unavailable (caller
+/// Try the in-process linker. Returns null if gabbrolld.dll is unavailable (caller
 /// should fall back to spawning), true on a successful link, false on failure.
 fn tryInProcess(allocator: std.mem.Allocator, args: []const []const u8) ?bool {
     if (builtin.os.tag != .windows) return null;
-    const module = win.LoadLibraryA("skarnlld.dll") orelse return null;
-    const proc = win.GetProcAddress(module, "skarn_lld_link_coff") orelse return null;
+    const module = win.LoadLibraryA("gabbrolld.dll") orelse return null;
+    const proc = win.GetProcAddress(module, "gabbro_lld_link_coff") orelse return null;
     const link_fn: LldLinkFn = @ptrCast(proc);
 
     var argv: std.ArrayList([*:0]const u8) = .empty;
@@ -141,7 +141,7 @@ pub const WindowsLinkOptions = struct {
     libs: []const []const u8 = &.{},
     /// Produce a DLL (shared library) instead of an executable. Uses `/DLL`
     /// with `/NOENTRY` (no CRT entry); `#export`ed functions are exported via
-    /// their dllexport directives. This is how `skarnld.dll` is built.
+    /// their dllexport directives. This is how `gabld.dll` is built.
     dll: bool = false,
     /// PE subsystem for executables (console window or not).
     subsystem: Subsystem = .console,
@@ -155,7 +155,7 @@ pub const WindowsLinkOptions = struct {
     /// Honor the `/DEFAULTLIB` directives embedded in the linked objects/archives
     /// (a C library's own system deps — opengl32, gdi32, …), instead of blanket
     /// `/NODEFAULTLIB`. Only the CRT-startup umbrella libs are suppressed (they'd
-    /// clash with Skarn's own entry); the C runtime is provided via `ucrt`/`vcruntime`.
+    /// clash with Gabbro's own entry); the C runtime is provided via `ucrt`/`vcruntime`.
     honor_defaultlibs: bool = false,
 };
 
@@ -186,14 +186,14 @@ pub fn buildArgs(allocator: std.mem.Allocator, opts: WindowsLinkOptions) ![]cons
         // Honor the linked C library's own `/DEFAULTLIB` directives (so its system
         // deps — opengl32, gdi32, winmm, … — flow in automatically, C3-style), but
         // suppress only the CRT-startup *umbrella* libs: they provide their own
-        // `mainCRTStartup`/`_DllMainCRTStartup` which would clash with Skarn's entry.
+        // `mainCRTStartup`/`_DllMainCRTStartup` which would clash with Gabbro's entry.
         // The actual C runtime (malloc/__chkstk/…) comes from ucrt+vcruntime, which
         // the build links explicitly and which carry no startup.
         const crt_umbrellas = [_][]const u8{ "libcmt", "libcmtd", "msvcrt", "msvcrtd", "libc", "libcd" };
         for (crt_umbrellas) |u|
             try args.append(allocator, try std.fmt.allocPrint(allocator, "/NODEFAULTLIB:{s}", .{u}));
     } else {
-        // Strict: ignore every embedded `/DEFAULTLIB` directive (Skarn's minimal-runtime default).
+        // Strict: ignore every embedded `/DEFAULTLIB` directive (Gabbro's minimal-runtime default).
         try args.append(allocator, try allocator.dupe(u8, "/NODEFAULTLIB"));
     }
     try args.append(allocator, try allocator.dupe(u8, "kernel32.lib"));
@@ -219,7 +219,7 @@ pub fn printCommand(allocator: std.mem.Allocator, opts: WindowsLinkOptions) void
     std.debug.print("\n", .{});
 }
 
-/// The LLD path: in-process (skarnlld.dll) if available, else spawn lld-link.exe.
+/// The LLD path: in-process (gabbrolld.dll) if available, else spawn lld-link.exe.
 /// Reads the object(s) from disk (lld needs files).
 fn linkWithLld(allocator: std.mem.Allocator, io: std.Io, opts: WindowsLinkOptions) LinkError!void {
     const args = buildArgs(allocator, opts) catch return error.OutOfMemory;
@@ -266,9 +266,9 @@ pub const LinuxLinkOptions = struct {
 };
 
 /// Link a single ELF object into a **static, non-PIE** Linux executable via
-/// `ld.lld`. Freestanding by default (no libc) — a pure-Skarn program has zero
+/// `ld.lld`. Freestanding by default (no libc) — a pure-Gabbro program has zero
 /// dynamic dependencies. libc is pulled in only when the user's `#extern` /
-/// `build.sk` adds `-lc`. Runs `ld.lld` on the host (cross-linking from Windows
+/// `build.gab` adds `-lc`. Runs `ld.lld` on the host (cross-linking from Windows
 /// works since LLD is target-agnostic).
 pub fn linkLinux(
     allocator: std.mem.Allocator,
@@ -343,28 +343,28 @@ pub fn linkLinux(
     }
 }
 
-/// A concrete reason the fast skarnld path can't be used (null = it *would* have
-/// been eligible, so the only explanation is skarnld.dll being absent/failing —
+/// A concrete reason the fast gabld path can't be used (null = it *would* have
+/// been eligible, so the only explanation is gabld.dll being absent/failing —
 /// not worth warning about, e.g. in the test runner). Used to explain the
-/// slower LLD fallback to the user. These are exactly skarnld's current gaps.
+/// slower LLD fallback to the user. These are exactly gabld's current gaps.
 fn lldFallbackReason(opts: WindowsLinkOptions, obj_bytes: ?[]const u8) ?[]const u8 {
-    if (opts.obj_files.len != 1) return "multiple object files (skarnld links one object)";
-    if (opts.extra_flags.len != 0) return "extra raw linker flags skarnld can't apply";
+    if (opts.obj_files.len != 1) return "multiple object files (gabld links one object)";
+    if (opts.extra_flags.len != 0) return "extra raw linker flags gabld can't apply";
     if (opts.honor_defaultlibs)
-        return "honoring a C library's /DEFAULTLIB directives (skarnld can't parse them)";
+        return "honoring a C library's /DEFAULTLIB directives (gabld can't parse them)";
     _ = obj_bytes;
     return null;
 }
 
 fn noteLldFallback(opts: WindowsLinkOptions, obj_bytes: ?[]const u8) void {
     const reason = lldFallbackReason(opts, obj_bytes) orelse return;
-    std.debug.print("note: linked with LLD — the skarnld fast path was skipped ({s})\n", .{reason});
+    std.debug.print("note: linked with LLD — the gabld fast path was skipped ({s})\n", .{reason});
 }
 
-/// Link from object files on disk. Prefers the self-hosted Skarn linker (skarnld.dll),
+/// Link from object files on disk. Prefers the self-hosted Gabbro linker (gabld.dll),
 /// then LLD.
 pub fn windows(allocator: std.mem.Allocator, io: std.Io, opts: WindowsLinkOptions) LinkError!void {
-    if (trySkarnld(allocator, opts)) |ok| {
+    if (tryGabld(allocator, opts)) |ok| {
         if (ok) return;
     }
     noteLldFallback(opts, null);
@@ -372,10 +372,10 @@ pub fn windows(allocator: std.mem.Allocator, io: std.Io, opts: WindowsLinkOption
 }
 
 /// Link straight from in-memory object bytes — no `.obj` on disk. Hands the
-/// bytes to skarnld; only when skarnld can't handle it (absent/ineligible/failed)
+/// bytes to gabld; only when gabld can't handle it (absent/ineligible/failed)
 /// does it spill the object to `opts.obj_files[0]` and fall back to LLD.
 pub fn windowsMem(allocator: std.mem.Allocator, io: std.Io, obj_bytes: []const u8, opts: WindowsLinkOptions) LinkError!void {
-    if (trySkarnldMem(allocator, obj_bytes, opts)) |ok| {
+    if (tryGabldMem(allocator, obj_bytes, opts)) |ok| {
         if (ok) return;
     }
     noteLldFallback(opts, obj_bytes);
